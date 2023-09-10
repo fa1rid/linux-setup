@@ -1,10 +1,37 @@
 #!/bin/bash
+
 version="0.2.1"
+github_repo="fa1rid/linux-setup"
+script_name="SetupMenu.sh"
+script_folder="setup_menu"
+local_script_path="/usr/local/bin/"
+
 # Check if the script is run as root
 if [[ $EUID -ne 0 ]]; then
     echo "This script must be run as root."
     exit 1
 fi
+
+# Function to check for updates
+check_for_update() {
+    if ! command -v curl &>/dev/null; then
+        apt update && apt install curl
+    fi
+    latest_version=$(curl -s "https://raw.githubusercontent.com/${github_repo}/master/${script_folder}/version.txt")
+
+    if [ "$latest_version" != "$version" ]; then
+        echo "A newer version ($latest_version) is available. Updating..."
+        curl -o "${local_script_path}${script_name}" "https://raw.githubusercontent.com/$github_repo/master/${script_folder}/$script_name"
+        chmod +x "${local_script_path}${script_name}"
+        echo "Update complete. Please run the script again."
+        exit 0
+    else
+        echo "You have the latest version ($version) of the script."
+    fi
+}
+
+#########################################
+
 cron_dir="/root/cron/"
 mkdir -p ${cron_dir}
 
@@ -167,8 +194,8 @@ install_php() {
         # ; function: An alias to the granular configuration 1205.
         enableJIT=$(echo "${phpVer} > 8" | bc)
         if [ "$enableJIT" -eq 1 ]; then
-        sed -i "s/opcache.jit.*/opcache.jit=function/" "/etc/php/${phpVer}/mods-available/opcache.ini"
-        echo "opcache.jit_buffer_size = 256M" >> "/etc/php/${phpVer}/mods-available/opcache.ini"
+            sed -i "s/opcache.jit.*/opcache.jit=function/" "/etc/php/${phpVer}/mods-available/opcache.ini"
+            echo "opcache.jit_buffer_size = 256M" >>"/etc/php/${phpVer}/mods-available/opcache.ini"
         fi
 
         # Set default time zone
@@ -1302,7 +1329,8 @@ display_menu() {
     echo "14 Configure terminal and system banners"
     echo "15 Read mysql/MariaDB config"
     echo "16 Add cloudflare IPs SYNC script with cron job"
-    echo "17 Create vhostx"
+    echo "17 Create vhost"
+    echo "20 Check for script update"
     echo "0. Exit"
     echo "==============================="
 }
@@ -1330,6 +1358,7 @@ while true; do
     15) read_mysql_config ;;
     16) add_cloudflare ;;
     17) create_vhost ;;
+    20) check_for_update ;;
     0) exit ;;
     *) echo "Invalid choice. Please select again." ;;
     esac
