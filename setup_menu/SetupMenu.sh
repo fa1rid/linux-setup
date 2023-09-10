@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.1"
+version="0.2.2"
 github_repo="fa1rid/linux-setup"
 script_name="SetupMenu.sh"
 script_folder="setup_menu"
@@ -1330,6 +1330,7 @@ display_menu() {
     echo "15 Read mysql/MariaDB config"
     echo "16 Add cloudflare IPs SYNC script with cron job"
     echo "17 Create vhost"
+    echo "18 Install Wordpress (coming soon)"
     echo "20 Check for script update"
     echo "0. Exit"
     echo "==============================="
