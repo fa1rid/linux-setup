@@ -1,5 +1,5 @@
 #!/bin/bash
-
+version="0.2.1"
 # Check if the script is run as root
 if [[ $EUID -ne 0 ]]; then
     echo "This script must be run as root."
@@ -30,10 +30,10 @@ generate_php_conf() {
     domain=$2
     phpVer=$3
     # memory_limit
-    read -p "Enter memory_limit value in MB (or press Enter to use the default '128'): " memory_limit
+    read -p "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
     # Use the user input if provided, or the default value if the input is empty
     if [ -z "$memory_limit" ]; then
-        memory_limit=128
+        memory_limit=256
     fi
     echo "Memory_limit is: ${memory_limit}"
 
@@ -46,10 +46,10 @@ generate_php_conf() {
     echo "time_zone is: ${time_zone}"
 
     # upload_max_filesize
-    read -p "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '20'): " upload_max_filesize
+    read -p "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
     # Use the user input if provided, or the default value if the input is upload_max_filesize
     if [ -z "$upload_max_filesize" ]; then
-        upload_max_filesize=20
+        upload_max_filesize=100
     fi
     echo "upload_max_filesize is: ${upload_max_filesize}"
     sleep 1
@@ -66,11 +66,11 @@ listen.group = www-data
 listen.mode = 0660
 
 pm = dynamic
-pm.max_children = 10
-pm.start_servers = 2
-pm.min_spare_servers = 1
-pm.max_spare_servers = 5
-pm.max_requests = 100
+pm.max_children = 15
+pm.start_servers = 10
+pm.min_spare_servers = 10
+pm.max_spare_servers = 10
+pm.max_requests = 5000
 request_terminate_timeout = 300
 pm.process_idle_timeout = 10s
 chdir = /
@@ -86,24 +86,21 @@ php_value[disable_functions] = "opcache_get_status"
 php_value[error_reporting] = "E_ALL & ~E_DEPRECATED & ~E_STRICT"
 php_value[expose_php] = off
 php_value[max_execution_time] = 300
+php_value[output_buffering] = 8192
 
 php_value[session.gc_probability] = 1
 php_value[session.sid_length] = 100
 php_value[session.name] = "SID"
 
-php_value[opcache.jit] = 1254
-php_value[opcache.jit_buffer_size] = 128M
 php_value[opcache.huge_code_pages] = 1
 php_value[opcache.max_wasted_percentage] = 10
 php_value[opcache.interned_strings_buffer] = 64
-php_value[opcache.memory_consumption] = 256
+php_value[opcache.memory_consumption] = 384
 php_value[opcache.max_accelerated_files] = 16229
 php_value[opcache.revalidate_path] = 0
 php_value[opcache.revalidate_freq] = 60
 
 ; [opcache.jit]
-; tracing: An alias to the granular configuration 1254.
-; function: An alias to the granular configuration 1205.
 ; A value of 50-100% of the current Opcache shared memory for Opcode might be the ideal value for opcache.jit_buffer_size.
 EOF
     systemctl restart php${phpVer}-fpm
@@ -113,10 +110,10 @@ EOF
 install_php() {
 
     # memory_limit
-    read -p "Enter memory_limit value in MB (or press Enter to use the default '128'): " memory_limit
+    read -p "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
     # Use the user input if provided, or the default value if the input is empty
     if [ -z "$memory_limit" ]; then
-        memory_limit=128
+        memory_limit=256
     fi
     echo "Memory_limit is: ${memory_limit}"
 
@@ -137,10 +134,10 @@ install_php() {
         echo
     fi
     # upload_max_filesize
-    read -p "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '20'): " upload_max_filesize
+    read -p "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
     # Use the user input if provided, or the default value if the input is upload_max_filesize
     if [ -z "$upload_max_filesize" ]; then
-        upload_max_filesize=20
+        upload_max_filesize=100
     fi
     echo "upload_max_filesize is: ${upload_max_filesize}"
     sleep 1
@@ -150,20 +147,29 @@ install_php() {
     for phpVer in "${PHP_Versions[@]}"; do
         echo -e "\nInstalling PHP ${phpVer}"
         # Essential & Commonly Used Extensions Extensions
-        apt install -y php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy} >/dev/null 2>&1
-
+        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,pcntl} >/dev/null 2>&1
+        # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
         # Zend OPcache
 
         # Less Commonly Used Extensions
-        # apt install php${phpVer}-{bz2,soap,pspell,xmlrpc,memcached}
+        # apt install php${phpVer}-{soap,pspell,xmlrpc,memcached}
 
         # For dev
         # apt install php${phpVer}-{dev}
 
         # Modify default configs
         sed -i "s/memory_limit = .*/memory_limit = ${memory_limit}M/" /etc/php/${phpVer}/cli/php.ini
+
+        # Enable JIT
+        # ; tracing: An alias to the granular configuration 1254.
+        # ; function: An alias to the granular configuration 1205.
+        enableJIT=$(echo "${phpVer} > 8" | bc)
+        if [ "$enableJIT" -eq 1 ]; then
+        sed -i "s/opcache.jit.*/opcache.jit=function/" "/etc/php/${phpVer}/mods-available/opcache.ini"
+        echo "opcache.jit_buffer_size = 256M" >> "/etc/php/${phpVer}/mods-available/opcache.ini"
+        fi
 
         # Set default time zone
         time_zone_escaped=$(printf '%s\n' "${time_zone}" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
@@ -176,6 +182,9 @@ install_php() {
         if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.conf" ]; then
             mv /etc/php/${phpVer}/fpm/pool.d/www.conf /etc/php/${phpVer}/fpm/pool.d/www.disabled
         fi
+
+        echo "Stopping service as there are no configs.."
+        systemctl stop php${phpVer}-fpm
 
         echo "Done Installing PHP ${phpVer}"
         echo "----------------------------------"
@@ -484,7 +493,8 @@ install_mariadb_server() {
     # Secure MariaDB installation
     # mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED VIA unix_socket WITH GRANT OPTION;FLUSH PRIVILEGES;"
     # mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASS';"
-    # mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket;"  SHOW GRANTS FOR 'root'@'localhost';
+    # mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket;";
+    # mysql -e "SHOW GRANTS FOR 'root'@'localhost';"
 
     # Remove anonymous users
     mysql -e "DELETE FROM mysql.user WHERE User='';"
@@ -611,7 +621,9 @@ install_phpmyadmin() {
     echo "pmapass: $pmapass"
 
     # Create Database User for phpMyAdmin.
-    mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+    # mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+    # Fix for AWS managed databses (RDS):
+    mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
 
     # Create Database User for phpMyAdmin management (for multi user use).
     mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
@@ -804,7 +816,8 @@ install_standard_packages() {
         mime-support \
         bzip2 \
         iproute2 \
-        pciutils >/dev/null 2>&1
+        pciutils \
+        bc >/dev/null 2>&1
 
     # The following additional packages will be installed:
     # bind9-host bind9-libs ca-certificates file git-man libcurl3-gnutls libcurl4 liberror-perl
@@ -1272,7 +1285,7 @@ install_more_packages() {
 # Function to display the menu
 display_menu() {
     clear
-    echo "===== Farid's Setup Menu v0.1 ====="
+    echo "===== Farid's Setup Menu v${version} ====="
     echo "1. Install PHP 7 and 8"
     echo "2. Install Nginx"
     echo "3. Install MariaDB Server"
