@@ -18,7 +18,7 @@ check_for_update() {
         apt update && apt install curl
     fi
     latest_version=$(curl -s "https://raw.githubusercontent.com/${github_repo}/main/${script_folder}/version.txt")
-
+    echo "Latest Version: $latest_version"
     if [ "$latest_version" != "$version" ]; then
         echo "A newer version ($latest_version) is available. Updating..."
         curl -o "${local_script_path}${script_name}" "https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name"
