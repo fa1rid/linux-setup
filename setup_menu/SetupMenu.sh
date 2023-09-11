@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.3"
+version="0.2.4"
 github_repo="fa1rid/linux-setup"
 script_name="SetupMenu.sh"
 script_folder="setup_menu"
@@ -170,12 +170,11 @@ install_php() {
     sleep 1
     # Calculate post_max_size
     post_max_size=$((upload_max_filesize + 1))
-
+    apt update
     for phpVer in "${PHP_Versions[@]}"; do
         echo -e "\nInstalling PHP ${phpVer}"
         # Essential & Commonly Used Extensions Extensions
-        apt update
-        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap} >/dev/null 2>&1 || echo "Failed to install"; exit 1
+        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap} >/dev/null 2>&1 || echo "Failed to install" && exit 1 
         # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
