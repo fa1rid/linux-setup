@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.2"
+version="0.2.3"
 github_repo="fa1rid/linux-setup"
 script_name="SetupMenu.sh"
 script_folder="setup_menu"
@@ -18,10 +18,10 @@ check_for_update() {
         apt update && apt install curl
     fi
     latest_version=$(curl -s "https://raw.githubusercontent.com/${github_repo}/main/${script_folder}/version.txt")
-    echo "Latest Version: $latest_version"
+    echo "Latest Version: ($latest_version)"
     if [ "$latest_version" != "$version" ]; then
         echo "A newer version ($latest_version) is available. Updating..."
-        curl -o "${local_script_path}${script_name}" "https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name"
+        curl -so "${local_script_path}${script_name}" "https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name" || echo "Failed to connect"
         chmod +x "${local_script_path}${script_name}"
         echo "Update complete. Please run the script again."
         exit 0
@@ -174,7 +174,8 @@ install_php() {
     for phpVer in "${PHP_Versions[@]}"; do
         echo -e "\nInstalling PHP ${phpVer}"
         # Essential & Commonly Used Extensions Extensions
-        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,pcntl} >/dev/null 2>&1
+        apt update
+        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap} >/dev/null 2>&1 || echo "Failed to install"; exit 1
         # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
