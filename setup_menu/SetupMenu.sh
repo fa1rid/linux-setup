@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.4"
+version="0.2.5"
 github_repo="fa1rid/linux-setup"
 script_name="SetupMenu.sh"
 script_folder="setup_menu"
@@ -173,8 +173,13 @@ install_php() {
     apt update
     for phpVer in "${PHP_Versions[@]}"; do
         echo -e "\nInstalling PHP ${phpVer}"
+
+        if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.disabled" ]; then
+            mv /etc/php/${phpVer}/fpm/pool.d/www.disabled /etc/php/${phpVer}/fpm/pool.d/www.conf
+        fi
+
         # Essential & Commonly Used Extensions Extensions
-        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap} >/dev/null 2>&1 || echo "Failed to install" && exit 1 
+        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap} >/dev/null 2>&1 || (echo "Failed to install" && exit 1 )
         # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
@@ -210,8 +215,8 @@ install_php() {
             mv /etc/php/${phpVer}/fpm/pool.d/www.conf /etc/php/${phpVer}/fpm/pool.d/www.disabled
         fi
 
-        echo "Stopping service as there are no configs.."
-        systemctl stop php${phpVer}-fpm
+        # echo "Stopping service as there are no configs.."
+        # systemctl stop php${phpVer}-fpm
 
         echo "Done Installing PHP ${phpVer}"
         echo "----------------------------------"
@@ -493,6 +498,18 @@ EOF
 
 # Function to install MariaDB Server
 install_mariadb_server() {
+
+    PACKAGE_NAME="mariadb-server"
+    # Check if the package is installed
+    if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
+        echo "$PACKAGE_NAME is already installed."
+        return
+    else
+        echo "$PACKAGE_NAME is not installed. Installing..."
+        apt update && apt upgrade -y
+        apt install -y $PACKAGE_NAME >/dev/null 2>&1
+        echo "$PACKAGE_NAME has been installed."
+    fi
     # Prompt for variable values
     # read -p "Enter the InnoDB buffer pool size (e.g., 512M): " INNODB_BUFFER_POOL_SIZE
     # read -p "Enter the root password for MariaDB: " DB_ROOT_PASS
@@ -505,17 +522,7 @@ install_mariadb_server() {
     # DB_USER="your_app_user"
     # DB_USER_PASS="your_app_user_password"
     # DB_NAME="your_db_name"
-
-    PACKAGE_NAME="mariadb-server"
-    # Check if the package is installed
-    if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
-        echo "$PACKAGE_NAME is already installed."
-    else
-        echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update && apt upgrade -y
-        apt install -y $PACKAGE_NAME >/dev/null 2>&1
-        echo "$PACKAGE_NAME has been installed."
-    fi
+    
     # mysql_secure_installation
     # Secure MariaDB installation
     # mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED VIA unix_socket WITH GRANT OPTION;FLUSH PRIVILEGES;"
@@ -1207,11 +1214,11 @@ create_vhost() {
     generate_nginx_vhost "${vuser}" "${domain}" "${phpVer}"
 
     # Enable nginx site
-    if [ -L "/etc/nginx/sites-enabled/${domain}.conf" ]; then
-        echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${domain}.conf' already exists."
+    if [ -L "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
+        echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists."
     else
-        if [ -e "/etc/nginx/sites-enabled/${domain}.conf" ]; then
-            echo -e "\nqFile or directory with the name '/etc/nginx/sites-enabled/${domain}.conf' already exists. Cannot create the symbolic link."
+        if [ -e "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
+            echo -e "\nqFile or directory with the name '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists. Cannot create the symbolic link."
         else
             ln -s /etc/nginx/sites-available/${vuser}-${domain}.conf /etc/nginx/sites-enabled/
             echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' created to '/etc/nginx/sites-available/${vuser}-${domain}.conf'"
