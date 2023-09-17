@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.5"
+version="0.2.6"
 github_repo="fa1rid/linux-setup"
 script_name="SetupMenu.sh"
 script_folder="setup_menu"
@@ -179,7 +179,7 @@ install_php() {
         fi
 
         # Essential & Commonly Used Extensions Extensions
-        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap} >/dev/null 2>&1 || (echo "Failed to install" && exit 1 )
+        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap} >/dev/null 2>&1 || (echo "Failed to install" && exit 1)
         # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
@@ -276,34 +276,9 @@ install_nginx() {
 
     # Add log rotation for nginx
     sed -i "s/^\/var\/log\/nginx\/\*\.log/\/var\/www\/*\/logs\/*\/*.log/" /etc/logrotate.d/nginx
-    #     bash -c 'cat <<EOT >> /etc/logrotate.d/nginx
-    # /var/www/*/logs/*/*.log {
-    #     daily
-    #     missingok
-    #     rotate 14
-    #     compress
-    #     delaycompress
-    #     notifempty
-    #     create 0640 www-data adm
-    #     sharedscripts
-    #     prerotate
-    # 		if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
-    # 			run-parts /etc/logrotate.d/httpd-prerotate; \
-    # 		fi \
-    # 	endscript
-    #     postrotate
-    #         invoke-rc.d nginx rotate >/dev/null 2>&1
-    #     endscript
-    # }
-    # EOT'
 
     # Create log folder for the main profile
     rm -rf /var/www/html
-    # basedir="/var/www/${default_user}/"
-    # mkdir -p ${basedir}${default_domain}/public
-    # mkdir -p ${basedir}logs/${default_domain}/
-    # chown -R default:www-data ${basedir}
-    # chmod 710 ${basedir}
 
     # Generate self-signed SSL certificate
     nginx_key="/etc/ssl/private/nginx.key"
@@ -333,8 +308,8 @@ install_nginx() {
     fi
 
     cat >"${caching_nginx_snippet}" <<EOF
-location ~* \.(?:ico|gif|jpe?g|png|htc|xml|otf|ttf|eot|woff|woff2|svg|css|js)\$ {
-    expires 1d;
+location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)\$ {
+    expires 1m;
     add_header Cache-Control public;
     open_file_cache max=3000 inactive=120s;
     open_file_cache_valid 120s;
@@ -385,13 +360,13 @@ EOF
 user www-data;
 worker_processes auto;
 worker_rlimit_nofile 20960;
+worker_connections 2048;
+multi_accept        on; 
 pid /run/nginx.pid;
 include /etc/nginx/modules-enabled/*.conf;
 
-events {
-    worker_connections 1024;
-    multi_accept        on;  
-}
+fastcgi_buffer_size 16k; # 4k/8k/16k/32k
+fastcgi_buffers 64 16k
 
 http {
     sendfile on;
@@ -522,7 +497,7 @@ install_mariadb_server() {
     # DB_USER="your_app_user"
     # DB_USER_PASS="your_app_user_password"
     # DB_NAME="your_db_name"
-    
+
     # mysql_secure_installation
     # Secure MariaDB installation
     # mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED VIA unix_socket WITH GRANT OPTION;FLUSH PRIVILEGES;"
@@ -1272,6 +1247,7 @@ server {
     root /var/www/${vuser}/${domain}/public;
     include ${ssl_nginx_snippet};
     include ${common_nginx_snippet};
+    include ${caching_nginx_snippet};
     access_log /var/www/${vuser}/logs/${domain}/ssl_access.log;
     error_log /var/www/${vuser}/logs/${domain}/ssl_error.log error;
     # error_page 404 /404.html;
@@ -1316,6 +1292,60 @@ install_more_packages() {
     echo "More Packages installation complete."
 }
 
+install_docker() {
+    # Add Docker's official GPG key:
+    apt-get update
+    apt-get install -y ca-certificates curl gnupg
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+    # Add the repository to Apt sources:
+    echo \
+        "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" |
+        tee /etc/apt/sources.list.d/docker.list >/dev/null
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+}
+
+remove_docker() {
+    # Remove the official docker
+    apt-get purge docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    # for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do apt-get -y remove $pkg; done
+    # Remove debian's docker
+    # for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get -y remove $pkg; done
+    apt-get purge docker.io docker-doc docker-compose podman-docker containerd runc
+
+}
+
+manage_docker() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. Install docker"
+        echo "2. Remove (purge) docker"
+        echo "3. Quit"
+
+        read -p "Enter your choice (1/2/3): " choice
+
+        case $choice in
+            1)
+                install_docker  # Call the install_software function
+                ;;
+            2)
+                remove_docker  # Call the remove_software function
+                ;;
+            3)
+                echo "Exiting..."
+                return 0
+                ;;
+            *)
+                echo "Invalid choice. Please select 1, 2, or 3."
+                ;;
+        esac
+    done
+}
+
 # Function to display the menu
 display_menu() {
     clear
@@ -1339,6 +1369,7 @@ display_menu() {
     echo "17 Create vhost"
     echo "18 Install Wordpress (coming soon)"
     echo "20 Check for script update"
+    echo "21 Manage Docker"
     echo "0. Exit"
     echo "==============================="
 }
@@ -1367,6 +1398,7 @@ while true; do
     16) add_cloudflare ;;
     17) create_vhost ;;
     20) check_for_update ;;
+    21) manage_docker ;;
     0) exit ;;
     *) echo "Invalid choice. Please select again." ;;
     esac
