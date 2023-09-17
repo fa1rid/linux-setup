@@ -474,6 +474,9 @@ EOF
 # Function to install MariaDB Server
 install_mariadb_server() {
 
+    # Add MariaDB Repository
+    # curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s --
+
     PACKAGE_NAME="mariadb-server"
     # Check if the package is installed
     if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
