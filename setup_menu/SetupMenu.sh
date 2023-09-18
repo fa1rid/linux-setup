@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.7"
+version="0.2.8"
 github_repo="fa1rid/linux-setup"
 script_name="SetupMenu.sh"
 script_folder="setup_menu"
@@ -39,10 +39,11 @@ mkdir -p ${cron_dir}
 generate_password() {
     local LENGTH="$1"
     if [[ -z "$LENGTH" ]]; then
-        LENGTH=16 # Default password length
+        LENGTH=20 # Default password length
     fi
 
-    LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+{}:<>?' </dev/urandom | head -c "$LENGTH"
+    LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$LENGTH"
+    # LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+{}:<>?' </dev/urandom | head -c "$LENGTH"
 }
 ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
 common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
@@ -143,19 +144,19 @@ manage_php() {
         read -p "Enter your choice: " choice
 
         case $choice in
-            1)
-                install_php
-                ;;
-            2)
-                remove_php 
-                ;;
-            0)
-                echo "Exiting..."
-                return 0
-                ;;
-            *)
-                echo "Invalid choice."
-                ;;
+        1)
+            install_php
+            ;;
+        2)
+            remove_php
+            ;;
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
         esac
     done
 }
@@ -300,19 +301,19 @@ manage_nginx() {
         read -p "Enter your choice: " choice
 
         case $choice in
-            1)
-                install_nginx
-                ;;
-            2)
-                remove_nginx 
-                ;;
-            0)
-                echo "Exiting..."
-                return 0
-                ;;
-            *)
-                echo "Invalid choice."
-                ;;
+        1)
+            install_nginx
+            ;;
+        2)
+            remove_nginx
+            ;;
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
         esac
     done
 }
@@ -386,8 +387,8 @@ install_nginx() {
 
     cat >"${caching_nginx_snippet}" <<EOF
 location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)\$ {
-    expires 1m;
-    add_header Cache-Control public;
+    # expires 30d;
+    add_header Cache-Control "max-age=2592000, public";
     open_file_cache max=3000 inactive=120s;
     open_file_cache_valid 120s;
     open_file_cache_min_uses 4;
@@ -437,15 +438,17 @@ EOF
 user www-data;
 worker_processes auto;
 worker_rlimit_nofile 20960;
-worker_connections 2048;
-multi_accept        on; 
 pid /run/nginx.pid;
 include /etc/nginx/modules-enabled/*.conf;
 
-fastcgi_buffer_size 16k; # 4k/8k/16k/32k
-fastcgi_buffers 64 16k
+events {
+    worker_connections 2048;
+    multi_accept        on; 
+}
 
 http {
+    fastcgi_buffer_size 16k; # 4k/8k/16k/32k
+    fastcgi_buffers 64 16k;
     sendfile on;
     tcp_nopush on;
     tcp_nodelay on;
@@ -581,22 +584,22 @@ manage_mariadb() {
         read -p "Enter your choice: " choice
 
         case $choice in
-            1)
-                install_mariadb_server
-                ;;
-            2)
-                install_mariadb_client
-                ;;
-            3)
-                remove_mariadb
-                ;;
-            0)
-                echo "Exiting..."
-                return 0
-                ;;
-            *)
-                echo "Invalid choice."
-                ;;
+        1)
+            install_mariadb_server
+            ;;
+        2)
+            install_mariadb_client
+            ;;
+        3)
+            remove_mariadb
+            ;;
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
         esac
     done
 }
@@ -604,13 +607,14 @@ manage_mariadb() {
 # Function to install MariaDB Server
 install_mariadb_server() {
 
-    read -p "Install from:\n 1. mariadb repo\n 2. Debian repo" install_from
+    read -p $'Install from:\n 1. Mariadb repo\n 2. Debian repo\n Choice: ' install_from
     if [[ $install_from == "1" ]]; then
         # Add MariaDB Repository
         echo "Adding mariadb repo.."
-        curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {echo "Failed adding Mariadb repo"; return}
+        curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {echo "Failed adding Mariadb repo"
+        return}
     fi
-    
+
     PACKAGE_NAME="mariadb-server"
     # Check if the package is installed
     if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
@@ -637,33 +641,33 @@ install_mariadb_server() {
 
     # mysql_secure_installation
     # Secure MariaDB installation
-    # mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED VIA unix_socket WITH GRANT OPTION;FLUSH PRIVILEGES;"
-    # mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASS';"
-    # mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket;";
-    # mysql -e "SHOW GRANTS FOR 'root'@'localhost';"
+    # mariadb -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED VIA unix_socket WITH GRANT OPTION;FLUSH PRIVILEGES;"
+    # mariadb -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASS';"
+    # mariadb -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket;";
+    # mariadb -e "SHOW GRANTS FOR 'root'@'localhost';"
 
     # Remove anonymous users
-    mysql -e "DELETE FROM mysql.user WHERE User='';"
+    mariadb -e "DELETE FROM mysql.user WHERE User='';"
     # Disallow root login remotely
-    mysql -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+    mariadb -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
     # Remove the test database
-    mysql -e "DROP DATABASE IF EXISTS test;"
+    mariadb -e "DROP DATABASE IF EXISTS test;"
     # Reload privilege tables
-    mysql -e "FLUSH PRIVILEGES;"
+    mariadb -e "FLUSH PRIVILEGES;"
 
     echo -e "\nMySQL secure installation completed.\n"
 
     # Create a new database and user
-    mysql -e "CREATE DATABASE $DB_NAME;"
-    mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
-    mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-    mysql -e "FLUSH PRIVILEGES;"
-    mysql -e "SELECT @@character_set_server AS character_set, @@collation_server AS collation;"
+    mariadb -e "CREATE DATABASE $DB_NAME;"
+    mariadb -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
+    mariadb -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
+    mariadb -e "FLUSH PRIVILEGES;"
+    mariadb -e "SELECT @@character_set_server AS character_set, @@collation_server AS collation;"
 
     # Show users and their permissions
-    mysql -e "SELECT user, host, plugin, password FROM mysql.user;"
-    grants_commands=$(mysql -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
-    mysql -e "$grants_commands"
+    mariadb -e "SELECT user, host, plugin, password FROM mysql.user;"
+    grants_commands=$(mariadb -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
+    mariadb -e "$grants_commands"
 
     # Update MariaDB configuration for production use
     #     cat <<EOT >>/etc/mysql/mariadb.conf.d/50-server.cnf
@@ -756,19 +760,19 @@ manage_memcached() {
         read -p "Enter your choice: " choice
 
         case $choice in
-            1)
-                install_memcached
-                ;;
-            2)
-                remove_memcached
-                ;;
-            0)
-                echo "Exiting..."
-                return 0
-                ;;
-            *)
-                echo "Invalid choice."
-                ;;
+        1)
+            install_memcached
+            ;;
+        2)
+            remove_memcached
+            ;;
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
         esac
     done
 }
@@ -852,10 +856,10 @@ install_phpmyadmin() {
     # Create Database User for phpMyAdmin.
     # mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
     # Fix for AWS managed databses (RDS):
-    mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+    mariadb -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
 
     # Create Database User for phpMyAdmin management (for multi user use).
-    mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
+    mariadb -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
 
     # Download and Extract phpMyAdmin archive
     mkdir -p "${INSTALL_DIR}"
@@ -876,7 +880,7 @@ install_phpmyadmin() {
     cp "${INSTALL_DIR}/config.sample.inc.php" "${INSTALL_DIR}/config.inc.php"
 
     # Load phpmyadmin database into the database
-    mysql <"${INSTALL_DIR}/sql/create_tables.sql"
+    mariadb <"${INSTALL_DIR}/sql/create_tables.sql"
 
     # Generate a random blowfish secret for enhanced security
     BLOWFISH_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
@@ -946,6 +950,9 @@ install_standard_packages() {
         iproute2 \
         pciutils \
         bc >/dev/null 2>&1
+
+        echo -e "\nRunning apt purge exim4-*\n"
+        apt -y purge exim4-*
 
     # The following additional packages will be installed:
     # bind9-host bind9-libs ca-certificates file git-man libcurl3-gnutls libcurl4 liberror-perl
@@ -1224,13 +1231,13 @@ read_mysql_config() {
 
     # Loop through each configuration parameter and retrieve its value
     for param in "${CONFIG_PARAMS[@]}"; do
-        value=$(mysql -BNe "SHOW VARIABLES LIKE '$param';" | awk '{print $2}')
+        value=$(mariadb -BNe "SHOW VARIABLES LIKE '$param';" | awk '{print $2}')
         echo -e "\e[91m${param}=\e[0m $value"
     done
 
-    mysql -e "SELECT user, host, plugin, password FROM mysql.user;"
-    grants_commands=$(mysql -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
-    mysql -e "$grants_commands"
+    mariadb -e "SELECT user, host, plugin, password FROM mysql.user;"
+    grants_commands=$(mariadb -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
+    mariadb -e "$grants_commands"
 }
 
 create_vhost() {
@@ -1443,26 +1450,154 @@ manage_docker() {
         echo "Choose an option:"
         echo "1. Install docker"
         echo "2. Remove (purge) docker"
-        echo "3. Quit"
+        echo "0. Quit"
 
-        read -p "Enter your choice (1/2/3): " choice
+        read -p "Enter your choice: " choice
 
         case $choice in
-            1)
-                install_docker  # Call the install_software function
-                ;;
-            2)
-                remove_docker  # Call the remove_software function
-                ;;
-            3)
-                echo "Exiting..."
-                return 0
-                ;;
-            *)
-                echo "Invalid choice. Please select 1, 2, or 3."
-                ;;
+        1)
+            install_docker
+            ;;
+        2)
+            remove_docker
+            ;;
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
         esac
     done
+}
+
+manage_wordpress() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. Install Wordpress"
+        # echo "2. Remove (purge) docker"
+        echo "0. Quit"
+
+        read -p "Enter your choice: " choice
+
+        case $choice in
+        1)
+            install_wordpress
+            ;;
+
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
+        esac
+    done
+}
+
+install_wordpress() {
+    # Prompt for the installation directory
+    read -p "Enter the full path where you want to install WordPress (e.g., /var/www/html/myblog): " install_dir
+    read -p "Enter the user that will run wp: " local_user
+    read -p "Enter the URL to access Wordpres: (e.g., https://example.com) " wpURL
+
+    # Verify the installation directory
+    if [ ! -d "$install_dir" ]; then
+        echo "The specified directory does not exist."
+        exit 1
+    fi
+
+    if [ -f "/usr/local/bin/wp" ]; then
+        echo " Notice: wp-cli already installed"
+    else
+        curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+        chmod +x wp-cli.phar
+        mv wp-cli.phar /usr/local/bin/wp
+    fi
+
+    # Database name, user, and admin user
+    hex=$(openssl rand -hex 3)
+    DB_NAME="wp_${hex}"
+    DB_USER="wp_${hex}"
+    DB_PASS=$(openssl rand -base64 12)
+    WP_ADMIN_USER="admin"
+    WP_ADMIN_PASS=$(openssl rand -base64 12)
+
+    WP_ADMIN_EMAIL="user@example.com"
+    WP_URL="${wpURL}"
+    WP_TITLE="Your Site Title"
+
+    # Create MySQL database and user
+    mariadb <<MYSQL_SCRIPT
+CREATE DATABASE $DB_NAME DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
+
+    # Download WordPress using WP-CLI
+    echo -e "\n Downloading WordPress using WP-CLI"
+    sudo -u ${local_user} -s wp core download --path="${install_dir}" --locale=en_US
+
+    # Create wp-config.php file
+    echo -e "\n Creating wp-config.php file"
+    sudo -u ${local_user} -s wp config create \
+        --path="${install_dir}" \
+        --dbname="$DB_NAME" \
+        --dbuser="$DB_USER" \
+        --dbpass="$DB_PASS" \
+        --locale=en_US
+
+    # Install WordPress
+    echo -e "\n Installing WordPress"
+    sudo -u ${local_user} -s wp core install \
+        --path="${install_dir}" \
+        --url="$WP_URL" \
+        --title="$WP_TITLE" \
+        --admin_user="$WP_ADMIN_USER" \
+        --admin_password="$WP_ADMIN_PASS" \
+        --admin_email="$WP_ADMIN_EMAIL"
+
+    echo -e "\n Installing Plugins"
+    sudo -u ${local_user} -s wp plugin install all-in-one-seo-pack all-in-one-wp-migration amp google-analytics-for-wordpress jetpack w3-total-cache wp-mail-smtp --path="$install_dir"
+    echo -e "\n Activating Plugins"
+    sudo -u ${local_user} -s wp plugin activate jetpack --path="$install_dir"
+
+
+cat >>"${install_dir}/wp-config.php" <<'EOFX'
+/**
+ * Disable pingback.ping xmlrpc method to prevent WordPress from participating in DDoS attacks
+ * More info at: https://docs.bitnami.com/general/apps/wordpress/troubleshooting/xmlrpc-and-pingback/
+ */
+if ( !defined( 'WP_CLI' ) ) {
+	// remove x-pingback HTTP header
+	add_filter("wp_headers", function($headers) {
+		unset($headers["X-Pingback"]);
+		return $headers;
+	});
+	// disable pingbacks
+	add_filter( "xmlrpc_methods", function( $methods ) {
+		unset( $methods["pingback.ping"] );
+		return $methods;
+	});
+}
+EOFX
+
+    # wp_user_create=$(wp user create "$admin_user" admin@example.com --user_pass="$admin_password" --path="$install_dir")
+    echo "#############################################################"
+
+    # if [[ $wp_user_create == *"Success"* ]]; then
+    echo "WordPress is now installed and configured in $install_dir."
+    echo "username: $WP_ADMIN_USER | password: $WP_ADMIN_PASS"
+    echo "You can access it in your web browser to complete the setup."
+    # else
+    # echo "Error creating the WordPress admin user."
+    # exit 1
+    # fi
+    echo "#############################################################"
+
 }
 
 # Function to display the menu
@@ -1476,7 +1611,7 @@ display_menu() {
     echo "5. Install PHPMyAdmin"
     echo "6. Install Standard Packages"
     echo "7. Manage Docker"
-    echo "8. Manage Wordpress (coming soon)"
+    echo "8. Manage Wordpress"
     echo "9. Check for script update"
     echo "10. Clean up (autoremove, autoclean, update)"
     echo "11 Install & configure SSH (port 4444 allows root with pass)"
@@ -1484,7 +1619,7 @@ display_menu() {
     echo "13 Read mysql/MariaDB config"
     echo "14 Add cloudflare IPs (nginx) SYNC script with cron job"
     echo "15 Create vhost"
-   
+
     echo "0. Exit"
     echo "==============================="
 }
