@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.6"
+version="0.2.7"
 github_repo="fa1rid/linux-setup"
 script_name="SetupMenu.sh"
 script_folder="setup_menu"
@@ -133,6 +133,33 @@ EOF
     systemctl restart php${phpVer}-fpm
 }
 
+manage_php() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. Install PHP"
+        echo "2. Remove (purge) PHP"
+        echo "0. Quit"
+
+        read -p "Enter your choice: " choice
+
+        case $choice in
+            1)
+                install_php
+                ;;
+            2)
+                remove_php 
+                ;;
+            0)
+                echo "Exiting..."
+                return 0
+                ;;
+            *)
+                echo "Invalid choice."
+                ;;
+        esac
+    done
+}
+
 # Function to install PHP
 install_php() {
 
@@ -238,6 +265,56 @@ install_php() {
 
     echo "PHP installation and configuration complete."
 
+}
+
+# Function to remove PHP
+remove_php() {
+    # Ask for confirmation
+    read -p "This will purge PHP and its configuration.. Are you sure? (y/n): " confirmation
+
+    if [[ $confirmation != "y" ]]; then
+        echo "Aborting."
+        return 0
+    fi
+
+    for phpVer in "${PHP_Versions[@]}"; do
+
+        # Purge PHP packages
+        apt purge php${phpVer}-* && apt autoremove
+
+    done
+
+    # Remove PHP configuration files
+    rm -rf /etc/php/
+
+    echo "PHP and its configuration have been purged."
+}
+
+manage_nginx() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. Install nginx"
+        echo "2. Remove (purge) nginx"
+        echo "0. Quit"
+
+        read -p "Enter your choice: " choice
+
+        case $choice in
+            1)
+                install_nginx
+                ;;
+            2)
+                remove_nginx 
+                ;;
+            0)
+                echo "Exiting..."
+                return 0
+                ;;
+            *)
+                echo "Invalid choice."
+                ;;
+        esac
+    done
 }
 
 # Function to install Nginx
@@ -471,12 +548,69 @@ EOF
 
 }
 
+# Function to remove Nginx
+remove_nginx() {
+    # Ask for confirmation
+    read -p "This will purge Nginx and its configuration.. Are you sure? (y/n): " confirmation
+
+    if [[ $confirmation != "y" ]]; then
+        echo "Aborting."
+        return 0
+    fi
+
+    # Stop Nginx if it's running
+    systemctl stop nginx
+
+    # Purge Nginx and its configuration
+    apt purge nginx nginx-common && apt autoremove
+
+    # Remove configuration files
+    rm -rf /etc/nginx
+
+    echo "Nginx and its configuration have been purged."
+}
+
+manage_mariadb() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. install_mariadb_server"
+        echo "2. install_mariadb_client"
+        echo "3. Remove (purge) mariadb"
+        echo "0. Quit"
+
+        read -p "Enter your choice: " choice
+
+        case $choice in
+            1)
+                install_mariadb_server
+                ;;
+            2)
+                install_mariadb_client
+                ;;
+            3)
+                remove_mariadb
+                ;;
+            0)
+                echo "Exiting..."
+                return 0
+                ;;
+            *)
+                echo "Invalid choice."
+                ;;
+        esac
+    done
+}
+
 # Function to install MariaDB Server
 install_mariadb_server() {
 
-    # Add MariaDB Repository
-    # curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s --
-
+    read -p "Install from:\n 1. mariadb repo\n 2. Debian repo" install_from
+    if [[ $install_from == "1" ]]; then
+        # Add MariaDB Repository
+        echo "Adding mariadb repo.."
+        curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {echo "Failed adding Mariadb repo"; return}
+    fi
+    
     PACKAGE_NAME="mariadb-server"
     # Check if the package is installed
     if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
@@ -484,7 +618,7 @@ install_mariadb_server() {
         return
     else
         echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update && apt upgrade -y
+        apt update
         apt install -y $PACKAGE_NAME >/dev/null 2>&1
         echo "$PACKAGE_NAME has been installed."
     fi
@@ -580,6 +714,65 @@ EOF
 
 }
 
+# Function to remove MariaDB
+remove_mariadb() {
+    # Ask for confirmation
+    read -p "This will uninstall MariaDB. Are you sure? (y/n): " confirmation
+
+    if [[ $confirmation != "y" ]]; then
+        echo "Aborting."
+        return 0
+    fi
+
+    # Uninstall MariaDB
+    apt remove --purge mariadb-server mariadb-client
+    # apt remove --purge mariadb* mysql*
+    echo -e "\nRunning dpkg -l | grep -e mysql -e mariadb "
+    dpkg -l | grep -e mysql -e mariadb
+
+    read -p "Do you want to remove configurations by running apt autoremove? (y/n): " confirmation2
+
+    if [[ $confirmation2 != "y" ]]; then
+        apt autoremove
+    fi
+
+    # Delete configuration and database files
+    # rm -rf /etc/mysql /var/lib/mysql /var/log/mysql
+
+    # Remove MariaDB user and group
+    # deluser mysql
+    # delgroup mysql
+
+    echo -e "\nMariaDB has been purged from the system. All databases and configuration files have been deleted."
+}
+
+manage_memcached() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. Install memcached"
+        echo "23. Remove (purge) memcached"
+        echo "0. Quit"
+
+        read -p "Enter your choice: " choice
+
+        case $choice in
+            1)
+                install_memcached
+                ;;
+            2)
+                remove_memcached
+                ;;
+            0)
+                echo "Exiting..."
+                return 0
+                ;;
+            *)
+                echo "Invalid choice."
+                ;;
+        esac
+    done
+}
+
 # Function to install Memcached
 install_memcached() {
     # Install Memcached and required dependencies
@@ -600,6 +793,30 @@ install_memcached() {
     systemctl enable memcached
 
     echo "Memcached installation and configuration complete"
+}
+
+# Function to remove Memcached
+remove_memcached() {
+    # Ask for confirmation
+    read -p "This will purge Memcached and its configuration.. Are you sure? (y/n): " confirmation
+
+    if [[ $confirmation != "y" ]]; then
+        echo "Aborting."
+        return 0
+    fi
+    # Stop Memcached service
+    systemctl stop memcached
+
+    # Purge Memcached data
+    rm -rf /var/lib/memcached/*
+
+    # Remove Memcached configuration files
+    apt remove --purge memcached
+
+    # Also remove configuration files
+    rm -rf /etc/memcached.conf
+
+    echo "Memcached purged and configuration files removed."
 }
 
 # Function to install PHPMyAdmin
@@ -694,107 +911,6 @@ install_phpmyadmin() {
     # chmod -R 770 "${INSTALL_DIR}"
     chmod 660 "${INSTALL_DIR}/config.inc.php"
 
-}
-
-# Function to remove MariaDB
-remove_mariadb() {
-    # Ask for confirmation
-    read -p "This will uninstall MariaDB. Are you sure? (y/n): " confirmation
-
-    if [[ $confirmation != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
-
-    # Uninstall MariaDB
-    apt remove --purge mariadb-server mariadb-client
-    # apt remove --purge mariadb* mysql*
-    echo -e "\nRunning dpkg -l | grep -e mysql -e mariadb "
-    dpkg -l | grep -e mysql -e mariadb
-
-    read -p "Do you want to remove configurations by running apt autoremove? (y/n): " confirmation2
-
-    if [[ $confirmation2 != "y" ]]; then
-        apt autoremove
-    fi
-
-    # Delete configuration and database files
-    # rm -rf /etc/mysql /var/lib/mysql /var/log/mysql
-
-    # Remove MariaDB user and group
-    # deluser mysql
-    # delgroup mysql
-
-    echo -e "\nMariaDB has been purged from the system. All databases and configuration files have been deleted."
-}
-
-# Function to remove PHP
-remove_php() {
-    # Ask for confirmation
-    read -p "This will purge PHP and its configuration.. Are you sure? (y/n): " confirmation
-
-    if [[ $confirmation != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
-
-    for phpVer in "${PHP_Versions[@]}"; do
-
-        # Purge PHP packages
-        apt purge php${phpVer}-* && apt autoremove
-
-    done
-
-    # Remove PHP configuration files
-    rm -rf /etc/php/
-
-    echo "PHP and its configuration have been purged."
-}
-
-# Function to remove Nginx
-remove_nginx() {
-    # Ask for confirmation
-    read -p "This will purge Nginx and its configuration.. Are you sure? (y/n): " confirmation
-
-    if [[ $confirmation != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
-
-    # Stop Nginx if it's running
-    systemctl stop nginx
-
-    # Purge Nginx and its configuration
-    apt purge nginx nginx-common && apt autoremove
-
-    # Remove configuration files
-    rm -rf /etc/nginx
-
-    echo "Nginx and its configuration have been purged."
-}
-
-# Function to remove Memcached
-remove_memcached() {
-    # Ask for confirmation
-    read -p "This will purge Memcached and its configuration.. Are you sure? (y/n): " confirmation
-
-    if [[ $confirmation != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
-    # Stop Memcached service
-    systemctl stop memcached
-
-    # Purge Memcached data
-    rm -rf /var/lib/memcached/*
-
-    # Remove Memcached configuration files
-    apt remove --purge memcached
-
-    # Also remove configuration files
-    rm -rf /etc/memcached.conf
-
-    echo "Memcached purged and configuration files removed."
 }
 
 cleanUp() {
@@ -1353,26 +1469,22 @@ manage_docker() {
 display_menu() {
     clear
     echo "===== Farid's Setup Menu v${version} ====="
-    echo "1. Install PHP 7 and 8"
-    echo "2. Install Nginx"
-    echo "3. Install MariaDB Server"
-    echo "4. Install MariaDB Client"
-    echo "5. Install Memcached"
-    echo "6. Install PHPMyAdmin"
-    echo "7. Remove MariaDB"
-    echo "8. Remove PHP"
-    echo "9. Remove Nginx"
-    echo "10. Remove Memcached"
-    echo "11. Clean up (autoremove, autoclean, update)"
-    echo "12 Install Standard Packages"
-    echo "13 Install & configure SSH (port 4444 allows root with pass)"
-    echo "14 Configure terminal and system banners"
-    echo "15 Read mysql/MariaDB config"
-    echo "16 Add cloudflare IPs SYNC script with cron job"
-    echo "17 Create vhost"
-    echo "18 Install Wordpress (coming soon)"
-    echo "20 Check for script update"
-    echo "21 Manage Docker"
+    echo "1. Manage PHP 7 and 8"
+    echo "2. Manage Nginx"
+    echo "3. Manage MariaDB"
+    echo "4. Manage Memcached"
+    echo "5. Install PHPMyAdmin"
+    echo "6. Install Standard Packages"
+    echo "7. Manage Docker"
+    echo "8. Manage Wordpress (coming soon)"
+    echo "9. Check for script update"
+    echo "10. Clean up (autoremove, autoclean, update)"
+    echo "11 Install & configure SSH (port 4444 allows root with pass)"
+    echo "12 Configure terminal and system banners"
+    echo "13 Read mysql/MariaDB config"
+    echo "14 Add cloudflare IPs (nginx) SYNC script with cron job"
+    echo "15 Create vhost"
+   
     echo "0. Exit"
     echo "==============================="
 }
@@ -1383,25 +1495,21 @@ while true; do
     read -p "Enter your choice: " choice
 
     case $choice in
-    1) install_php ;;
-    2) install_nginx ;;
-    3) install_mariadb_server ;;
-    4) install_mariadb_client ;;
-    5) install_memcached ;;
-    6) install_phpmyadmin ;;
-    7) remove_mariadb ;;
-    8) remove_php ;;
-    9) remove_nginx ;;
-    10) remove_memcached ;;
-    11) cleanUp ;;
-    12) install_standard_packages ;;
-    13) install_configure_SSH ;;
-    14) configure_terminal_system_banners ;;
-    15) read_mysql_config ;;
-    16) add_cloudflare ;;
-    17) create_vhost ;;
-    20) check_for_update ;;
-    21) manage_docker ;;
+    1) manage_php ;;
+    2) manage_nginx ;;
+    3) manage_mariadb ;;
+    4) manage_memcached ;;
+    5) install_phpmyadmin ;;
+    6) install_standard_packages ;;
+    7) manage_docker ;;
+    8) manage_wordpress ;;
+    9) check_for_update ;;
+    10) cleanUp ;;
+    11) install_configure_SSH ;;
+    12) configure_terminal_system_banners ;;
+    13) read_mysql_config ;;
+    14) add_cloudflare ;;
+    15) create_vhost ;;
     0) exit ;;
     *) echo "Invalid choice. Please select again." ;;
     esac
