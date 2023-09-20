@@ -784,11 +784,11 @@ install_memcached() {
     apt install -y memcached libmemcached-tools >/dev/null 2>&1
 
     # Configure Memcached
-    echo "-m 512" >>/etc/memcached.conf       # Set memory limit to 512MB
+    echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
     echo "-l 127.0.0.1" >>/etc/memcached.conf # Bind to localhost
     echo "-p 11211" >>/etc/memcached.conf     # Use port 11211
     echo "-U 0" >>/etc/memcached.conf         # Run as the root user
-    echo "-t 4" >>/etc/memcached.conf         # Use 4 threads
+    # echo "-t 4" >>/etc/memcached.conf         # Use 4 threads
 
     # Restart Memcached
     systemctl restart memcached
