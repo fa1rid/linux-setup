@@ -1561,7 +1561,7 @@ MYSQL_SCRIPT
         --admin_email="$WP_ADMIN_EMAIL"
 
     echo -e "\n Installing Plugins"
-    sudo -u ${local_user} -s wp plugin install all-in-one-seo-pack all-in-one-wp-migration amp google-analytics-for-wordpress jetpack w3-total-cache wp-mail-smtp --path="$install_dir"
+    sudo -u ${local_user} -s wp plugin install all-in-one-seo-pack all-in-one-wp-migration amp google-analytics-for-wordpress jetpack w3-total-cache wp-mail-smtp taxopress --path="$install_dir"
     echo -e "\n Activating Plugins"
     sudo -u ${local_user} -s wp plugin activate jetpack --path="$install_dir"
 
@@ -1651,3 +1651,19 @@ while true; do
 
     read -p "Press Enter to continue..."
 done
+
+# Fix files/folders permission:
+# sudo chown -R bitnami:daemon TARGET
+# sudo find TARGET -type d -exec chmod 775 {} \;
+# sudo find TARGET -type f -exec chmod 664 {} \;
+# sudo chmod 640 TARGET/wp-config.php
+
+# Backup:
+    # mysqldump database_name > backup.sql
+    # To back up all the databases:
+    # mysqldump -A > backup.sql
+
+# restore:
+    # mysql < backup.sql
+    # To restore the data to a specific database, include the database name in the command
+    # mysql -D bitnami_app < backup.sql
