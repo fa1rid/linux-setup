@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.8"
+version="0.2.9"
 github_repo="fa1rid/linux-setup"
 script_name="SetupMenu.sh"
 script_folder="setup_menu"
@@ -951,8 +951,8 @@ install_standard_packages() {
         pciutils \
         bc >/dev/null 2>&1
 
-        echo -e "\nRunning apt purge exim4-*\n"
-        apt -y purge exim4-*
+    echo -e "\nRunning apt purge exim4-*\n"
+    apt -y purge exim4-*
 
     # The following additional packages will be installed:
     # bind9-host bind9-libs ca-certificates file git-man libcurl3-gnutls libcurl4 liberror-perl
@@ -1565,8 +1565,7 @@ MYSQL_SCRIPT
     echo -e "\n Activating Plugins"
     sudo -u ${local_user} -s wp plugin activate jetpack --path="$install_dir"
 
-
-cat >>"${install_dir}/wp-config.php" <<'EOFX'
+    cat >>"${install_dir}/wp-config.php" <<'EOFX'
 /**
  * Disable pingback.ping xmlrpc method to prevent WordPress from participating in DDoS attacks
  * More info at: https://docs.bitnami.com/general/apps/wordpress/troubleshooting/xmlrpc-and-pingback/
@@ -1600,6 +1599,229 @@ EOFX
 
 }
 
+# Function to comment or uncomment lines in a config file
+comment_uncomment() {
+    local search_pattern="$1"
+    local config_file="$2"
+    local comment_uncomment="$3"
+
+    # Check if the config file exists
+    if [ ! -f "$config_file" ]; then
+        echo "Error: Config file '$config_file' not found."
+        return 1
+    fi
+
+    # Define the AWK script
+    local awk_script='
+  {
+    # Count leading whitespace (tabs or spaces)
+    whitespace_count = match($0, /^[ \t]*/)
+    whitespace = substr($0, RSTART, RLENGTH)
+    line = substr($0, RLENGTH + 1)
+
+    # Check if the line matches the search pattern
+    if ($0 ~ search_pattern) {
+      if (comment_uncomment == "comment" && substr(line, 1, 1) != "#") {
+        # Comment the line and add a space after the comment symbol if needed
+        if (substr(line, 1, 1) != " ") {
+          line = " " line
+        }
+        $0 = whitespace "#" line
+      } else if (comment_uncomment == "uncomment") {
+        # Uncomment the line and remove all preceding comment symbols and spaces
+        sub(whitespace "[# ]*", whitespace, $0)
+      }
+    }
+
+    # Print the modified line
+    print
+  }
+  '
+
+    # Use AWK to process the config file and redirect the output to a temporary file
+    awk -v search_pattern="$search_pattern" -v comment_uncomment="$comment_uncomment" "$awk_script" "$config_file" >"$config_file.tmp"
+
+    # Replace the original config file with the temporary file
+    mv "$config_file.tmp" "$config_file"
+
+    echo "Done. Configuration file '$config_file' has been modified."
+
+    # Example usage:
+    # comment_uncomment "search_pattern" "/path/to/config/file" "comment"
+    # comment_uncomment "search_pattern" "/path/to/config/file" "uncomment"
+}
+
+#!/bin/bash
+
+# Function to add a new line under a pattern with correct indentation
+add_line_under_pattern() {
+    local pattern_to_match="$1"
+    local config_file="$2"
+    local new_line="$3"
+
+    # Check if the config file exists
+    if [ ! -f "$config_file" ]; then
+        echo "Config file not found: $config_file"
+        return 1
+    fi
+
+    # Escape special characters in the pattern
+    local escaped_pattern
+    escaped_pattern=$(sed 's/[][\/.^$*]/\\&/g' <<<"$pattern_to_match")
+
+    # Get the indentation of the pattern line
+    local indentation
+    indentation=$(sed -n "/$escaped_pattern/{s/^\([[:space:]]*\).*$/\1/;p;q}" "$config_file")
+
+    # Check if the new line already exists after the pattern line
+    if grep -qFx "${indentation}${new_line}" "$config_file"; then
+        echo "The new line already exists after the pattern. No duplicate line added."
+    else
+        # Use sed to insert the new line under the pattern with the same indentation
+        sed -i "\%$escaped_pattern%a\\${indentation}${new_line}" "$config_file"
+        echo "New line added under the pattern '$pattern_to_match' with correct indentation."
+    fi
+
+    # Example usage:
+    # add_line_under_pattern "include /etc/nginx/snippets/ssl" /path/to/your/config/file.conf "new_line_to_append"
+
+}
+######### Certbot Start #########
+# Function to configure Cloudflare
+configure_cloudflare() {
+  read -p "Enter your Cloudflare email: " cloudflare_email
+  read -p "Enter your Cloudflare API key: " cloudflare_api_key
+
+  config_name="$cloudflare_email"
+
+  # Create the Cloudflare configuration
+  mkdir -p "/etc/letsencrypt/cloudflare/$config_name"
+  cat >"/etc/letsencrypt/cloudflare/$config_name/cloudflare.ini" <<EOF
+dns_cloudflare_email = $cloudflare_email
+dns_cloudflare_api_key = $cloudflare_api_key
+EOF
+  chmod 600 "/etc/letsencrypt/cloudflare/$config_name/cloudflare.ini"
+}
+
+# Function to list existing Cloudflare configurations and return the selected name
+list_cloudflare_configs() {
+  config_names=()
+  echo "Existing Cloudflare configurations:"
+  i=1
+  for config in /etc/letsencrypt/cloudflare/*; do
+    if [ -d "$config" ]; then
+      config_name=$(basename "$config")
+      config_names+=("$config_name")
+      echo " $i. $config_name"
+      ((i++))
+    fi
+  done
+  echo " 0. Create a new Cloudflare configuration"
+  while true; do
+    read -p "Enter the number of the existing Cloudflare configuration or '0' to create a new one: " choice
+    if [ "$choice" -ge 0 ] && [ "$choice" -le ${#config_names[@]} ]; then
+      if [ "$choice" -eq 0 ]; then
+        configure_cloudflare
+        break
+      else
+        selected_name="${config_names[$((choice - 1))]}"
+        break
+      fi
+    else
+      echo "Invalid choice. Please try again."
+    fi
+  done
+  echo "$selected_name"
+}
+
+# Function to get a new or renew a certificate
+get_certbot_certificate() {
+  read -p "Enter your domain name (e.g., example.com): " domain_name
+
+  # Check if any Cloudflare configurations exist
+  selected_config=$(list_cloudflare_configs)
+
+  # Request the certificate
+  certbot certonly --dns-cloudflare -d "$domain_name" -d "*.$domain_name" --dns-cloudflare-credentials "/etc/letsencrypt/cloudflare/$selected_config/cloudflare.ini"
+
+  # Update the nginx configuration to include the certificate snippet
+  nginx_config="/etc/nginx/sites-available/$domain_name"
+  snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+  cat >"$snippet_path" <<EOF
+ssl_certificate /etc/letsencrypt/live/$domain_name/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/$domain_name/privkey.pem;
+EOF
+
+  # Add or update the include line in the nginx configuration
+  if grep -q "include $snippet_path;" "$nginx_config"; then
+    echo "Uncommentting: include $snippet_path"
+    comment_uncomment "include $snippet_path;" "$nginx_config" uncomment
+
+    echo "Certificate for $domain_name has been obtained and nginx configuration updated."
+  else
+    add_line_under_pattern "include /etc/nginx/snippets/ssl-snippet.conf;" "nginx_config" "include $snippet_path;"
+    echo "Certificate for $domain_name has been obtained and nginx configuration updated."
+  fi
+
+  echo "Commentting: include /etc/nginx/snippets/ssl-snippet.conf;"
+  comment_uncomment "include /etc/nginx/snippets/ssl-snippet.conf;" "$nginx_config" comment
+}
+
+# Function to revert to self-signed certificate
+revert_to_self_signed() {
+  read -p "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
+  nginx_config="/etc/nginx/sites-available/$domain_name"
+
+  if [ -f "$nginx_config" ]; then
+    snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+
+    echo "Commentting: include $snippet_path;"
+    comment_uncomment "include $snippet_path;" "$nginx_config" comment
+
+    echo "Uncommentting: include /etc/nginx/snippets/ssl-snippet.conf;"
+    comment_uncomment "include /etc/nginx/snippets/ssl-snippet.conf;" "$nginx_config" uncomment
+
+    echo "Reverted $domain_name to use the self-signed certificate."
+  else
+    echo "Nginx configuration file not found for $domain_name."
+  fi
+}
+
+manage_certbot() {
+  # Check if Certbot is installed
+  if ! command -v certbot &>/dev/null; then
+    echo "Certbot is not installed. Installing Certbot..."
+    apt-get update
+    apt-get -y install certbot python3-certbot-dns-cloudflare
+  fi
+  while true; do
+    echo "Choose an option:"
+    echo "1. Get/Renew Certificate"
+    echo "2. Revert to Self-Signed Certificate"
+    echo "0. Quit"
+
+    read -p "Enter your choice: " choice
+
+    case $choice in
+    1)
+      get_certbot_certificate
+      ;;
+    2)
+      revert_to_self_signed
+      ;;
+    0)
+      echo "Exiting..."
+      return 0
+      ;;
+    *)
+      echo "Invalid choice."
+      ;;
+    esac
+  done
+}
+######### Certbot END #########
+
+
 # Function to display the menu
 display_menu() {
     clear
@@ -1619,6 +1841,7 @@ display_menu() {
     echo "13 Read mysql/MariaDB config"
     echo "14 Add cloudflare IPs (nginx) SYNC script with cron job"
     echo "15 Create vhost"
+    echo "16 Manage Certbot"
 
     echo "0. Exit"
     echo "==============================="
@@ -1645,6 +1868,7 @@ while true; do
     13) read_mysql_config ;;
     14) add_cloudflare ;;
     15) create_vhost ;;
+    16) manage_certbot ;;
     0) exit ;;
     *) echo "Invalid choice. Please select again." ;;
     esac
@@ -1659,11 +1883,11 @@ done
 # sudo chmod 640 TARGET/wp-config.php
 
 # Backup:
-    # mysqldump database_name > backup.sql
-    # To back up all the databases:
-    # mysqldump -A > backup.sql
+# mysqldump database_name > backup.sql
+# To back up all the databases:
+# mysqldump -A > backup.sql
 
 # restore:
-    # mysql < backup.sql
-    # To restore the data to a specific database, include the database name in the command
-    # mysql -D bitnami_app < backup.sql
+# mysql < backup.sql
+# To restore the data to a specific database, include the database name in the command
+# mysql -D bitnami_app < backup.sql
