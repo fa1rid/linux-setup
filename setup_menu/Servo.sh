@@ -1825,138 +1825,177 @@ add_line_under_pattern() {
 ######### Certbot Start #########
 # Function to configure Cloudflare
 configure_cloudflare() {
-  read -p "Enter your Cloudflare email: " cloudflare_email
-  read -p "Enter your Cloudflare API key: " cloudflare_api_key
+    read -p "Enter your Cloudflare email: " cloudflare_email
+    read -p "Enter your Cloudflare API key: " cloudflare_api_key
 
-  config_name="$cloudflare_email"
+    config_name="$cloudflare_email"
 
-  # Create the Cloudflare configuration
-  mkdir -p "/etc/letsencrypt/cloudflare/$config_name"
-  cat >"/etc/letsencrypt/cloudflare/$config_name/cloudflare.ini" <<EOF
+    # Create the Cloudflare configuration
+    mkdir -p "/etc/letsencrypt/cloudflare/$config_name"
+    cat >"/etc/letsencrypt/cloudflare/$config_name/cloudflare.ini" <<EOF
 dns_cloudflare_email = $cloudflare_email
 dns_cloudflare_api_key = $cloudflare_api_key
 EOF
-  chmod 600 "/etc/letsencrypt/cloudflare/$config_name/cloudflare.ini"
+    chmod 600 "/etc/letsencrypt/cloudflare/$config_name/cloudflare.ini"
 }
 
 # Function to list existing Cloudflare configurations and return the selected name
 list_cloudflare_configs() {
-  config_names=()
-  echo "Existing Cloudflare configurations:"
-  i=1
-  for config in /etc/letsencrypt/cloudflare/*; do
-    if [ -d "$config" ]; then
-      config_name=$(basename "$config")
-      config_names+=("$config_name")
-      echo " $i. $config_name"
-      ((i++))
-    fi
-  done
-  echo " 0. Create a new Cloudflare configuration"
-  while true; do
-    read -p "Enter the number of the existing Cloudflare configuration or '0' to create a new one: " choice
-    if [ "$choice" -ge 0 ] && [ "$choice" -le ${#config_names[@]} ]; then
-      if [ "$choice" -eq 0 ]; then
-        configure_cloudflare
-        break
-      else
-        selected_name="${config_names[$((choice - 1))]}"
-        break
-      fi
-    else
-      echo "Invalid choice. Please try again."
-    fi
-  done
-  echo "$selected_name"
+    config_names=()
+    echo "Existing Cloudflare configurations:"
+    i=1
+    for config in /etc/letsencrypt/cloudflare/*; do
+        if [ -d "$config" ]; then
+            config_name=$(basename "$config")
+            config_names+=("$config_name")
+            echo " $i. $config_name"
+            ((i++))
+        fi
+    done
+    echo " 0. Create a new Cloudflare configuration"
+    while true; do
+        read -p "Enter the number of the existing Cloudflare configuration or '0' to create a new one: " choice
+        if [ "$choice" -ge 0 ] && [ "$choice" -le ${#config_names[@]} ]; then
+            if [ "$choice" -eq 0 ]; then
+                configure_cloudflare
+                break
+            else
+                selected_name="${config_names[$((choice - 1))]}"
+                break
+            fi
+        else
+            echo "Invalid choice. Please try again."
+        fi
+    done
+    echo "$selected_name"
 }
 
 # Function to get a new or renew a certificate
 get_certbot_certificate() {
-  read -p "Enter your domain name (e.g., example.com): " domain_name
+    read -p "Enter your domain name (e.g., example.com): " domain_name
 
-  # Check if any Cloudflare configurations exist
-  selected_config=$(list_cloudflare_configs)
+    # Check if any Cloudflare configurations exist
+    selected_config=$(list_cloudflare_configs)
 
-  # Request the certificate
-  certbot certonly --dns-cloudflare -d "$domain_name" -d "*.$domain_name" --dns-cloudflare-credentials "/etc/letsencrypt/cloudflare/$selected_config/cloudflare.ini"
+    # Request the certificate
+    certbot certonly --dns-cloudflare -d "$domain_name" -d "*.$domain_name" --dns-cloudflare-credentials "/etc/letsencrypt/cloudflare/$selected_config/cloudflare.ini"
 
-  # Update the nginx configuration to include the certificate snippet
-  nginx_config="/etc/nginx/sites-available/$domain_name"
-  snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
-  cat >"$snippet_path" <<EOF
+    snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+    cat >"$snippet_path" <<EOF
 ssl_certificate /etc/letsencrypt/live/$domain_name/fullchain.pem;
 ssl_certificate_key /etc/letsencrypt/live/$domain_name/privkey.pem;
 EOF
+}
 
-  # Add or update the include line in the nginx configuration
-  if grep -q "include $snippet_path;" "$nginx_config"; then
-    echo "Uncommentting: include $snippet_path"
-    comment_uncomment "include $snippet_path;" "$nginx_config" uncomment
+set_nginx_cert() {
 
-    echo "Certificate for $domain_name has been obtained and nginx configuration updated."
-  else
-    add_line_under_pattern "include /etc/nginx/snippets/ssl-snippet.conf;" "nginx_config" "include $snippet_path;"
-    echo "Certificate for $domain_name has been obtained and nginx configuration updated."
-  fi
+    local nginx_conf_dir="/etc/nginx/sites-available"
+    local letsencrypt_dir="/etc/letsencrypt/live"
+    local selected_conf=""
+    local selected_letsencrypt=""
 
-  echo "Commentting: include /etc/nginx/snippets/ssl-snippet.conf;"
-  comment_uncomment "include /etc/nginx/snippets/ssl-snippet.conf;" "$nginx_config" comment
+    # List all Nginx configuration files in the directory
+    local nginx_confs=("$nginx_conf_dir"/*)
+
+    # Check if there are any configuration files
+    if [ ${#nginx_confs[@]} -eq 0 ]; then
+        echo "No Nginx configuration files found in $nginx_conf_dir."
+        return 1
+    fi
+
+    while true; do
+        # Display a numbered list of configuration files
+        echo "Select an Nginx configuration file to edit (or '0' to go back):"
+        for ((i = 0; i < ${#nginx_confs[@]}; i++)); do
+            echo "[$((i + 1))] ${nginx_confs[i]##*/}"
+        done
+
+        # Prompt the user to select a file by number
+        read -p "Enter the number of the configuration file you want to select: " choice
+
+        if [ "$choice" -eq 0 ]; then
+            # Option 0 is chosen to go back
+            return 1
+        elif [ "$choice" -ge 1 ] && [ "$choice" -le ${#nginx_confs[@]} ]; then
+            # Check if the chosen number is within the range of available files
+            selected_conf="${nginx_confs[choice - 1]}"
+            echo "Selected Nginx configuration file: $selected_conf"
+            break
+        else
+            echo "Invalid choice. Please enter a valid number or '0' to go back."
+        fi
+    done
+
+    nginx_config="$selected_conf"
+
+    # Add or update the include line in the nginx configuration
+    if grep -q "include $snippet_path;" "$nginx_config"; then
+        echo "Uncommentting: include $snippet_path"
+        comment_uncomment "include $snippet_path;" "$nginx_config" uncomment
+
+        echo "Certificate for $domain_name has been obtained and nginx configuration updated."
+    else
+        add_line_under_pattern "include /etc/nginx/snippets/ssl-snippet.conf;" "nginx_config" "include $snippet_path;"
+        echo "Certificate for $domain_name has been obtained and nginx configuration updated."
+    fi
+
+    echo "Commentting: include /etc/nginx/snippets/ssl-snippet.conf;"
+    comment_uncomment "include /etc/nginx/snippets/ssl-snippet.conf;" "$nginx_config" comment
 }
 
 # Function to revert to self-signed certificate
 revert_to_self_signed() {
-  read -p "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
-  nginx_config="/etc/nginx/sites-available/$domain_name"
+    read -p "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
+    nginx_config="/etc/nginx/sites-available/$domain_name"
 
-  if [ -f "$nginx_config" ]; then
-    snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+    if [ -f "$nginx_config" ]; then
+        snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
 
-    echo "Commentting: include $snippet_path;"
-    comment_uncomment "include $snippet_path;" "$nginx_config" comment
+        echo "Commentting: include $snippet_path;"
+        comment_uncomment "include $snippet_path;" "$nginx_config" comment
 
-    echo "Uncommentting: include /etc/nginx/snippets/ssl-snippet.conf;"
-    comment_uncomment "include /etc/nginx/snippets/ssl-snippet.conf;" "$nginx_config" uncomment
+        echo "Uncommentting: include /etc/nginx/snippets/ssl-snippet.conf;"
+        comment_uncomment "include /etc/nginx/snippets/ssl-snippet.conf;" "$nginx_config" uncomment
 
-    echo "Reverted $domain_name to use the self-signed certificate."
-  else
-    echo "Nginx configuration file not found for $domain_name."
-  fi
+        echo "Reverted $domain_name to use the self-signed certificate."
+    else
+        echo "Nginx configuration file not found for $domain_name."
+    fi
 }
 
 manage_certbot() {
-  # Check if Certbot is installed
-  if ! command -v certbot &>/dev/null; then
-    echo "Certbot is not installed. Installing Certbot..."
-    apt-get update
-    apt-get -y install certbot python3-certbot-dns-cloudflare
-  fi
-  while true; do
-    echo "Choose an option:"
-    echo "1. Get/Renew Certificate"
-    echo "2. Revert to Self-Signed Certificate"
-    echo "0. Quit"
+    # Check if Certbot is installed
+    if ! command -v certbot &>/dev/null; then
+        echo "Certbot is not installed. Installing Certbot..."
+        apt-get update
+        apt-get -y install certbot python3-certbot-dns-cloudflare
+    fi
+    while true; do
+        echo "Choose an option:"
+        echo "1. Get/Renew Certificate"
+        echo "2. Revert to Self-Signed Certificate"
+        echo "0. Quit"
 
-    read -p "Enter your choice: " choice
+        read -p "Enter your choice: " choice
 
-    case $choice in
-    1)
-      get_certbot_certificate
-      ;;
-    2)
-      revert_to_self_signed
-      ;;
-    0)
-      echo "Exiting..."
-      return 0
-      ;;
-    *)
-      echo "Invalid choice."
-      ;;
-    esac
-  done
+        case $choice in
+        1)
+            get_certbot_certificate
+            ;;
+        2)
+            revert_to_self_signed
+            ;;
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
+        esac
+    done
 }
 ######### Certbot END #########
-
 
 # Function to display the menu
 display_menu() {
