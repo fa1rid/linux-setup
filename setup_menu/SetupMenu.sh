@@ -1,8 +1,8 @@
 #!/bin/bash
 
-version="0.2.8"
+version="0.2.9"
 github_repo="fa1rid/linux-setup"
-script_name="SetupMenu.sh"
+script_name="Servo.sh"
 script_folder="setup_menu"
 local_script_path="/usr/local/bin/"
 
@@ -579,6 +579,8 @@ manage_mariadb() {
         echo "1. install_mariadb_server"
         echo "2. install_mariadb_client"
         echo "3. Remove (purge) mariadb"
+        echo "4. Backup Database (Dump)"
+        echo "5. Restore Database Dump"
         echo "0. Quit"
 
         read -p "Enter your choice: " choice
@@ -593,6 +595,12 @@ manage_mariadb() {
         3)
             remove_mariadb
             ;;
+        4)
+            backup_db
+            ;;
+        5)
+            restore_db
+            ;;
         0)
             echo "Exiting..."
             return 0
@@ -602,6 +610,95 @@ manage_mariadb() {
             ;;
         esac
     done
+
+    # Backup:
+    # mysqldump database_name > backup.sql
+    # To back up all the databases:
+    # mysqldump -A > backup.sql
+
+    # restore:
+    # mysql < backup.sql
+    # To restore the data to a specific database, include the database name in the command
+    # mysql -D bitnami_app < backup.sql
+
+}
+
+# Function to restore a database from a dump
+restore_db() {
+    local database_name="$1"
+    local dump_file="$2"
+
+    # Check if both arguments are provided
+    if [ -z "$database_name" ] || [ -z "$dump_file" ]; then
+        read -p "Enter the database name to restore to: " database_name
+        read -p "Enter the path to the database dump file (supported: gz,xz,zip, or raw): " dump_file
+
+        # Check again if they are empty
+        if [ -z "$database_name" ] || [ -z "$dump_file" ]; then
+            echo "Both database name and dump file path are required."
+            return 1
+        fi
+    fi
+
+    # Check if the dump file exists
+    if [ ! -f "$dump_file" ]; then
+        echo "Dump file '$dump_file' does not exist."
+        return 1
+    fi
+
+    # Determine the compression format based on file extension
+    local extension="${dump_file##*.}"
+    local decompress_command="cat" # Default to no decompression
+
+    case "$extension" in
+    gz)
+        decompress_command="gzip -dc"
+        ;;
+    xz)
+        decompress_command="xz -dc"
+        ;;
+    zip)
+        decompress_command="unzip -p"
+        ;;
+    esac
+
+    # Restore the database dump
+    $decompress_command "$dump_file" | mariadb "$database_name"
+
+    echo "Database '$database_name' restored from '$dump_file'."
+}
+
+# Function to create a database dump with a timestamped filename
+backup_db() {
+
+    local database_name="$1"
+    local save_location="$2"
+
+    # Check if both arguments are provided
+    if [ -z "$database_name" ] || [ -z "$save_location" ]; then
+        read -p "Enter the database name: " database_name
+        read -p "Enter the save location (e.g., /path/to/save): " save_location
+
+        # Check again if they are empty
+        if [ -z "$database_name" ] || [ -z "$save_location" ]; then
+            echo "Both database name and save location are required."
+            return 1
+        fi
+    fi
+
+    # Generate a timestamp with underscores
+    local timestamp=$(date +"%Y_%m_%d_%H_%M_%S")
+
+    # Define the dump file name
+    local dump_file="${database_name}_${timestamp}.sql.xz"
+
+    # Create the database dump and compress it
+    mysqldump "$database_name" | xz -9 >"$save_location/$dump_file"
+
+    echo "Database dump saved as: $save_location/$dump_file"
+
+    # Call the function with command-line arguments if provided
+    # Backup_Database "$1" "$2"
 }
 
 # Function to install MariaDB Server
@@ -951,8 +1048,8 @@ install_standard_packages() {
         pciutils \
         bc >/dev/null 2>&1
 
-        echo -e "\nRunning apt purge exim4-*\n"
-        apt -y purge exim4-*
+    echo -e "\nRunning apt purge exim4-*\n"
+    apt -y purge exim4-*
 
     # The following additional packages will be installed:
     # bind9-host bind9-libs ca-certificates file git-man libcurl3-gnutls libcurl4 liberror-perl
@@ -1565,8 +1662,7 @@ MYSQL_SCRIPT
     echo -e "\n Activating Plugins"
     sudo -u ${local_user} -s wp plugin activate jetpack --path="$install_dir"
 
-
-cat >>"${install_dir}/wp-config.php" <<'EOFX'
+    cat >>"${install_dir}/wp-config.php" <<'EOFX'
 /**
  * Disable pingback.ping xmlrpc method to prevent WordPress from participating in DDoS attacks
  * More info at: https://docs.bitnami.com/general/apps/wordpress/troubleshooting/xmlrpc-and-pingback/
@@ -1600,6 +1696,47 @@ EOFX
 
 }
 
+# Function to fix files and folders permissions
+fix_permissions() {
+
+    # chown -R user:group TARGET
+    # find TARGET -type d -exec chmod 775 {} \;
+    # find TARGET -type f -exec chmod 664 {} \;
+    # chmod 640 TARGET/wp-config.php
+
+    local target="$1"
+    local user="$2"
+    local group="$3"
+
+    # Prompt for input if any argument is missing
+    if [ -z "$target" ]; then
+        read -p "Enter the target directory: " target
+    fi
+
+    if [ -z "$user" ]; then
+        read -p "Enter the user: " user
+    fi
+
+    if [ -z "$group" ]; then
+        read -p "Enter the group: " group
+    fi
+
+    # Check if all arguments are provided
+    if [ -z "$target" ] || [ -z "$user" ] || [ -z "$group" ]; then
+        echo "Usage: fix_permissions <target> <user> <group>"
+        return 1
+    fi
+
+    # Fix ownership
+    chown -R "$user:$group" "$target"
+
+    # Set directory permissions to 775 and file permissions to 664
+    find "$target" -type d -exec chmod 775 {} \;
+    find "$target" -type f -exec chmod 664 {} \;
+
+    echo "Permissions fixed for '$target'."
+}
+
 # Function to display the menu
 display_menu() {
     clear
@@ -1619,51 +1756,48 @@ display_menu() {
     echo "13 Read mysql/MariaDB config"
     echo "14 Add cloudflare IPs (nginx) SYNC script with cron job"
     echo "15 Create vhost"
+    echo "16 Set Files/Folders Permissions"
 
     echo "0. Exit"
     echo "==============================="
 }
 
-# Main script loop
-while true; do
-    display_menu
-    read -p "Enter your choice: " choice
+if [ $# -ge 1 ]; then
+    function_name="$1"
+    shift # Remove the function name from the argument list
+    "$function_name" "$@"
+else
+    # Main script loop
+    while true; do
+        echo "Usage: $0 <function_name> [function_arguments]"
+        echo "Available functions:"
+        echo "  backup_db [database_name] [save_location]"
+        echo "  restore_db [database_name] [db_filename]"
+        echo "  fix_permissions <target> <user> <group>"
 
-    case $choice in
-    1) manage_php ;;
-    2) manage_nginx ;;
-    3) manage_mariadb ;;
-    4) manage_memcached ;;
-    5) install_phpmyadmin ;;
-    6) install_standard_packages ;;
-    7) manage_docker ;;
-    8) manage_wordpress ;;
-    9) check_for_update ;;
-    10) cleanUp ;;
-    11) install_configure_SSH ;;
-    12) configure_terminal_system_banners ;;
-    13) read_mysql_config ;;
-    14) add_cloudflare ;;
-    15) create_vhost ;;
-    0) exit ;;
-    *) echo "Invalid choice. Please select again." ;;
-    esac
+        display_menu
+        read -p "Enter your choice: " choice
 
-    read -p "Press Enter to continue..."
-done
-
-# Fix files/folders permission:
-# sudo chown -R bitnami:daemon TARGET
-# sudo find TARGET -type d -exec chmod 775 {} \;
-# sudo find TARGET -type f -exec chmod 664 {} \;
-# sudo chmod 640 TARGET/wp-config.php
-
-# Backup:
-    # mysqldump database_name > backup.sql
-    # To back up all the databases:
-    # mysqldump -A > backup.sql
-
-# restore:
-    # mysql < backup.sql
-    # To restore the data to a specific database, include the database name in the command
-    # mysql -D bitnami_app < backup.sql
+        case $choice in
+        1) manage_php ;;
+        2) manage_nginx ;;
+        3) manage_mariadb ;;
+        4) manage_memcached ;;
+        5) install_phpmyadmin ;;
+        6) install_standard_packages ;;
+        7) manage_docker ;;
+        8) manage_wordpress ;;
+        9) check_for_update ;;
+        10) cleanUp ;;
+        11) install_configure_SSH ;;
+        12) configure_terminal_system_banners ;;
+        13) read_mysql_config ;;
+        14) add_cloudflare ;;
+        15) create_vhost ;;
+        16) fix_permissions ;;
+        0) exit ;;
+        *) echo "Invalid choice. Please select again." ;;
+        esac
+        read -p "Press Enter to continue..."
+    done
+fi
