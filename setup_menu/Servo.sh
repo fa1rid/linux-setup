@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.2.9"
+version="0.3.0"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -35,6 +35,81 @@ check_for_update() {
 cron_dir="/root/cron/"
 mkdir -p ${cron_dir}
 
+ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
+common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
+caching_nginx_snippet="/etc/nginx/snippets/caching-snippet.conf"
+# default_domain="domain.local"
+# default_user="default"
+
+PHP_Versions=("7.4" "8.2")
+
+#########################################
+
+gen_pass() {
+    local length="$1"
+    local min_numbers="$2"
+    local min_special_chars="$3"
+
+    if [[ -z "$length" ]]; then
+        length=20
+    fi
+
+    if [[ -z "$min_numbers" ]]; then
+        min_numbers=3
+    fi
+
+    if [[ -z "$min_special_chars" ]]; then
+        min_special_chars=0
+    fi
+
+    # Validate input
+    if ((length < min_numbers + min_special_chars)); then
+        echo "Error: The total length should be at least as large as the sum of minimum numbers and minimum special characters."
+        return 1
+    fi
+
+    # Define character sets
+    lowercase='abcdefghijklmnopqrstuvwxyz'
+    uppercase='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    numbers='0123456789'
+    special_chars='!@#$%^&*'
+
+    # Initialize the password
+    password=""
+
+    # Ensure minimum numbers
+    for ((i = 0; i < min_numbers; i++)); do
+        rand_num="${numbers:RANDOM%${#numbers}:1}"
+        password="${password}${rand_num}"
+    done
+
+    # Ensure minimum special characters
+    for ((i = 0; i < min_special_chars; i++)); do
+        rand_special="${special_chars:RANDOM%${#special_chars}:1}"
+        password="${password}${rand_special}"
+    done
+
+    # Calculate the remaining characters needed
+    remaining_length=$((length - min_numbers - min_special_chars))
+
+    # Generate the remaining random characters
+    for ((i = 0; i < remaining_length; i++)); do
+        rand_char="${lowercase}${uppercase}"
+        rand_char="${rand_char:RANDOM%${#rand_char}:1}"
+        password="${password}${rand_char}"
+    done
+
+    # Shuffle the password characters
+    password=$(echo "$password" | fold -w1 | shuf | tr -d '\n')
+
+    echo "$password"
+
+    # Usage
+    # total_length="$1"
+    # min_num="$2"
+    # min_special="$3"
+}
+
 # Function to generate a random password
 generate_password() {
     local LENGTH="$1"
@@ -45,13 +120,58 @@ generate_password() {
     LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$LENGTH"
     # LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+{}:<>?' </dev/urandom | head -c "$LENGTH"
 }
-ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
-common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
-caching_nginx_snippet="/etc/nginx/snippets/caching-snippet.conf"
-# default_domain="domain.local"
-# default_user="default"
 
-PHP_Versions=("7.4" "8.2")
+# Function to list directory contents and prompt for selection
+function select_from_directory() {
+    # Usage: select_from_directory [directory]
+    clear >&2
+    local directory="$1"
+    local selection=
+
+    if [ -z "$directory" ]; then
+        read -rp "Enter directory path: " directory
+    fi
+
+    # Check if the path ends with a slash and remove it if present
+    directory="${directory%/}"
+    echo "Select a file/folder from $directory:" >&2
+    echo "0. Return" >&2
+
+    local count=1
+    for item in "$directory"/*; do
+        if [ -e "$item" ]; then
+            if [ -d "$item" ]; then
+                echo -e "\033[32m${count}. $(basename "$item")\033[0m" >&2
+            else
+                echo -e "\033[34m${count}. $(basename "$item")\033[0m" >&2
+            fi
+            count=$((count + 1))
+        fi
+    done
+    while [ -z "$selection" ]; do
+        read -r selection
+
+        if [[ ! "$selection" =~ ^[0-9]+$ ]]; then
+            echo "Invalid input. Please enter a number." >&2
+            selection=
+            continue
+        fi
+
+        if [ "$selection" -eq 0 ]; then
+            break
+        fi
+
+        if [ "$selection" -ge 1 ] && [ "$selection" -lt "$count" ]; then
+            selected_item=$(ls -1 "$directory" | sed -n "${selection}p")
+            echo "$directory/$selected_item"
+            break
+        else
+            echo "Invalid selection. Please choose a valid option." >&2
+            selection=
+        fi
+
+    done
+}
 
 generate_php_conf() {
     username=$1
@@ -947,7 +1067,7 @@ install_phpmyadmin() {
     read -p "Enter new password for dbadmin user: " dbadmin_pass
     # read -p "Enter new password for management user (pma)" pmapass
     # Generate a password with default length
-    pmapass=$(generate_password)
+    pmapass=$(gen_pass)
     echo "pmapass: $pmapass"
 
     # Create Database User for phpMyAdmin.
@@ -1840,7 +1960,7 @@ EOF
 }
 
 # Function to list existing Cloudflare configurations and return the selected name
-list_cloudflare_configs() {
+certbot_cloudflare_configs() {
     config_names=()
     echo "Existing Cloudflare configurations:"
     i=1
@@ -1875,7 +1995,7 @@ get_certbot_certificate() {
     read -p "Enter your domain name (e.g., example.com): " domain_name
 
     # Check if any Cloudflare configurations exist
-    selected_config=$(list_cloudflare_configs)
+    selected_config=$(certbot_cloudflare_configs)
 
     # Request the certificate
     certbot certonly --dns-cloudflare -d "$domain_name" -d "*.$domain_name" --dns-cloudflare-credentials "/etc/letsencrypt/cloudflare/$selected_config/cloudflare.ini"
@@ -1945,8 +2065,16 @@ set_nginx_cert() {
 
 # Function to revert to self-signed certificate
 revert_to_self_signed() {
-    read -p "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
-    nginx_config="/etc/nginx/sites-available/$domain_name"
+    # read -p "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
+    echo "Select nginx config"
+    nginx_config=$(select_from_directory "/etc/nginx/sites-available/")
+    echo "Selected config: $nginx_config"
+
+    base_filename="${nginx_config##*/}"
+    domain_name="${base_filename##*-}"
+    domain_name="${result%.*}"
+
+    # nginx_config="/etc/nginx/sites-available/$domain_name"
 
     if [ -f "$nginx_config" ]; then
         snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
@@ -1959,7 +2087,7 @@ revert_to_self_signed() {
 
         echo "Reverted $domain_name to use the self-signed certificate."
     else
-        echo "Nginx configuration file not found for $domain_name."
+        echo "Nginx configuration file not found."
     fi
 }
 
@@ -1973,7 +2101,9 @@ manage_certbot() {
     while true; do
         echo "Choose an option:"
         echo "1. Get/Renew Certificate"
-        echo "2. Revert to Self-Signed Certificate"
+        echo "2. Set nginx Cert"
+        echo "3. Revert nginx to Self-Signed Certificate"
+        echo "4. certbot cloudflare configs"
         echo "0. Quit"
 
         read -p "Enter your choice: " choice
@@ -1983,7 +2113,13 @@ manage_certbot() {
             get_certbot_certificate
             ;;
         2)
+            set_nginx_cert
+            ;;
+        3)
             revert_to_self_signed
+            ;;
+        4)
+            certbot_cloudflare_configs
             ;;
         0)
             echo "Exiting..."
