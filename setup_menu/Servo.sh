@@ -45,6 +45,17 @@ PHP_Versions=("7.4" "8.2")
 
 #########################################
 
+function is_valid_domain() {
+    local domain="$1"
+    local regex="^(http(s)?://)?[a-zA-Z0-9.-]+(\.[a-zA-Z]{2,})+$"
+
+    if [[ $domain =~ $regex ]]; then
+        return 0 # Valid domain
+    else
+        return 1 # Invalid domain
+    fi
+}
+
 gen_pass() {
     local length="$1"
     local min_numbers="$2"
@@ -69,13 +80,16 @@ gen_pass() {
     fi
 
     # Define character sets
-    lowercase='abcdefghijklmnopqrstuvwxyz'
-    uppercase='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    numbers='0123456789'
-    special_chars='!@#$%^&*'
+    local lowercase='abcdefghijklmnopqrstuvwxyz'
+    local uppercase='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    local numbers='0123456789'
+    local special_chars='!@#$%^&*'
 
-    # Initialize the password
-    password=""
+    # Initialize the variables
+    local password=""
+    local rand_num=""
+    local rand_special=""
+    local rand_char=""
 
     # Ensure minimum numbers
     for ((i = 0; i < min_numbers; i++)); do
@@ -122,7 +136,7 @@ generate_password() {
 }
 
 # Function to list directory contents and prompt for selection
-function select_from_directory() {
+select_from_directory() {
     # Usage: select_from_directory [directory]
     clear >&2
     local directory="$1"
@@ -162,7 +176,7 @@ function select_from_directory() {
         fi
 
         if [ "$selection" -ge 1 ] && [ "$selection" -lt "$count" ]; then
-            selected_item=$(ls -1 "$directory" | sed -n "${selection}p")
+            local selected_item=$(ls -1 "$directory" | sed -n "${selection}p")
             echo "$directory/$selected_item"
             break
         else
@@ -174,9 +188,15 @@ function select_from_directory() {
 }
 
 generate_php_conf() {
-    username=$1
-    domain=$2
-    phpVer=$3
+    local username=$1
+    local domain=$2
+    local phpVer=$3
+    local memory_limit
+    local time_zone
+    local time_zone
+    local upload_max_filesize
+    local post_max_size
+
     # memory_limit
     read -p "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
     # Use the user input if provided, or the default value if the input is empty
@@ -284,6 +304,14 @@ manage_php() {
 # Function to install PHP
 install_php() {
 
+    local memory_limit
+    local time_zone
+    local upload_max_filesize
+    local post_max_size
+    local enableJIT
+    local time_zone_escaped
+    local composer_php_ver
+
     # memory_limit
     read -p "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
     # Use the user input if provided, or the default value if the input is empty
@@ -327,7 +355,7 @@ install_php() {
         fi
 
         # Essential & Commonly Used Extensions Extensions
-        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap} >/dev/null 2>&1 || (echo "Failed to install" && exit 1)
+        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} >/dev/null 2>&1 || (echo "Failed to install" && return 1)
         # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
@@ -390,6 +418,7 @@ install_php() {
 
 # Function to remove PHP
 remove_php() {
+    local confirmation
     # Ask for confirmation
     read -p "This will purge PHP and its configuration.. Are you sure? (y/n): " confirmation
 
@@ -412,6 +441,7 @@ remove_php() {
 }
 
 manage_nginx() {
+    local choice
     while true; do
         echo "Choose an option:"
         echo "1. Install nginx"
@@ -444,13 +474,13 @@ install_nginx() {
     # COUNTRY="US"
     # STATE="California"
     # LOCALITY="San Francisco"
-    COUNTRY="AE"
-    STATE="Dubai"
-    LOCALITY="Dubai"
-    ORGANIZATION="MyCompany"
-    ORG_UNIT="IT"
-    COMMON_NAME="localhost"
-    EMAIL="webmaster@example.com"
+    local COUNTRY="AE"
+    local STATE="Dubai"
+    local LOCALITY="Dubai"
+    local ORGANIZATION="MyCompany"
+    local ORG_UNIT="IT"
+    local COMMON_NAME="localhost"
+    local EMAIL="webmaster@example.com"
 
     if [ -f "/etc/apt/sources.list.d/nginx.list" ]; then
         echo -e "\nnginx Repo Exists"
@@ -461,7 +491,7 @@ install_nginx() {
         echo
     fi
 
-    PACKAGE_NAME="nginx"
+    local PACKAGE_NAME="nginx"
     # Check if the package is installed
     if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
         echo "$PACKAGE_NAME is already installed."
@@ -479,8 +509,8 @@ install_nginx() {
     rm -rf /var/www/html
 
     # Generate self-signed SSL certificate
-    nginx_key="/etc/ssl/private/nginx.key"
-    nginx_cert="/etc/ssl/certs/nginx.crt"
+    local nginx_key="/etc/ssl/private/nginx.key"
+    local nginx_cert="/etc/ssl/certs/nginx.crt"
     # nginx_dhparams2048="/etc/ssl/dhparams2048.pem"
     # openssl dhparam -out ${nginx_dhparams2048} 2048
 
@@ -673,6 +703,7 @@ EOF
 
 # Function to remove Nginx
 remove_nginx() {
+    local confirmation
     # Ask for confirmation
     read -p "This will purge Nginx and its configuration.. Are you sure? (y/n): " confirmation
 
@@ -694,6 +725,7 @@ remove_nginx() {
 }
 
 manage_mariadb() {
+    local choice
     while true; do
         echo "Choose an option:"
         echo "1. install_mariadb_server"
@@ -823,13 +855,21 @@ backup_db() {
 
 # Function to install MariaDB Server
 install_mariadb_server() {
+    local install_from
+    local PACKAGE_NAME
+    local DB_USER
+    local DB_USER_PASS
+    local DB_NAME
+    local grants_commands
 
     read -p $'Install from:\n 1. Mariadb repo\n 2. Debian repo\n Choice: ' install_from
     if [[ $install_from == "1" ]]; then
         # Add MariaDB Repository
         echo "Adding mariadb repo.."
-        curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {echo "Failed adding Mariadb repo"
-        return}
+        curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {
+            echo "Failed adding Mariadb repo"
+            return 1
+        }
     fi
 
     PACKAGE_NAME="mariadb-server"
@@ -909,6 +949,10 @@ install_mariadb_server() {
 
 # Function to install MariaDB Client
 install_mariadb_client() {
+    local db_host
+    local db_user
+    local db_pass
+
     # Install the MariaDB client
     echo "Installing MariaDB client..."
     apt update
@@ -937,6 +981,8 @@ EOF
 
 # Function to remove MariaDB
 remove_mariadb() {
+    local confirmation
+    local confirmation2
     # Ask for confirmation
     read -p "This will uninstall MariaDB. Are you sure? (y/n): " confirmation
 
@@ -968,6 +1014,7 @@ remove_mariadb() {
 }
 
 manage_memcached() {
+    local choice
     while true; do
         echo "Choose an option:"
         echo "1. Install memcached"
@@ -997,14 +1044,13 @@ manage_memcached() {
 # Function to install Memcached
 install_memcached() {
     # Install Memcached and required dependencies
-    apt update
-    apt install -y memcached libmemcached-tools >/dev/null 2>&1
+    apt update && apt install -y memcached libmemcached-tools || (echo "Failed" && return 1)
 
     # Configure Memcached
-    echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
-    echo "-l 127.0.0.1" >>/etc/memcached.conf # Bind to localhost
-    echo "-p 11211" >>/etc/memcached.conf     # Use port 11211
-    echo "-U 0" >>/etc/memcached.conf         # Run as the root user
+    # echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
+    # echo "-l 127.0.0.1" >>/etc/memcached.conf # Bind to localhost
+    # echo "-p 11211" >>/etc/memcached.conf     # Use port 11211
+    # echo "-U 0" >>/etc/memcached.conf         # Run as the root user
     # echo "-t 4" >>/etc/memcached.conf         # Use 4 threads
 
     # Restart Memcached
@@ -1018,6 +1064,8 @@ install_memcached() {
 
 # Function to remove Memcached
 remove_memcached() {
+    local confirmation
+
     # Ask for confirmation
     read -p "This will purge Memcached and its configuration.. Are you sure? (y/n): " confirmation
 
@@ -1042,6 +1090,15 @@ remove_memcached() {
 
 # Function to install PHPMyAdmin
 install_phpmyadmin() {
+    local vuser
+    local domain
+    local web_dir
+    local PHPMYADMIN_VERSION
+    local INSTALL_DIR
+    local CONFIRM_XYZ
+    local dbadmin_pass
+    local pmapass
+    local BLOWFISH_SECRET
 
     while true; do
         # Prompt for the username
@@ -1135,11 +1192,9 @@ install_phpmyadmin() {
 }
 
 cleanUp() {
-    # Clean up
     apt autoremove
     apt autoclean
     apt update
-    apt autoremove -y
     apt clean
 }
 
@@ -1166,7 +1221,8 @@ install_standard_packages() {
         bzip2 \
         iproute2 \
         pciutils \
-        bc >/dev/null 2>&1
+        bc \
+        jq
 
     echo -e "\nRunning apt purge exim4-*\n"
     apt -y purge exim4-*
@@ -1189,11 +1245,8 @@ install_standard_packages() {
 
 install_configure_SSH() {
 
-    # Update package lists
-    apt update
-
-    # Install SSH server
-    apt install openssh-server -y >/dev/null 2>&1
+    # Update package lists & Install SSH server
+    apt update && apt install openssh-server -y || return 1
 
     # Backup the original configuration
     if [ -e "/etc/ssh/sshd_config_backup" ]; then
@@ -1229,6 +1282,8 @@ install_configure_SSH() {
 }
 
 configure_terminal_system_banners() {
+    local restore_choice
+
     echo "Setting server's timezone to Asia/Dubai"
     timedatectl set-timezone Asia/Dubai || echo "Failed to set timezone"
     echo ""
@@ -1237,8 +1292,7 @@ configure_terminal_system_banners() {
         # Check if Backup exist
         if [ -e "/etc/bash.bashrc.backup" ]; then
             cp /etc/bash.bashrc.backup /etc/bash.bashrc
-            cp_success=$?
-            if [ $cp_success -eq 0 ]; then
+            if [ $? -eq 0 ]; then
                 echo "Original configuration has been restored."
             else
                 echo "Failed to restore original configuration."
@@ -1260,23 +1314,23 @@ configure_terminal_system_banners() {
     # Define the new PS1 prompt with color codes
     # hetzner uses red yeloow cyan yellow pink
     # Define colors using ANSI escape codes
-    RED="\[\033[01;31m\]"
-    GREEN="\[\033[01;32m\]"
-    YELLOW="\[\033[01;33m\]"
-    PINK="\[\033[01;35m\]"
-    CYAN="\[\033[01;36m\]"
-    RESET="\[\033[0m\]"
+    local RED="\[\033[01;31m\]"
+    local GREEN="\[\033[01;32m\]"
+    local YELLOW="\[\033[01;33m\]"
+    local PINK="\[\033[01;35m\]"
+    local CYAN="\[\033[01;36m\]"
+    local RESET="\[\033[0m\]"
 
     # Set the customized PS1 variable
-    CUSTOM_PS1="'\${debian_chroot:+(\$debian_chroot)}${RED}\\u${YELLOW}@${CYAN}\\h ${YELLOW}\\w ${PINK}\\\$ ${RESET}'"
-    escaped_PS1=$(echo "$CUSTOM_PS1" | sed 's/[\/&]/\\&/g')
+    local CUSTOM_PS1="'\${debian_chroot:+(\$debian_chroot)}${RED}\\u${YELLOW}@${CYAN}\\h ${YELLOW}\\w ${PINK}\\\$ ${RESET}'"
+    local escaped_PS1=$(echo "$CUSTOM_PS1" | sed 's/[\/&]/\\&/g')
 
     # Replace the old PS1 line with the new one
     sed -i "s/PS1=.*/PS1=${escaped_PS1}/" /etc/bash.bashrc
 
     # "echo \"IP: \$(hostname -I | awk '{print \$1}') \$(ip -o -4 route show to default | awk '{print $5}')\""
 
-    aliases=(
+    local aliases=(
         "alias ls='ls --color=auto'"
         "alias ll='ls -lh'"
         "alias la='ls -A'"
@@ -1292,7 +1346,7 @@ configure_terminal_system_banners() {
         "sinfo"
     )
     for value in "${aliases[@]}"; do
-        escaped_value=$(printf '%s\n' "$value" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
+        local escaped_value=$(printf '%s\n' "$value" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
         if ! grep -qF "$value" "/etc/bash.bashrc"; then
             echo "$value" >>"/etc/bash.bashrc"
         fi
@@ -1308,7 +1362,7 @@ configure_terminal_system_banners() {
 EOFX
     echo "FServer!" >/etc/motd
 
-    sinfo_script="/usr/local/bin/sinfo"
+    local sinfo_script="/usr/local/bin/sinfo"
     # Use a here document to create the script content
     cat >"$sinfo_script" <<'EOF'
 #!/bin/bash
@@ -1362,7 +1416,7 @@ EOF
 }
 
 add_cloudflare() {
-    cloudflare_script="/usr/local/bin/cloudflare_sync"
+    local cloudflare_script="/usr/local/bin/cloudflare_sync"
     cat >"$cloudflare_script" <<'EOF'
 #!/bin/bash
 
@@ -1409,7 +1463,7 @@ EOF
 
 read_mysql_config() {
     # Array of configuration parameters to check
-    CONFIG_PARAMS=(
+    local CONFIG_PARAMS=(
         "bind_address"
         "character_set_server"
         "collation_server"
@@ -1445,10 +1499,10 @@ read_mysql_config() {
         "table_open_cache"
         "thread_cache_size"
     )
-
+    local param
     # Loop through each configuration parameter and retrieve its value
     for param in "${CONFIG_PARAMS[@]}"; do
-        value=$(mariadb -BNe "SHOW VARIABLES LIKE '$param';" | awk '{print $2}')
+        local value=$(mariadb -BNe "SHOW VARIABLES LIKE '$param';" | awk '{print $2}')
         echo -e "\e[91m${param}=\e[0m $value"
     done
 
@@ -1458,6 +1512,9 @@ read_mysql_config() {
 }
 
 create_vhost() {
+    local domain
+    local vuser
+
     while true; do
         # Prompt for the domain name
         read -p "Enter the domain name (e.g., example.com): " domain
@@ -1486,7 +1543,8 @@ create_vhost() {
     else
         echo "User ${vuser} does not exist."
         useradd -N -m -s $(which bash) -d "/var/www/${vuser}" ${vuser}
-        passwd "$vuser"
+        rm -rf /var/www/${vuser}/{.bashrc,.profile,.bash_logout}
+        passwd -l "$vuser"
 
     fi
 
@@ -1897,12 +1955,19 @@ comment_uncomment() {
   '
 
     # Use AWK to process the config file and redirect the output to a temporary file
-    awk -v search_pattern="$search_pattern" -v comment_uncomment="$comment_uncomment" "$awk_script" "$config_file" >"$config_file.tmp"
+    awk -v search_pattern="$search_pattern" -v comment_uncomment="$comment_uncomment" "$awk_script" "$config_file" >"$config_file.tmp" || {
+        echo " Error in awk in comment_uncomment IN '$config_file'"
+        return 1
+    }
 
     # Replace the original config file with the temporary file
-    mv "$config_file.tmp" "$config_file"
+    mv "$config_file.tmp" "$config_file" || {
+        echo " Error in mv in comment_uncomment IN '$config_file'"
+        return 1
+    }
 
-    echo "Done. Configuration file '$config_file' has been modified."
+    # echo "Success ${comment_uncomment}ing IN '$config_file'"
+    echo "Success"
 
     # Example usage:
     # comment_uncomment "search_pattern" "/path/to/config/file" "comment"
@@ -1934,8 +1999,8 @@ add_line_under_pattern() {
         echo "The new line already exists after the pattern. No duplicate line added."
     else
         # Use sed to insert the new line under the pattern with the same indentation
-        sed -i "\%$escaped_pattern%a\\${indentation}${new_line}" "$config_file"
-        echo "New line added under the pattern '$pattern_to_match' with correct indentation."
+        sed -i "\%$escaped_pattern%a\\${indentation}${new_line}" "$config_file" && echo "Success" || echo "Failed: ADDING '$new_line' UNDER '$pattern_to_match' IN '$config_file' "
+
     fi
 
     # Example usage:
@@ -1944,7 +2009,7 @@ add_line_under_pattern() {
 }
 ######### Certbot Start #########
 # Function to configure Cloudflare
-configure_cloudflare() {
+certbot_create_cloudflare_config() {
     read -p "Enter your Cloudflare email: " cloudflare_email
     read -p "Enter your Cloudflare API key: " cloudflare_api_key
 
@@ -1952,42 +2017,26 @@ configure_cloudflare() {
 
     # Create the Cloudflare configuration
     mkdir -p "/etc/letsencrypt/cloudflare/$config_name"
-    cat >"/etc/letsencrypt/cloudflare/$config_name/cloudflare.ini" <<EOF
-dns_cloudflare_email = $cloudflare_email
-dns_cloudflare_api_key = $cloudflare_api_key
+    cat >"/etc/letsencrypt/cloudflare/${config_name}.ini" <<EOF
+dns_cloudflare_api_token = $cloudflare_api_key
 EOF
-    chmod 600 "/etc/letsencrypt/cloudflare/$config_name/cloudflare.ini"
+    chmod 600 "/etc/letsencrypt/cloudflare/${config_name}.ini"
 }
 
 # Function to list existing Cloudflare configurations and return the selected name
-certbot_cloudflare_configs() {
+certbot_list_cloudflare_config() {
     config_names=()
     echo "Existing Cloudflare configurations:"
     i=1
     for config in /etc/letsencrypt/cloudflare/*; do
-        if [ -d "$config" ]; then
+        if [ -f "$config" ]; then
             config_name=$(basename "$config")
             config_names+=("$config_name")
-            echo " $i. $config_name"
+            echo -e "\n \033[32m$i. $config_name\033[0m"
+            cat "$config"
             ((i++))
         fi
     done
-    echo " 0. Create a new Cloudflare configuration"
-    while true; do
-        read -p "Enter the number of the existing Cloudflare configuration or '0' to create a new one: " choice
-        if [ "$choice" -ge 0 ] && [ "$choice" -le ${#config_names[@]} ]; then
-            if [ "$choice" -eq 0 ]; then
-                configure_cloudflare
-                break
-            else
-                selected_name="${config_names[$((choice - 1))]}"
-                break
-            fi
-        else
-            echo "Invalid choice. Please try again."
-        fi
-    done
-    echo "$selected_name"
 }
 
 # Function to get a new or renew a certificate
@@ -1995,16 +2044,21 @@ get_certbot_certificate() {
     read -p "Enter your domain name (e.g., example.com): " domain_name
 
     # Check if any Cloudflare configurations exist
-    selected_config=$(certbot_cloudflare_configs)
+    selected_config=$(select_from_directory "/etc/letsencrypt/cloudflare")
+    echo "Selected file: $selected_config"
+
+    read -p "Enter enter to continue: " enter_to_continue
 
     # Request the certificate
-    certbot certonly --dns-cloudflare -d "$domain_name" -d "*.$domain_name" --dns-cloudflare-credentials "/etc/letsencrypt/cloudflare/$selected_config/cloudflare.ini"
+    certbot certonly --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 60 --dns-cloudflare-credentials "${selected_config}"
+    # For debugging add: --dry-run -vvv
 
-    snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
-    cat >"$snippet_path" <<EOF
-ssl_certificate /etc/letsencrypt/live/$domain_name/fullchain.pem;
-ssl_certificate_key /etc/letsencrypt/live/$domain_name/privkey.pem;
-EOF
+    # For CURL
+    # zid 1c2a1aaa99b81e8ecfae3d1e81e52e60
+    # curl -X GET "https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?type=TXT&name=_acme-challenge.domain.com" \
+    #   -H "Authorization: Bearer {api_token}" \
+    #   -H "Content-Type:application/json" | jq .
+
 }
 
 set_nginx_cert() {
@@ -2023,44 +2077,57 @@ set_nginx_cert() {
         return 1
     fi
 
-    while true; do
-        # Display a numbered list of configuration files
-        echo "Select an Nginx configuration file to edit (or '0' to go back):"
-        for ((i = 0; i < ${#nginx_confs[@]}; i++)); do
-            echo "[$((i + 1))] ${nginx_confs[i]##*/}"
-        done
+    nginx_config=$(select_from_directory "$nginx_conf_dir")
+    echo "Selected config: $nginx_config"
 
-        # Prompt the user to select a file by number
-        read -p "Enter the number of the configuration file you want to select: " choice
+    domain_name=$(get_domain_from_nginx_conf_path "${nginx_config}")
+    [[ -n $domain_name ]] || {
+        echo "$domain_name"
+        return 1
+    }
 
-        if [ "$choice" -eq 0 ]; then
-            # Option 0 is chosen to go back
-            return 1
-        elif [ "$choice" -ge 1 ] && [ "$choice" -le ${#nginx_confs[@]} ]; then
-            # Check if the chosen number is within the range of available files
-            selected_conf="${nginx_confs[choice - 1]}"
-            echo "Selected Nginx configuration file: $selected_conf"
-            break
-        else
-            echo "Invalid choice. Please enter a valid number or '0' to go back."
-        fi
-    done
+    echo -e "\n Domain: ${domain_name}\n"
 
-    nginx_config="$selected_conf"
+    mkdir -p "/etc/nginx/snippets/"
+    snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+    cat >"$snippet_path" <<EOF
+ssl_certificate $letsencrypt_dir/$domain_name/fullchain.pem;
+ssl_certificate_key $letsencrypt_dir/$domain_name/privkey.pem;
+EOF
 
     # Add or update the include line in the nginx configuration
     if grep -q "include $snippet_path;" "$nginx_config"; then
-        echo "Uncommentting: include $snippet_path"
         comment_uncomment "include $snippet_path;" "$nginx_config" uncomment
-
-        echo "Certificate for $domain_name has been obtained and nginx configuration updated."
     else
-        add_line_under_pattern "include /etc/nginx/snippets/ssl-snippet.conf;" "nginx_config" "include $snippet_path;"
-        echo "Certificate for $domain_name has been obtained and nginx configuration updated."
+        add_line_under_pattern "include ${ssl_nginx_snippet};" "$nginx_config" "include $snippet_path;"
     fi
+    comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" comment
+}
 
-    echo "Commentting: include /etc/nginx/snippets/ssl-snippet.conf;"
-    comment_uncomment "include /etc/nginx/snippets/ssl-snippet.conf;" "$nginx_config" comment
+get_domain_from_nginx_conf_path() {
+    local path="$1"
+
+    # Extract the base filename
+    local domain_name="${path##*/}"
+
+    # Remove the file extension
+    domain_name="${domain_name%.*}"
+
+    # Get domain with subomain
+    # domain_name="${base_filename##*-}"
+
+    # Get domain only - Use awk to split the string by hyphen and capture the last part after the last dot
+    domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
+
+    domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
+
+    if is_valid_domain "$domain_name"; then
+        echo "$domain_name"
+        return 0
+    else
+        echo "$domain_to_check is not a valid domain."
+        return 1
+    fi
 }
 
 # Function to revert to self-signed certificate
@@ -2070,22 +2137,23 @@ revert_to_self_signed() {
     nginx_config=$(select_from_directory "/etc/nginx/sites-available/")
     echo "Selected config: $nginx_config"
 
-    base_filename="${nginx_config##*/}"
-    domain_name="${base_filename##*-}"
-    domain_name="${result%.*}"
+    domain_name=$(get_domain_from_nginx_conf_path "${nginx_config}")
+    [[ -n $domain_name ]] || {
+        echo "$domain_name"
+        return 1
+    }
 
     # nginx_config="/etc/nginx/sites-available/$domain_name"
 
     if [ -f "$nginx_config" ]; then
         snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
 
-        echo "Commentting: include $snippet_path;"
+        # echo "Commenting: include $snippet_path;"
         comment_uncomment "include $snippet_path;" "$nginx_config" comment
 
-        echo "Uncommentting: include /etc/nginx/snippets/ssl-snippet.conf;"
-        comment_uncomment "include /etc/nginx/snippets/ssl-snippet.conf;" "$nginx_config" uncomment
+        comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" uncomment
 
-        echo "Reverted $domain_name to use the self-signed certificate."
+        # echo "Reverted $domain_name to use the self-signed certificate."
     else
         echo "Nginx configuration file not found."
     fi
@@ -2099,12 +2167,15 @@ manage_certbot() {
         apt-get -y install certbot python3-certbot-dns-cloudflare
     fi
     while true; do
+        echo -e "\033[33m"
         echo "Choose an option:"
         echo "1. Get/Renew Certificate"
         echo "2. Set nginx Cert"
         echo "3. Revert nginx to Self-Signed Certificate"
-        echo "4. certbot cloudflare configs"
+        echo "4. List cloudflare configs"
+        echo "5. Create cloudflare config"
         echo "0. Quit"
+        echo -e "\033[0m"
 
         read -p "Enter your choice: " choice
 
@@ -2119,7 +2190,10 @@ manage_certbot() {
             revert_to_self_signed
             ;;
         4)
-            certbot_cloudflare_configs
+            certbot_list_cloudflare_config
+            ;;
+        5)
+            certbot_create_cloudflare_config
             ;;
         0)
             echo "Exiting..."
@@ -2133,10 +2207,102 @@ manage_certbot() {
 }
 ######### Certbot END #########
 
+list_users() {
+    RED='\033[1;31m'
+    GREEN='\033[1;32m'
+    YELLOW='\033[1;33m'
+    RESET='\033[0m'
+
+    # Create a header for the table
+    printf "${GREEN}%-20s%-20s%-20s%-20s%-20s${RESET}\n" "Username" "User ID" "Group ID" "Home Directory" "Can Login"
+
+    # Use the awk command to extract user information and format it
+    awk -F: 'BEGIN {OFS="\t"} {print $1, $3, $4, $6}' /etc/passwd |
+        while IFS=$'\t' read -r username uid gid home; do
+            can_login=$(awk -F: -v user="$username" '$1 == user {print $2}' /etc/shadow)
+            if [[ "$can_login" == *":"* || "$can_login" == "!"* ]]; then
+                login_status="${RED}No${RESET}"
+            else
+                login_status="${GREEN}Yes${RESET}"
+            fi
+            printf "${YELLOW}%-20s${RESET}%-20s%-20s%-20s${login_status}\n" "$username" "$uid" "$gid" "$home"
+        done
+
+}
+
+list_groups() {
+    GREEN='\033[1;32m'
+    YELLOW='\033[1;33m'
+    RESET='\033[0m'
+
+    # Create a header for the table
+    printf "${GREEN}%-20s%-20s%-20s${RESET}\n" "Group Name" "Group ID" "Group Members"
+
+    # Iterate through each group, list members, and sort by group name
+    for groupname in $(cut -d: -f1 /etc/group | sort); do
+        gid=$(getent group "$groupname" | cut -d: -f3)
+        members=$(members "$groupname" 2>/dev/null)
+
+        if [ -z "$members" ]; then
+            members="N/A"
+        fi
+
+        printf "${YELLOW}%-20s${RESET}%-20s${members}\n" "$groupname" "$gid"
+    done
+
+}
+
+manage_users() {
+
+    # Check if the 'members' command is available
+    if ! command -v members >/dev/null 2>&1; then
+        echo "The 'members' command is not installed. Installing..."
+        apt update && apt-get install -y members
+    fi
+    while true; do
+        echo -e "\033[33m"
+        echo "Choose an option:"
+        echo "1. List Users"
+        echo "2. List Groups"
+        echo "3. "
+        echo "4. "
+        echo "5. "
+        echo "0. Quit"
+        echo -e "\033[0m"
+
+        read -p "Enter your choice: " choice
+
+        case $choice in
+        1)
+            list_users
+            ;;
+        2)
+            list_groups
+            ;;
+        3) ;;
+        4) ;;
+        5) ;;
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
+        esac
+    done
+}
 # Function to display the menu
 display_menu() {
     clear
-    echo "===== Farid's Setup Menu v${version} ====="
+
+    # echo "Usage: $0 <function_name> [function_arguments]"
+    echo -e "\033[93mAvailable functions:\033[94m"
+    echo "  backup_db [database_name] [save_location]"
+    echo "  restore_db [database_name] [db_filename]"
+    echo "  fix_permissions <target> <user> <group>"
+
+    echo -e "\033[93m===== Farid's Setup Menu v${version} =====\033[92m"
     echo "1. Manage PHP 7 and 8"
     echo "2. Manage Nginx"
     echo "3. Manage MariaDB"
@@ -2154,9 +2320,10 @@ display_menu() {
     echo "15 Create vhost"
     echo "16 Set Files/Folders Permissions"
     echo "17 Manage Certbot"
+    echo "18 Manage Users"
 
     echo "0. Exit"
-    echo "==============================="
+    echo -e "\033[93m===============================\033[0m"
 }
 
 if [ $# -ge 1 ]; then
@@ -2166,11 +2333,6 @@ if [ $# -ge 1 ]; then
 else
     # Main script loop
     while true; do
-        echo "Usage: $0 <function_name> [function_arguments]"
-        echo "Available functions:"
-        echo "  backup_db [database_name] [save_location]"
-        echo "  restore_db [database_name] [db_filename]"
-        echo "  fix_permissions <target> <user> <group>"
 
         display_menu
         read -p "Enter your choice: " choice
@@ -2193,6 +2355,7 @@ else
         15) create_vhost ;;
         16) fix_permissions ;;
         17) manage_certbot ;;
+        18) manage_users ;;
         0) exit ;;
         *) echo "Invalid choice. Please select again." ;;
         esac
