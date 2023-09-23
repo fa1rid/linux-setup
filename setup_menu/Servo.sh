@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="0.3.0"
+servo_version="0.3.1"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -19,14 +19,14 @@ check_for_update() {
     fi
     latest_version=$(curl -s "https://raw.githubusercontent.com/${github_repo}/main/${script_folder}/version.txt")
     echo "Latest Version: ($latest_version)"
-    if [ "$latest_version" != "$version" ]; then
+    if [ "$latest_version" != "$servo_version" ]; then
         echo "A newer version ($latest_version) is available. Updating..."
         curl -so "${local_script_path}${script_name}" "https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name" || echo "Failed to connect"
         chmod +x "${local_script_path}${script_name}"
         echo "Update complete. Please run the script again."
         exit 0
     else
-        echo "You have the latest version ($version) of the script."
+        echo "You have the latest version ($servo_version) of the script."
     fi
 }
 
@@ -2238,28 +2238,22 @@ manage_users() {
         echo "2. List Groups"
         echo "3. "
         echo "4. "
-        echo "5. "
         echo "0. Quit"
         echo -e "\033[0m"
 
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            list_users
+        1) list_users
             ;;
-        2)
-            list_groups
+        2) list_groups
             ;;
         3) ;;
         4) ;;
-        5) ;;
-        0)
-            echo "Exiting..."
+        0) echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
+        *) echo "Invalid choice."
             ;;
         esac
     done
@@ -2278,18 +2272,14 @@ manage_rsync() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            install_rsync
+        1) install_rsync
             ;;
-        2)
-            rsync_push_letsencrypt
+        2) rsync_push_letsencrypt
             ;;
-        0)
-            echo "Exiting..."
+        0) echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
+        *) echo "Invalid choice."
             ;;
         esac
     done
@@ -2302,7 +2292,7 @@ install_rsync() {
         apt update && apt-get install -y rsync
     fi
 
-    echo "adding log rotation"
+    echo -e "\nAdding log rotation.."
     cat >/etc/logrotate.d/rsync <<EOFX
 /var/log/rsync/*.log {
     daily
@@ -2340,7 +2330,7 @@ display_menu() {
     echo "  restore_db [database_name] [db_filename]"
     echo "  fix_permissions <target> <user> <group>"
 
-    echo -e "\033[93m===== Farid's Setup Menu v${version} =====\033[92m"
+    echo -e "\033[93m===== Farid's Setup Menu v${servo_version} =====\033[92m"
     echo "1. Manage PHP 7 and 8"
     echo "2. Manage Nginx"
     echo "3. Manage MariaDB"
@@ -2359,6 +2349,7 @@ display_menu() {
     echo "16 Set Files/Folders Permissions"
     echo "17 Manage Certbot"
     echo "18 Manage Users"
+    echo "19 Manage Rsync"
 
     echo "0. Exit"
     echo -e "\033[93m===============================\033[0m"
@@ -2394,6 +2385,7 @@ else
         16) fix_permissions ;;
         17) manage_certbot ;;
         18) manage_users ;;
+        19) manage_rsync ;;
         0) exit ;;
         *) echo "Invalid choice. Please select again." ;;
         esac
