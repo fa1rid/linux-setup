@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.1"
+servo_version="0.3.2"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -34,7 +34,7 @@ check_for_update() {
 
 cron_dir="/root/cron/"
 mkdir -p ${cron_dir}
-
+cloudflare_config_dir="/etc/letsencrypt/cloudflare"
 ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
 common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
 caching_nginx_snippet="/etc/nginx/snippets/caching-snippet.conf"
@@ -1988,11 +1988,11 @@ certbot_create_cloudflare_config() {
     config_name="$cloudflare_email"
 
     # Create the Cloudflare configuration
-    mkdir -p "/etc/letsencrypt/cloudflare/$config_name"
-    cat >"/etc/letsencrypt/cloudflare/${config_name}.ini" <<EOF
+    mkdir -p "${cloudflare_config_dir}/$config_name"
+    cat >"${cloudflare_config_dir}/${config_name}.ini" <<EOF
 dns_cloudflare_api_token = $cloudflare_api_key
 EOF
-    chmod 600 "/etc/letsencrypt/cloudflare/${config_name}.ini"
+    chmod 600 "${cloudflare_config_dir}/${config_name}.ini"
 }
 
 # Function to list existing Cloudflare configurations and return the selected name
@@ -2000,7 +2000,7 @@ certbot_list_cloudflare_config() {
     config_names=()
     echo "Existing Cloudflare configurations:"
     i=1
-    for config in /etc/letsencrypt/cloudflare/*; do
+    for config in ${cloudflare_config_dir}/*; do
         if [ -f "$config" ]; then
             config_name=$(basename "$config")
             config_names+=("$config_name")
@@ -2016,7 +2016,7 @@ get_certbot_certificate() {
     read -p "Enter your domain name (e.g., example.com): " domain_name
 
     # Check if any Cloudflare configurations exist
-    selected_config=$(select_from_directory "/etc/letsencrypt/cloudflare")
+    selected_config=$(select_from_directory "${cloudflare_config_dir}")
     echo "Selected file: $selected_config"
 
     read -p "Enter enter to continue: " enter_to_continue
@@ -2316,7 +2316,7 @@ rsync_push_letsencrypt() {
     read -rp "enter host or IP: " host
     read -rp "enter port: " port
     read -rp "enter user: " user
-    rsync --delete --stats -uavhz /etc/letsencrypt/live/ -e "ssh -p $port" ${user}@${host}:/etc/letsencrypt/live/ >>/var/log/rsync/letsencrypt.log
+    rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzR /etc/letsencrypt/ -e "ssh -p $port" ${user}@${host}:/
 
 }
 
