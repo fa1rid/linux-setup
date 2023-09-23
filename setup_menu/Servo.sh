@@ -471,16 +471,13 @@ manage_nginx() {
 # Function to install Nginx
 install_nginx() {
 
-    # COUNTRY="US"
-    # STATE="California"
-    # LOCALITY="San Francisco"
-    local COUNTRY="AE"
-    local STATE="Dubai"
-    local LOCALITY="Dubai"
-    local ORGANIZATION="MyCompany"
-    local ORG_UNIT="IT"
+    # local COUNTRY="AE"
+    # local STATE="Dubai"
+    # local LOCALITY="Dubai"
+    # local ORGANIZATION="MyCompany"
+    # local ORG_UNIT="IT"
     local COMMON_NAME="localhost"
-    local EMAIL="webmaster@example.com"
+    # local EMAIL="webmaster@example.com"
 
     if [ -f "/etc/apt/sources.list.d/nginx.list" ]; then
         echo -e "\nnginx Repo Exists"
@@ -516,10 +513,11 @@ install_nginx() {
 
     if [ ! -f "$nginx_cert" ] || [ ! -f "$nginx_key" ]; then
         echo -e "\nGenerating new self-signed cert for nginx.."
-        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        openssl req -x509 -nodes -days 3650 -newkey ed25519 \
             -keyout "$nginx_key" \
             -out "$nginx_cert" \
-            -subj "/C=$COUNTRY/ST=$STATE/L=$LOCALITY/O=$ORGANIZATION/OU=$ORG_UNIT/CN=$COMMON_NAME/emailAddress=$EMAIL"
+            -subj "/CN=$COMMON_NAME"
+        # -subj "/C=$COUNTRY/ST=$STATE/L=$LOCALITY/O=$ORGANIZATION/OU=$ORG_UNIT/CN=$COMMON_NAME/emailAddress=$EMAIL"
     fi
 
     # Configure nginx for production use
@@ -535,7 +533,7 @@ install_nginx() {
         echo "SSL snippet file generated at $ssl_nginx_snippet"
     fi
 
-    cat >"${caching_nginx_snippet}" <<EOF
+    cat >"${caching_nginx_snippet}" <<EOFX
 location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)\$ {
     # expires 30d;
     add_header Cache-Control "max-age=2592000, public";
@@ -544,9 +542,9 @@ location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)\$ {
     open_file_cache_min_uses 4;
     open_file_cache_errors on;
 }
-EOF
+EOFX
 
-    cat >"${common_nginx_snippet}" <<EOF
+    cat >"${common_nginx_snippet}" <<EOFX
 index index.html index.htm index.php;
 # index "index.html" "index.cgi" "index.pl" "index.php" "index.xhtml" "index.htm" "index.shtml";
 
@@ -583,8 +581,8 @@ location = /xmlrpc.php {
     log_not_found off;
     return 444;
 }
-EOF
-    bash -c 'cat <<EOT >/etc/nginx/nginx.conf
+EOFX
+    bash -c 'cat <<EOTX >/etc/nginx/nginx.conf
 user www-data;
 worker_processes auto;
 worker_rlimit_nofile 20960;
@@ -620,9 +618,33 @@ http {
     include /etc/nginx/conf.d/*.conf;
     include /etc/nginx/sites-enabled/*;
 }
-EOT'
+EOTX'
+    local compression_types='application/atom+xml
+application/javascript
+application/json
+application/rss+xml
+application/vnd.ms-fontobject
+application/x-font-opentype
+application/x-font-truetype
+application/x-font-ttf
+application/x-javascript
+application/xhtml+xml
+application/xml
+font/eot
+font/opentype
+font/otf
+font/truetype
+image/svg+xml
+image/vnd.microsoft.icon
+image/x-icon
+image/x-win-bitmap
+text/css
+text/javascript
+text/plain
+text/xml
+text/x-component;'
 
-    cat >/etc/nginx/conf.d/gzip.conf <<EOF
+    cat >/etc/nginx/conf.d/gzip.conf <<EOFX
 gzip on;
 gzip_static on;
 gzip_comp_level 5;
@@ -631,63 +653,17 @@ gzip_proxied any;
 gzip_vary on;
 
 gzip_types
-application/atom+xml
-application/javascript
-application/json
-application/rss+xml
-application/vnd.ms-fontobject
-application/x-font-opentype
-application/x-font-truetype
-application/x-font-ttf
-application/x-javascript
-application/xhtml+xml
-application/xml
-font/eot
-font/opentype
-font/otf
-font/truetype
-image/svg+xml
-image/vnd.microsoft.icon
-image/x-icon
-image/x-win-bitmap
-text/css
-text/javascript
-text/plain
-text/xml
-text/x-component;
-EOF
-    cat >/etc/nginx/conf.d/brotli.conf <<EOF
+$compression_types
+EOFX
+    cat >/etc/nginx/conf.d/brotli.conf <<EOFX
 brotli on;
 brotli_comp_level 6;
 brotli_static on;
 brotli_min_length 10000; #10kb
 
 brotli_types
-application/atom+xml
-application/javascript
-application/json
-application/rss+xml
-application/vnd.ms-fontobject
-application/x-font-opentype
-application/x-font-truetype
-application/x-font-ttf
-application/x-javascript
-application/xhtml+xml
-application/xml
-font/eot
-font/opentype
-font/otf
-font/truetype
-image/svg+xml
-image/vnd.microsoft.icon
-image/x-icon
-image/x-win-bitmap
-text/css
-text/javascript
-text/plain
-text/xml
-text/x-component;
-EOF
+$compression_types
+EOFX
 
     if [ ! -f "/etc/nginx/sites-available/default.disabled" ]; then
         mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default.disabled
@@ -736,7 +712,6 @@ manage_mariadb() {
         echo "0. Quit"
 
         read -p "Enter your choice: " choice
-
         case $choice in
         1)
             install_mariadb_server
@@ -762,7 +737,6 @@ manage_mariadb() {
             ;;
         esac
     done
-
     # Backup:
     # mysqldump database_name > backup.sql
     # To back up all the databases:
@@ -772,7 +746,6 @@ manage_mariadb() {
     # mysql < backup.sql
     # To restore the data to a specific database, include the database name in the command
     # mysql -D bitnami_app < backup.sql
-
 }
 
 # Function to restore a database from a dump
@@ -1615,7 +1588,7 @@ generate_nginx_vhost() {
         server_name="server_name $domain www.${domain}"
     fi
 
-    cat <<EOT >/etc/nginx/sites-available/${vuser}-${domain}.conf
+    cat >/etc/nginx/sites-available/${vuser}-${domain}.conf <<EOTX
 server {
     listen 80;
     ${server_name};
@@ -1682,7 +1655,7 @@ server {
        try_files \$uri \$uri/ /index.php\$is_args\$args;
     }
 }
-EOT
+EOTX
 }
 
 install_more_packages() {
@@ -1755,7 +1728,6 @@ manage_wordpress() {
         echo "0. Quit"
 
         read -p "Enter your choice: " choice
-
         case $choice in
         1)
             install_wordpress
@@ -2090,10 +2062,10 @@ set_nginx_cert() {
 
     mkdir -p "/etc/nginx/snippets/"
     snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
-    cat >"$snippet_path" <<EOF
+    cat >"$snippet_path" <<EOFX
 ssl_certificate $letsencrypt_dir/$domain_name/fullchain.pem;
 ssl_certificate_key $letsencrypt_dir/$domain_name/privkey.pem;
-EOF
+EOFX
 
     # Add or update the include line in the nginx configuration
     if grep -q "include $snippet_path;" "$nginx_config"; then
@@ -2292,6 +2264,72 @@ manage_users() {
         esac
     done
 }
+
+manage_rsync() {
+
+    while true; do
+        echo -e "\033[33m"
+        echo "Choose an option:"
+        echo "1. Install rsync & add log rotation"
+        echo "2. rsync_push_letsencrypt"
+        echo "0. Quit"
+        echo -e "\033[0m"
+
+        read -p "Enter your choice: " choice
+
+        case $choice in
+        1)
+            install_rsync
+            ;;
+        2)
+            rsync_push_letsencrypt
+            ;;
+        0)
+            echo "Exiting..."
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
+        esac
+    done
+}
+
+install_rsync() {
+    # Check if the 'rsync' command is available
+    if ! command -v rsync >/dev/null 2>&1; then
+        echo "The 'rsync' command is not installed. Installing..."
+        apt update && apt-get install -y rsync
+    fi
+
+    echo "adding log rotation"
+    cat >/etc/logrotate.d/rsync <<EOFX
+/var/log/rsync/*.log {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 640 root root
+}
+EOFX
+    mkdir /var/log/rsync
+    chown root:root /var/log/rsync
+    chmod 640 /var/log/rsync
+}
+
+rsync_push_letsencrypt() {
+    local host
+    local port
+    local user
+    read -rp "enter host or IP: " host
+    read -rp "enter port: " port
+    read -rp "enter user: " user
+    rsync --delete --stats -uavhz /etc/letsencrypt/live/ -e "ssh -p $port" ${user}@${host}:/etc/letsencrypt/live/ >>/var/log/rsync/letsencrypt.log
+
+}
+
 # Function to display the menu
 display_menu() {
     clear
