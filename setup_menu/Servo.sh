@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.2"
+servo_version="0.3.3"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -136,8 +136,8 @@ generate_password() {
 }
 
 # Function to list directory contents and prompt for selection
-select_from_directory() {
-    # Usage: select_from_directory [directory]
+select_from_dir() {
+    # Usage: select_from_dir [directory]
     clear >&2
     local directory="$1"
     local selection=
@@ -1577,9 +1577,10 @@ create_vhost() {
 }
 
 generate_nginx_vhost() {
-    vuser="$1"
-    domain="$2"
-    phpVer="$3"
+    local vuser="$1"
+    local domain="$2"
+    local phpVer="$3"
+    local server_name
 
     read -p "Is this default domain? (y/n) " is_default
     if [[ "$is_default" == "y" ]]; then
@@ -1661,7 +1662,7 @@ EOTX
 install_more_packages() {
     apt update
 
-    apt install -y build-essential software-properties-common python3 python3-pip >/dev/null 2>&1
+    apt install -y build-essential software-properties-common python3 python3-pip
 
     echo "More Packages installation complete."
 }
@@ -1703,18 +1704,14 @@ manage_docker() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            install_docker
+        1) install_docker
             ;;
-        2)
-            remove_docker
+        2) remove_docker
             ;;
-        0)
-            echo "Exiting..."
+        0) echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
+        *) echo "Invalid choice."
             ;;
         esac
     done
@@ -1729,22 +1726,22 @@ manage_wordpress() {
 
         read -p "Enter your choice: " choice
         case $choice in
-        1)
-            install_wordpress
+        1) install_wordpress
             ;;
 
-        0)
-            echo "Exiting..."
+        0) echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
+        *) echo "Invalid choice."
             ;;
         esac
     done
 }
 
 install_wordpress() {
+    local install_dir
+    local local_user
+    local wpURL
     # Prompt for the installation directory
     read -p "Enter the full path where you want to install WordPress (e.g., /var/www/html/myblog): " install_dir
     read -p "Enter the user that will run wp: " local_user
@@ -1765,16 +1762,16 @@ install_wordpress() {
     fi
 
     # Database name, user, and admin user
-    hex=$(openssl rand -hex 3)
-    DB_NAME="wp_${hex}"
-    DB_USER="wp_${hex}"
-    DB_PASS=$(openssl rand -base64 12)
-    WP_ADMIN_USER="admin"
-    WP_ADMIN_PASS=$(openssl rand -base64 12)
+    local hex=$(openssl rand -hex 3)
+    local DB_NAME="wp_${hex}"
+    local DB_USER="wp_${hex}"
+    local DB_PASS=$(openssl rand -base64 12)
+    local WP_ADMIN_USER="admin"
+    local WP_ADMIN_PASS=$(openssl rand -base64 12)
 
-    WP_ADMIN_EMAIL="user@example.com"
-    WP_URL="${wpURL}"
-    WP_TITLE="Your Site Title"
+    local WP_ADMIN_EMAIL="user@example.com"
+    local WP_URL="${wpURL}"
+    local WP_TITLE="Your Site Title"
 
     # Create MySQL database and user
     mariadb <<MYSQL_SCRIPT
@@ -1982,6 +1979,8 @@ add_line_under_pattern() {
 ######### Certbot Start #########
 # Function to configure Cloudflare
 certbot_create_cloudflare_config() {
+    local cloudflare_email
+    local cloudflare_api_key
     read -p "Enter your Cloudflare email: " cloudflare_email
     read -p "Enter your Cloudflare API key: " cloudflare_api_key
 
@@ -1997,12 +1996,12 @@ EOF
 
 # Function to list existing Cloudflare configurations and return the selected name
 certbot_list_cloudflare_config() {
-    config_names=()
+    local config_names=()
     echo "Existing Cloudflare configurations:"
     i=1
     for config in ${cloudflare_config_dir}/*; do
         if [ -f "$config" ]; then
-            config_name=$(basename "$config")
+            local config_name=$(basename "$config")
             config_names+=("$config_name")
             echo -e "\n \033[32m$i. $config_name\033[0m"
             cat "$config"
@@ -2013,17 +2012,22 @@ certbot_list_cloudflare_config() {
 
 # Function to get a new or renew a certificate
 get_certbot_certificate() {
+    local domain_name
     read -p "Enter your domain name (e.g., example.com): " domain_name
 
     # Check if any Cloudflare configurations exist
-    selected_config=$(select_from_directory "${cloudflare_config_dir}")
+    local selected_config=$(select_from_dir "${cloudflare_config_dir}")
     echo "Selected file: $selected_config"
 
-    read -p "Enter enter to continue: " enter_to_continue
+    read -p "Press Enter to continue..."
 
     # Request the certificate
-    certbot certonly --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 60 --dns-cloudflare-credentials "${selected_config}"
+    certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 60 --dns-cloudflare-credentials "${selected_config}"
     # For debugging add: --dry-run -vvv
+    if [ $? -eq 0 ]; then
+        mkdir -p /etc/ssl
+        cp -r /etc/letsencrypt/live/${domain_name} /etc/ssl/
+    fi
 
     # For CURL
     # zid 1c2a1aaa99b81e8ecfae3d1e81e52e60
@@ -2036,9 +2040,7 @@ get_certbot_certificate() {
 set_nginx_cert() {
 
     local nginx_conf_dir="/etc/nginx/sites-available"
-    local letsencrypt_dir="/etc/letsencrypt/live"
-    local selected_conf=""
-    local selected_letsencrypt=""
+    local ssl_dir="/etc/ssl"
 
     # List all Nginx configuration files in the directory
     local nginx_confs=("$nginx_conf_dir"/*)
@@ -2049,10 +2051,10 @@ set_nginx_cert() {
         return 1
     fi
 
-    nginx_config=$(select_from_directory "$nginx_conf_dir")
+    nginx_config=$(select_from_dir "$nginx_conf_dir")
     echo "Selected config: $nginx_config"
 
-    domain_name=$(get_domain_from_nginx_conf_path "${nginx_config}")
+    local domain_name=$(get_domain_from_nginx_conf_path "${nginx_config}")
     [[ -n $domain_name ]] || {
         echo "$domain_name"
         return 1
@@ -2063,8 +2065,8 @@ set_nginx_cert() {
     mkdir -p "/etc/nginx/snippets/"
     snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
     cat >"$snippet_path" <<EOFX
-ssl_certificate $letsencrypt_dir/$domain_name/fullchain.pem;
-ssl_certificate_key $letsencrypt_dir/$domain_name/privkey.pem;
+ssl_certificate $ssl_dir/$domain_name/fullchain.pem;
+ssl_certificate_key $ssl_dir/$domain_name/privkey.pem;
 EOFX
 
     # Add or update the include line in the nginx configuration
@@ -2106,10 +2108,10 @@ get_domain_from_nginx_conf_path() {
 revert_to_self_signed() {
     # read -p "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
     echo "Select nginx config"
-    nginx_config=$(select_from_directory "/etc/nginx/sites-available/")
+    local nginx_config=$(select_from_dir "/etc/nginx/sites-available/")
     echo "Selected config: $nginx_config"
 
-    domain_name=$(get_domain_from_nginx_conf_path "${nginx_config}")
+    local domain_name=$(get_domain_from_nginx_conf_path "${nginx_config}")
     [[ -n $domain_name ]] || {
         echo "$domain_name"
         return 1
@@ -2118,7 +2120,7 @@ revert_to_self_signed() {
     # nginx_config="/etc/nginx/sites-available/$domain_name"
 
     if [ -f "$nginx_config" ]; then
-        snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+        local snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
 
         # echo "Commenting: include $snippet_path;"
         comment_uncomment "include $snippet_path;" "$nginx_config" comment
@@ -2135,8 +2137,7 @@ manage_certbot() {
     # Check if Certbot is installed
     if ! command -v certbot &>/dev/null; then
         echo "Certbot is not installed. Installing Certbot..."
-        apt-get update
-        apt-get -y install certbot python3-certbot-dns-cloudflare
+        apt-get update && apt-get -y install certbot python3-certbot-dns-cloudflare
     fi
     while true; do
         echo -e "\033[33m"
@@ -2152,27 +2153,20 @@ manage_certbot() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            get_certbot_certificate
+        1) get_certbot_certificate
             ;;
-        2)
-            set_nginx_cert
+        2) set_nginx_cert
             ;;
-        3)
-            revert_to_self_signed
+        3) revert_to_self_signed
             ;;
-        4)
-            certbot_list_cloudflare_config
+        4) certbot_list_cloudflare_config
             ;;
-        5)
-            certbot_create_cloudflare_config
+        5) certbot_create_cloudflare_config
             ;;
-        0)
-            echo "Exiting..."
+        0) echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
+        *) echo "Invalid choice."
             ;;
         esac
     done
@@ -2180,10 +2174,12 @@ manage_certbot() {
 ######### Certbot END #########
 
 list_users() {
-    RED='\033[1;31m'
-    GREEN='\033[1;32m'
-    YELLOW='\033[1;33m'
-    RESET='\033[0m'
+    local RED='\033[1;31m'
+    local GREEN='\033[1;32m'
+    local YELLOW='\033[1;33m'
+    local RESET='\033[0m'
+    local login_status
+    local can_login
 
     # Create a header for the table
     printf "${GREEN}%-20s%-20s%-20s%-20s%-20s${RESET}\n" "Username" "User ID" "Group ID" "Home Directory" "Can Login"
@@ -2203,9 +2199,11 @@ list_users() {
 }
 
 list_groups() {
-    GREEN='\033[1;32m'
-    YELLOW='\033[1;33m'
-    RESET='\033[0m'
+    local GREEN='\033[1;32m'
+    local YELLOW='\033[1;33m'
+    local RESET='\033[0m'
+    local gid
+    local members
 
     # Create a header for the table
     printf "${GREEN}%-20s%-20s%-20s${RESET}\n" "Group Name" "Group ID" "Group Members"
@@ -2310,14 +2308,18 @@ EOFX
 }
 
 rsync_push_letsencrypt() {
+    local path=$(select_from_dir "/etc/letsencrypt/live/")
+    local domain="${path##*/}"
     local host
     local port
     local user
-    read -rp "enter host or IP: " host
-    read -rp "enter port: " port
-    read -rp "enter user: " user
-    rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzR /etc/letsencrypt/ -e "ssh -p $port" ${user}@${host}:/
-
+    read -rp "Enter host or IP: " host
+    read -rp "Enter port: " port
+    read -rp "Enter user (default root): " user
+    if [ -z "$user" ]; then
+        user=root
+    fi
+    rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL /etc/letsencrypt/live/${domain} -e "ssh -p $port" ${user}@${host}:/etc/ssl/
 }
 
 # Function to display the menu
@@ -2356,7 +2358,7 @@ display_menu() {
 }
 
 if [ $# -ge 1 ]; then
-    function_name="$1"
+    local function_name="$1"
     shift # Remove the function name from the argument list
     "$function_name" "$@"
 else
