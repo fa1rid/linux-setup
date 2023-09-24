@@ -541,14 +541,10 @@ location = /robots.txt {
     log_not_found off;
 }
 
-location ~ /\.ht {
+location ~ /\.(.*) {
     deny all;
 }
 
-# Deny access to any git repository
-location ~ /\.git {
-    deny all;
-}
 
 # Deny access to xmlrpc.php - a common brute force target against Wordpress
 location = /xmlrpc.php {
@@ -2315,3 +2311,16 @@ else
         read -p "Press Enter to continue..."
     done
 fi
+
+# Wordpress
+# define('WP_MEMORY_LIMIT', '256M');
+# wp plugin list
+# wp plugin deactivate --all
+# wp plugin deactivate [plugin_name]
+# wp theme activate twentynineteen
+# "plugins" folder change the folder name to something like "plugins_disabled"
+# To identify the problematic plugin, (e.g., plugin-name to _plugin-name)
+# define('WP_DEBUG', true);
+# define('WP_DEBUG_LOG', true);
+# define('WP_DEBUG_DISPLAY', false);
+# @ini_set('display_errors',0);
