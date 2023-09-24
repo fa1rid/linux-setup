@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.6"
+servo_version="0.3.7"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -286,7 +286,7 @@ manage_php() {
         case $choice in
         1) install_php ;;
         2) remove_php ;;
-        0) echo "Exiting..." && return 0 ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -409,11 +409,10 @@ install_php() {
 
 # Function to remove PHP
 remove_php() {
-    local confirmation
-    # Ask for confirmation
-    read -p "This will purge PHP and its configuration.. Are you sure? (y/n): " confirmation
+    local confirm
+    read -p "This will purge PHP and its configuration.. Are you sure? (y/n): " confirm
 
-    if [[ $confirmation != "y" ]]; then
+    if [[ $confirm != "y" ]]; then
         echo "Aborting."
         return 0
     fi
@@ -444,7 +443,7 @@ manage_nginx() {
         case $choice in
         1) install_nginx ;;
         2) remove_nginx ;;
-        0) echo "Exiting..." && return 0 ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -453,13 +452,7 @@ manage_nginx() {
 # Function to install Nginx
 install_nginx() {
 
-    # local COUNTRY="AE"
-    # local STATE="Dubai"
-    # local LOCALITY="Dubai"
-    # local ORGANIZATION="MyCompany"
-    # local ORG_UNIT="IT"
     local COMMON_NAME="localhost"
-    # local EMAIL="webmaster@example.com"
 
     if [ -f "/etc/apt/sources.list.d/nginx.list" ]; then
         echo -e "\nnginx Repo Exists"
@@ -703,7 +696,7 @@ manage_mariadb() {
         4) backup_db ;;
         5) restore_db ;;
         5) create_db_user ;;
-        0) echo "Exiting..." && return 0 ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -959,7 +952,7 @@ manage_memcached() {
     while true; do
         echo "Choose an option:"
         echo "1. Install memcached"
-        echo "23. Remove (purge) memcached"
+        echo "2. Remove (purge) memcached"
         echo "0. Quit"
 
         read -p "Enter your choice: " choice
@@ -967,7 +960,7 @@ manage_memcached() {
         case $choice in
         1) install_memcached ;;
         2) remove_memcached ;;
-        0) echo "Exiting..." && return 0 ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -1663,7 +1656,7 @@ manage_docker() {
         case $choice in
         1) install_docker ;;
         2) remove_docker ;;
-        0) echo "Exiting..." && return 0 ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -1674,13 +1667,12 @@ manage_wordpress() {
     while true; do
         echo "Choose an option:"
         echo "1. Install Wordpress"
-        # echo "2. Remove (purge) docker"
         echo "0. Quit"
 
         read -p "Enter your choice: " choice
         case $choice in
         1) install_wordpress ;;
-        0) echo "Exiting..." && return 0 ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -1989,15 +1981,6 @@ set_nginx_cert() {
     local nginx_conf_dir="/etc/nginx/sites-available"
     local ssl_dir="/etc/ssl"
 
-    # List all Nginx configuration files in the directory
-    local nginx_confs=("$nginx_conf_dir"/*)
-
-    # Check if there are any configuration files
-    if [ ${#nginx_confs[@]} -eq 0 ]; then
-        echo "No Nginx configuration files found in $nginx_conf_dir."
-        return 1
-    fi
-
     nginx_config=$(select_from_dir "$nginx_conf_dir")
     echo "Selected config: $nginx_config"
 
@@ -2011,6 +1994,7 @@ set_nginx_cert() {
 
     mkdir -p "/etc/nginx/snippets/"
     snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+
     cat >"$snippet_path" <<EOFX
 ssl_certificate $ssl_dir/$domain_name/fullchain.pem;
 ssl_certificate_key $ssl_dir/$domain_name/privkey.pem;
@@ -2091,7 +2075,7 @@ install_certbot() {
 }
 
 manage_certbot() {
-
+    local choice
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
@@ -2113,7 +2097,7 @@ manage_certbot() {
         4) revert_to_self_signed ;;
         5) certbot_list_cloudflare_config ;;
         6) certbot_create_cloudflare_config ;;
-        0) echo "Exiting..." && return 0 ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -2182,7 +2166,6 @@ manage_users() {
         echo "1. List Users"
         echo "2. List Groups"
         echo "3. "
-        echo "4. "
         echo "0. Quit"
         echo -e "\033[0m"
 
@@ -2191,8 +2174,8 @@ manage_users() {
         case $choice in
         1) list_users ;;
         2) list_groups ;;
-        3) 4 ;;
-        0) echo "Exiting..." && return 0 ;;
+        3) ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -2204,7 +2187,7 @@ manage_rsync() {
         echo -e "\033[33m"
         echo "Choose an option:"
         echo "1. Install rsync & add log rotation"
-        echo "2. rsync_push_letsencrypt"
+        echo "2. Rsync push letsencrypt"
         echo "0. Quit"
         echo -e "\033[0m"
 
@@ -2213,7 +2196,7 @@ manage_rsync() {
         case $choice in
         1) install_rsync ;;
         2) rsync_push_letsencrypt ;;
-        0) echo "Exiting..." && return 0 ;;
+        0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
