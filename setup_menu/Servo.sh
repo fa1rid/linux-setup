@@ -284,15 +284,13 @@ manage_php() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1) install_php
-            ;;
-        2) remove_php
-            ;;
-        0) echo "Exiting..."
+        1) install_php ;;
+        2) remove_php ;;
+        0)
+            echo "Exiting..."
             return 0
             ;;
-        *) echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
 }
@@ -447,15 +445,13 @@ manage_nginx() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1) install_nginx
-            ;;
-        2) remove_nginx
-            ;;
-        0) echo "Exiting..."
+        1) install_nginx ;;
+        2) remove_nginx ;;
+        0)
+            echo "Exiting..."
             return 0
             ;;
-        *) echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
 }
@@ -489,6 +485,8 @@ install_nginx() {
         apt update && apt install -y $PACKAGE_NAME
         echo "$PACKAGE_NAME has been installed."
     fi
+
+    systemctl enable nginx
 
     # Add log rotation for nginx
     sed -i "s/^\/var\/log\/nginx\/\*\.log/\/var\/www\/*\/logs\/*\/*.log/" /etc/logrotate.d/nginx
@@ -662,7 +660,7 @@ EOFX
     fi
 
     # Restart nginx for changes to take effect
-    systemctl restart nginx
+    nginx -t && systemctl restart nginx
 
     echo "Nginx setup completed!"
 
@@ -705,23 +703,17 @@ manage_mariadb() {
 
         read -p "Enter your choice: " choice
         case $choice in
-        1) install_mariadb_server
-            ;;
-        2) install_mariadb_client
-            ;;
-        3) remove_mariadb
-            ;;
-        4) backup_db
-            ;;
-        5) restore_db
-            ;;
-        5) create_db_user
-            ;;
-        0) echo "Exiting..."
+        1) install_mariadb_server ;;
+        2) install_mariadb_client ;;
+        3) remove_mariadb ;;
+        4) backup_db ;;
+        5) restore_db ;;
+        5) create_db_user ;;
+        0)
+            echo "Exiting..."
             return 0
             ;;
-        *) echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
     # Backup:
@@ -988,19 +980,13 @@ manage_memcached() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            install_memcached
-            ;;
-        2)
-            remove_memcached
-            ;;
+        1) install_memcached ;;
+        2) remove_memcached ;;
         0)
             echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
 }
@@ -1059,7 +1045,6 @@ install_phpmyadmin() {
     local web_dir
     local PHPMYADMIN_VERSION
     local INSTALL_DIR
-    local CONFIRM_XYZ
     local dbadmin_pass
     local pmapass
     local BLOWFISH_SECRET
@@ -1084,7 +1069,7 @@ install_phpmyadmin() {
     PHPMYADMIN_VERSION="5.2.1" # Update this to the desired phpMyAdmin version
     INSTALL_DIR="${web_dir}/public/dbadmin"
 
-    read -p "Make sure mariadb connection is configured and press enter" CONFIRM_XYZ
+    read -p "Make sure mariadb connection is configured and press enter"
     read -p "Enter new password for dbadmin user: " dbadmin_pass
     # read -p "Enter new password for management user (pma)" pmapass
     # Generate a password with default length
@@ -1123,7 +1108,6 @@ install_phpmyadmin() {
     # Generate a random blowfish secret for enhanced security
     BLOWFISH_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
     sed -i "s|cfg\['blowfish_secret'\] = ''|cfg\['blowfish_secret'\] = '${BLOWFISH_SECRET}'|" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting blowfish_secret"
-    # sed -i "s/\$cfg\['blowfish_secret'\] = '';.*/\$cfg\['blowfish_secret'\] = '$(pwgen -s 32 1)';/" "${INSTALL_DIR}/config.inc.php"
 
     # Set pma password
     sed -i "s/pmapass/${pmapass}/" "${INSTALL_DIR}/config.inc.php" || echo "Error on pma password"
@@ -1208,37 +1192,38 @@ install_standard_packages() {
 }
 
 install_configure_SSH() {
+    local sshd_config="/etc/ssh/sshd_config"
 
     # Update package lists & Install SSH server
     apt update && apt install openssh-server -y || return 1
 
     # Backup the original configuration
-    if [ -e "/etc/ssh/sshd_config_backup" ]; then
-        echo "Backup file '/etc/ssh/sshd_config_backup' already exists."
+    if [ -e "${sshd_config}_backup" ]; then
+        echo "Backup file '${sshd_config}_backup' already exists."
     else
-        cp /etc/ssh/sshd_config /etc/ssh/sshd_config_backup
+        cp "$sshd_config" "${sshd_config}_backup"
     fi
 
     # Enable root login (not recommended for production)
-    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
+    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
 
     # Disable root's ability to use password-based authentication
-    # sed -i 's/PermitRootLogin yes/PermitRootLogin without-password/' /etc/ssh/sshd_config
+    # sed -i 's/PermitRootLogin yes/PermitRootLogin without-password/' "$sshd_config"
 
     # Set SSH port to 4444
-    sed -i 's/#Port 22/Port 4444/' /etc/ssh/sshd_config
+    sed -i 's/#Port 22/Port 4444/' "$sshd_config"
 
     # Disable password authentication (use key-based authentication)
-    # sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+    # sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' "$sshd_config"
 
     # Enable PasswordAuthentication
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' "$sshd_config"
+    sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
+    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
 
     # Allow only specific users or groups to log in via SSH (replace with your username)
-    # echo "AllowUsers your_username" >> /etc/ssh/sshd_config
+    # echo "AllowUsers your_username" >> "$sshd_config"
 
     # Restart SSH service (for changes to take effect immediately)
     systemctl restart sshd
@@ -1247,6 +1232,7 @@ install_configure_SSH() {
 
 configure_terminal_system_banners() {
     local restore_choice
+    local bashrc="/etc/bash.bashrc"
 
     echo "Setting server's timezone to Asia/Dubai"
     timedatectl set-timezone Asia/Dubai || echo "Failed to set timezone"
@@ -1254,25 +1240,25 @@ configure_terminal_system_banners() {
     read -p "Do you want to restore the original configuration from the backup? (y/n): " restore_choice
     if [ "$restore_choice" == "y" ]; then
         # Check if Backup exist
-        if [ -e "/etc/bash.bashrc.backup" ]; then
-            cp /etc/bash.bashrc.backup /etc/bash.bashrc
+        if [ -e "${bashrc}.backup" ]; then
+            cp ${bashrc}.backup ${bashrc}
             if [ $? -eq 0 ]; then
                 echo "Original configuration has been restored."
             else
                 echo "Failed to restore original configuration."
             fi
         else
-            echo "Backup file '/etc/bash.bashrc.backup' doesn't exists."
+            echo "Backup file '${bashrc}.backup' doesn't exists."
         fi
         return
     fi
 
     # Backup the original configuration
-    if [ -e "/etc/bash.bashrc.backup" ]; then
-        echo "Skipping Backup (already exists) '/etc/bash.bashrc.backup'."
+    if [ -e "${bashrc}.backup" ]; then
+        echo "Skipping Backup (already exists) '${bashrc}.backup'."
     else
         echo -e "Creating backup (bash.bashrc.backup)...\n"
-        cp /etc/bash.bashrc /etc/bash.bashrc.backup
+        cp ${bashrc} ${bashrc}.backup
     fi
 
     # Define the new PS1 prompt with color codes
@@ -1290,7 +1276,7 @@ configure_terminal_system_banners() {
     local escaped_PS1=$(echo "$CUSTOM_PS1" | sed 's/[\/&]/\\&/g')
 
     # Replace the old PS1 line with the new one
-    sed -i "s/PS1=.*/PS1=${escaped_PS1}/" /etc/bash.bashrc
+    sed -i "s/PS1=.*/PS1=${escaped_PS1}/" ${bashrc}
 
     # "echo \"IP: \$(hostname -I | awk '{print \$1}') \$(ip -o -4 route show to default | awk '{print $5}')\""
 
@@ -1311,8 +1297,8 @@ configure_terminal_system_banners() {
     )
     for value in "${aliases[@]}"; do
         local escaped_value=$(printf '%s\n' "$value" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
-        if ! grep -qF "$value" "/etc/bash.bashrc"; then
-            echo "$value" >>"/etc/bash.bashrc"
+        if ! grep -qF "$value" "${bashrc}"; then
+            echo "$value" >>"${bashrc}"
         fi
     done
 
@@ -1381,7 +1367,7 @@ EOF
 
 add_cloudflare() {
     local cloudflare_script="/usr/local/bin/cloudflare_sync"
-    cat >"$cloudflare_script" <<'EOF'
+    cat >"$cloudflare_script" <<'EOFX'
 #!/bin/bash
 
 CLOUDFLARE_FILE_PATH=/etc/nginx/conf.d/cloudflare.conf
@@ -1405,7 +1391,7 @@ echo "real_ip_header CF-Connecting-IP;" >> $CLOUDFLARE_FILE_PATH;
 
 #test configuration and reload nginx
 nginx -t && systemctl reload nginx
-EOF
+EOFX
 
     chmod 700 "$cloudflare_script"
 
@@ -1478,6 +1464,8 @@ read_mysql_config() {
 create_vhost() {
     local domain
     local vuser
+    local REPLY
+    local PS3
 
     while true; do
         # Prompt for the domain name
@@ -1509,7 +1497,6 @@ create_vhost() {
         useradd -N -m -s $(which bash) -d "/var/www/${vuser}" ${vuser}
         rm -rf /var/www/${vuser}/{.bashrc,.profile,.bash_logout}
         passwd -l "$vuser"
-
     fi
 
     # Prompt the user to choose between two options
@@ -1531,11 +1518,9 @@ create_vhost() {
             ;;
         3)
             echo "Exiting the script."
-            exit 0
+            return 0
             ;;
-        *)
-            echo "Invalid choice. Please choose 1 or 2."
-            ;;
+        *) echo "Invalid choice. Please choose 1 or 2." ;;
         esac
     done
 
@@ -1572,6 +1557,7 @@ generate_nginx_vhost() {
     local domain="$2"
     local phpVer="$3"
     local server_name
+    local is_default
 
     read -p "Is this default domain? (y/n) " is_default
     if [[ "$is_default" == "y" ]]; then
@@ -1651,17 +1637,14 @@ EOTX
 }
 
 install_more_packages() {
-    apt update
-
-    apt install -y build-essential software-properties-common python3 python3-pip
+    apt update && apt install -y build-essential software-properties-common python3 python3-pip
 
     echo "More Packages installation complete."
 }
 
 install_docker() {
     # Add Docker's official GPG key:
-    apt-get update
-    apt-get install -y ca-certificates curl gnupg
+    apt-get update && apt-get install -y ca-certificates curl gnupg
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
@@ -1686,6 +1669,7 @@ remove_docker() {
 }
 
 manage_docker() {
+    local choice
     while true; do
         echo "Choose an option:"
         echo "1. Install docker"
@@ -1695,24 +1679,19 @@ manage_docker() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            install_docker
-            ;;
-        2)
-            remove_docker
-            ;;
+        1) install_docker ;;
+        2) remove_docker ;;
         0)
             echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
 }
 
 manage_wordpress() {
+    local choice
     while true; do
         echo "Choose an option:"
         echo "1. Install Wordpress"
@@ -1721,17 +1700,12 @@ manage_wordpress() {
 
         read -p "Enter your choice: " choice
         case $choice in
-        1)
-            install_wordpress
-            ;;
-
+        1) install_wordpress ;;
         0)
             echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
 }
@@ -1958,8 +1932,7 @@ add_line_under_pattern() {
     escaped_pattern=$(sed 's/[][\/.^$*]/\\&/g' <<<"$pattern_to_match")
 
     # Get the indentation of the pattern line
-    local indentation
-    indentation=$(sed -n "/$escaped_pattern/{s/^\([[:space:]]*\).*$/\1/;p;q}" "$config_file")
+    local indentation=$(sed -n "/$escaped_pattern/{s/^\([[:space:]]*\).*$/\1/;p;q}" "$config_file")
 
     # Check if the new line already exists after the pattern line
     if grep -qFx "${indentation}${new_line}" "$config_file"; then
@@ -1980,7 +1953,7 @@ certbot_create_cloudflare_config() {
     local cloudflare_email
     local cloudflare_api_key
     read -p "Enter your Cloudflare email: " cloudflare_email
-    read -p "Enter your Cloudflare API key: " cloudflare_api_key
+    read -p "Enter your Cloudflare API Token: " cloudflare_api_key
 
     config_name="$cloudflare_email"
 
@@ -2074,7 +2047,7 @@ EOFX
         add_line_under_pattern "include ${ssl_nginx_snippet};" "$nginx_config" "include $snippet_path;"
     fi
     comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" comment
-    systemctl reload nginx
+    nginx -t && systemctl reload nginx
 }
 
 get_domain_from_nginx_conf_path() {
@@ -2125,7 +2098,7 @@ revert_to_self_signed() {
         comment_uncomment "include $snippet_path;" "$nginx_config" comment
 
         comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" uncomment
-        systemctl reload nginx
+        nginx -t && systemctl reload nginx
 
         # echo "Reverted $domain_name to use the self-signed certificate."
     else
@@ -2158,31 +2131,17 @@ manage_certbot() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            install_certbot
-            ;;
-        2)
-            get_certbot_certificate
-            ;;
-        3)
-            set_nginx_cert
-            ;;
-        4)
-            revert_to_self_signed
-            ;;
-        5)
-            certbot_list_cloudflare_config
-            ;;
-        6)
-            certbot_create_cloudflare_config
-            ;;
+        1) install_certbot ;;
+        2) get_certbot_certificate ;;
+        3) set_nginx_cert ;;
+        4) revert_to_self_signed ;;
+        5) certbot_list_cloudflare_config ;;
+        6) certbot_create_cloudflare_config ;;
         0)
             echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
 }
@@ -2257,21 +2216,14 @@ manage_users() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            list_users
-            ;;
-        2)
-            list_groups
-            ;;
-        3) ;;
-        4) ;;
+        1) list_users ;;
+        2) list_groups ;;
+        3) 4 ;;
         0)
             echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
 }
@@ -2289,19 +2241,13 @@ manage_rsync() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            install_rsync
-            ;;
-        2)
-            rsync_push_letsencrypt
-            ;;
+        1) install_rsync ;;
+        2) rsync_push_letsencrypt ;;
         0)
             echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
-            ;;
+        *) echo "Invalid choice." ;;
         esac
     done
 }
