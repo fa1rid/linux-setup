@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.5"
+servo_version="0.3.6"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -286,10 +286,7 @@ manage_php() {
         case $choice in
         1) install_php ;;
         2) remove_php ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -447,10 +444,7 @@ manage_nginx() {
         case $choice in
         1) install_nginx ;;
         2) remove_nginx ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -709,10 +703,7 @@ manage_mariadb() {
         4) backup_db ;;
         5) restore_db ;;
         5) create_db_user ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -755,15 +746,9 @@ restore_db() {
     local decompress_command="cat" # Default to no decompression
 
     case "$ext" in
-    gz)
-        decompress_command="gzip -dc"
-        ;;
-    xz)
-        decompress_command="xz -dc"
-        ;;
-    zip)
-        decompress_command="unzip -p"
-        ;;
+    gz) decompress_command="gzip -dc" ;;
+    xz) decompress_command="xz -dc" ;;
+    zip) decompress_command="unzip -p" ;;
     esac
 
     # Restore the database dump
@@ -982,10 +967,7 @@ manage_memcached() {
         case $choice in
         1) install_memcached ;;
         2) remove_memcached ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -1681,10 +1663,7 @@ manage_docker() {
         case $choice in
         1) install_docker ;;
         2) remove_docker ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -1701,10 +1680,7 @@ manage_wordpress() {
         read -p "Enter your choice: " choice
         case $choice in
         1) install_wordpress ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -2137,10 +2113,7 @@ manage_certbot() {
         4) revert_to_self_signed ;;
         5) certbot_list_cloudflare_config ;;
         6) certbot_create_cloudflare_config ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -2219,10 +2192,7 @@ manage_users() {
         1) list_users ;;
         2) list_groups ;;
         3) 4 ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
@@ -2243,10 +2213,7 @@ manage_rsync() {
         case $choice in
         1) install_rsync ;;
         2) rsync_push_letsencrypt ;;
-        0)
-            echo "Exiting..."
-            return 0
-            ;;
+        0) echo "Exiting..." && return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
