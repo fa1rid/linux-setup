@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.3"
+servo_version="0.3.4"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -2076,6 +2076,7 @@ EOFX
         add_line_under_pattern "include ${ssl_nginx_snippet};" "$nginx_config" "include $snippet_path;"
     fi
     comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" comment
+    systemctl reload nginx
 }
 
 get_domain_from_nginx_conf_path() {
@@ -2126,6 +2127,7 @@ revert_to_self_signed() {
         comment_uncomment "include $snippet_path;" "$nginx_config" comment
 
         comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" uncomment
+        systemctl reload nginx
 
         # echo "Reverted $domain_name to use the self-signed certificate."
     else
@@ -2133,15 +2135,20 @@ revert_to_self_signed() {
     fi
 }
 
-manage_certbot() {
+install_certbot(){
     # Check if Certbot is installed
     if ! command -v certbot &>/dev/null; then
         echo "Certbot is not installed. Installing Certbot..."
         apt-get update && apt-get -y install certbot python3-certbot-dns-cloudflare
     fi
+}
+
+manage_certbot() {
+    
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
+        echo "1. Install Certbot"
         echo "1. Get/Renew Certificate"
         echo "2. Set nginx Cert"
         echo "3. Revert nginx to Self-Signed Certificate"
@@ -2153,15 +2160,17 @@ manage_certbot() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1) get_certbot_certificate
+        1) install_certbot
             ;;
-        2) set_nginx_cert
+        2) get_certbot_certificate
             ;;
-        3) revert_to_self_signed
+        3) set_nginx_cert
             ;;
-        4) certbot_list_cloudflare_config
+        $) revert_to_self_signed
             ;;
-        5) certbot_create_cloudflare_config
+        5) certbot_list_cloudflare_config
+            ;;
+        6) certbot_create_cloudflare_config
             ;;
         0) echo "Exiting..."
             return 0
