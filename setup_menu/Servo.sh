@@ -686,6 +686,7 @@ manage_mariadb() {
         echo "4. Backup Database (Dump)"
         echo "5. Restore Database (Dump)"
         echo "6. Create db and its user"
+        echo "7. Read mysql/MariaDB config"
         echo "0. Quit"
 
         read -p "Enter your choice: " choice
@@ -695,7 +696,8 @@ manage_mariadb() {
         3) remove_mariadb ;;
         4) backup_db ;;
         5) restore_db ;;
-        5) create_db_user ;;
+        6) create_db_user ;;
+        7) read_mysql_config ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -2264,7 +2266,7 @@ display_menu() {
     echo "10. Clean up (autoremove, autoclean, update)"
     echo "11 Install & configure SSH (port 4444 allows root with pass)"
     echo "12 Configure terminal and system banners"
-    echo "13 Read mysql/MariaDB config"
+    echo "13 Install (build-essential software-properties-common python3)"
     echo "14 Add cloudflare IPs (nginx) SYNC script with cron job"
     echo "15 Create vhost"
     echo "16 Set Files/Folders Permissions"
@@ -2300,7 +2302,7 @@ else
         10) cleanUp ;;
         11) install_configure_SSH ;;
         12) configure_terminal_system_banners ;;
-        13) read_mysql_config ;;
+        13) install_more_packages ;;
         14) add_cloudflare ;;
         15) create_vhost ;;
         16) fix_permissions ;;
