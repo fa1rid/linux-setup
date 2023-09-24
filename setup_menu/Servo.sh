@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.4"
+servo_version="0.3.5"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -284,18 +284,14 @@ manage_php() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            install_php
+        1) install_php
             ;;
-        2)
-            remove_php
+        2) remove_php
             ;;
-        0)
-            echo "Exiting..."
+        0) echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
+        *) echo "Invalid choice."
             ;;
         esac
     done
@@ -355,7 +351,7 @@ install_php() {
         fi
 
         # Essential & Commonly Used Extensions Extensions
-        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} >/dev/null 2>&1 || (echo "Failed to install" && return 1)
+        apt install -y bc php${phpVer}-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} || (echo "Failed to install" && return 1)
         # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
@@ -451,18 +447,14 @@ manage_nginx() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1)
-            install_nginx
+        1) install_nginx
             ;;
-        2)
-            remove_nginx
+        2) remove_nginx
             ;;
-        0)
-            echo "Exiting..."
+        0) echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
+        *) echo "Invalid choice."
             ;;
         esac
     done
@@ -494,8 +486,7 @@ install_nginx() {
         echo "$PACKAGE_NAME is already installed."
     else
         echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update
-        apt install -y $PACKAGE_NAME >/dev/null 2>&1
+        apt update && apt install -y $PACKAGE_NAME
         echo "$PACKAGE_NAME has been installed."
     fi
 
@@ -708,32 +699,28 @@ manage_mariadb() {
         echo "2. install_mariadb_client"
         echo "3. Remove (purge) mariadb"
         echo "4. Backup Database (Dump)"
-        echo "5. Restore Database Dump"
+        echo "5. Restore Database (Dump)"
+        echo "6. Create db and its user"
         echo "0. Quit"
 
         read -p "Enter your choice: " choice
         case $choice in
-        1)
-            install_mariadb_server
+        1) install_mariadb_server
             ;;
-        2)
-            install_mariadb_client
+        2) install_mariadb_client
             ;;
-        3)
-            remove_mariadb
+        3) remove_mariadb
             ;;
-        4)
-            backup_db
+        4) backup_db
             ;;
-        5)
-            restore_db
+        5) restore_db
             ;;
-        0)
-            echo "Exiting..."
+        5) create_db_user
+            ;;
+        0) echo "Exiting..."
             return 0
             ;;
-        *)
-            echo "Invalid choice."
+        *) echo "Invalid choice."
             ;;
         esac
     done
@@ -750,16 +737,16 @@ manage_mariadb() {
 
 # Function to restore a database from a dump
 restore_db() {
-    local database_name="$1"
+    local db_name="$1"
     local dump_file="$2"
 
     # Check if both arguments are provided
-    if [ -z "$database_name" ] || [ -z "$dump_file" ]; then
-        read -p "Enter the database name to restore to: " database_name
+    if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
+        read -p "Enter the database name to restore to: " db_name
         read -p "Enter the path to the database dump file (supported: gz,xz,zip, or raw): " dump_file
 
         # Check again if they are empty
-        if [ -z "$database_name" ] || [ -z "$dump_file" ]; then
+        if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
             echo "Both database name and dump file path are required."
             return 1
         fi
@@ -772,10 +759,10 @@ restore_db() {
     fi
 
     # Determine the compression format based on file extension
-    local extension="${dump_file##*.}"
+    local ext="${dump_file##*.}"
     local decompress_command="cat" # Default to no decompression
 
-    case "$extension" in
+    case "$ext" in
     gz)
         decompress_command="gzip -dc"
         ;;
@@ -788,24 +775,24 @@ restore_db() {
     esac
 
     # Restore the database dump
-    $decompress_command "$dump_file" | mariadb "$database_name"
+    $decompress_command "$dump_file" | mariadb "$db_name"
 
-    echo "Database '$database_name' restored from '$dump_file'."
+    echo "Database '$db_name' restored from '$dump_file'."
 }
 
 # Function to create a database dump with a timestamped filename
 backup_db() {
 
-    local database_name="$1"
+    local db_name="$1"
     local save_location="$2"
 
     # Check if both arguments are provided
-    if [ -z "$database_name" ] || [ -z "$save_location" ]; then
-        read -p "Enter the database name: " database_name
+    if [ -z "$db_name" ] || [ -z "$save_location" ]; then
+        read -p "Enter the database name: " db_name
         read -p "Enter the save location (e.g., /path/to/save): " save_location
 
         # Check again if they are empty
-        if [ -z "$database_name" ] || [ -z "$save_location" ]; then
+        if [ -z "$db_name" ] || [ -z "$save_location" ]; then
             echo "Both database name and save location are required."
             return 1
         fi
@@ -815,15 +802,29 @@ backup_db() {
     local timestamp=$(date +"%Y_%m_%d_%H_%M_%S")
 
     # Define the dump file name
-    local dump_file="${database_name}_${timestamp}.sql.xz"
+    local dump_file="${db_name}_${timestamp}.sql.xz"
 
     # Create the database dump and compress it
-    mysqldump "$database_name" | xz -9 >"$save_location/$dump_file"
+    mysqldump "$db_name" | xz -9 >"$save_location/$dump_file"
 
     echo "Database dump saved as: $save_location/$dump_file"
 
     # Call the function with command-line arguments if provided
     # Backup_Database "$1" "$2"
+}
+
+create_db_user() {
+    read -rp "Enter a name for the database: " DB_NAME
+    read -rp "Enter a db username: " DB_USER
+    read -rp "Enter a password for the db user: " DB_USER_PASS
+
+    # Create a new database and user
+    mariadb -e "CREATE DATABASE $DB_NAME;"
+    mariadb -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
+    mariadb -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
+    mariadb -e "FLUSH PRIVILEGES;"
+
+    echo "Done."
 }
 
 # Function to install MariaDB Server
@@ -852,16 +853,12 @@ install_mariadb_server() {
         return
     else
         echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update
-        apt install -y $PACKAGE_NAME >/dev/null 2>&1
+        apt update && install -y $PACKAGE_NAME
         echo "$PACKAGE_NAME has been installed."
     fi
     # Prompt for variable values
     # read -p "Enter the InnoDB buffer pool size (e.g., 512M): " INNODB_BUFFER_POOL_SIZE
     # read -p "Enter the root password for MariaDB: " DB_ROOT_PASS
-    read -p "Enter the application username: " DB_USER
-    read -p "Enter the password for the application user: " DB_USER_PASS
-    read -p "Enter the name for the database: " DB_NAME
 
     # Variables
     # DB_ROOT_PASS="your_root_password"
@@ -887,11 +884,6 @@ install_mariadb_server() {
 
     echo -e "\nMySQL secure installation completed.\n"
 
-    # Create a new database and user
-    mariadb -e "CREATE DATABASE $DB_NAME;"
-    mariadb -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
-    mariadb -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-    mariadb -e "FLUSH PRIVILEGES;"
     mariadb -e "SELECT @@character_set_server AS character_set, @@collation_server AS collation;"
 
     # Show users and their permissions
@@ -928,8 +920,7 @@ install_mariadb_client() {
 
     # Install the MariaDB client
     echo "Installing MariaDB client..."
-    apt update
-    apt install -y mariadb-client >/dev/null 2>&1
+    apt update && apt install -y mariadb-client
 
     read -p "Enter the MariaDB server hostname or IP (without port): " db_host
     read -p "Enter the database username: " db_user
@@ -937,7 +928,7 @@ install_mariadb_client() {
     echo
 
     # Create a configuration file for the MariaDB client
-    cat <<EOF >~/.my.cnf
+    cat >~/.my.cnf <<EOF
 [client]
 host=$db_host
 user=$db_user
@@ -1704,14 +1695,18 @@ manage_docker() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1) install_docker
+        1)
+            install_docker
             ;;
-        2) remove_docker
+        2)
+            remove_docker
             ;;
-        0) echo "Exiting..."
+        0)
+            echo "Exiting..."
             return 0
             ;;
-        *) echo "Invalid choice."
+        *)
+            echo "Invalid choice."
             ;;
         esac
     done
@@ -1726,13 +1721,16 @@ manage_wordpress() {
 
         read -p "Enter your choice: " choice
         case $choice in
-        1) install_wordpress
+        1)
+            install_wordpress
             ;;
 
-        0) echo "Exiting..."
+        0)
+            echo "Exiting..."
             return 0
             ;;
-        *) echo "Invalid choice."
+        *)
+            echo "Invalid choice."
             ;;
         esac
     done
@@ -2135,7 +2133,7 @@ revert_to_self_signed() {
     fi
 }
 
-install_certbot(){
+install_certbot() {
     # Check if Certbot is installed
     if ! command -v certbot &>/dev/null; then
         echo "Certbot is not installed. Installing Certbot..."
@@ -2144,38 +2142,46 @@ install_certbot(){
 }
 
 manage_certbot() {
-    
+
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
         echo "1. Install Certbot"
-        echo "1. Get/Renew Certificate"
-        echo "2. Set nginx Cert"
-        echo "3. Revert nginx to Self-Signed Certificate"
-        echo "4. List cloudflare configs"
-        echo "5. Create cloudflare config"
+        echo "2. Get/Renew Certificate"
+        echo "3. Set nginx Cert"
+        echo "4. Revert nginx to Self-Signed Certificate"
+        echo "5. List cloudflare configs"
+        echo "6. Create cloudflare config"
         echo "0. Quit"
         echo -e "\033[0m"
 
         read -p "Enter your choice: " choice
 
         case $choice in
-        1) install_certbot
+        1)
+            install_certbot
             ;;
-        2) get_certbot_certificate
+        2)
+            get_certbot_certificate
             ;;
-        3) set_nginx_cert
+        3)
+            set_nginx_cert
             ;;
-        $) revert_to_self_signed
+        4)
+            revert_to_self_signed
             ;;
-        5) certbot_list_cloudflare_config
+        5)
+            certbot_list_cloudflare_config
             ;;
-        6) certbot_create_cloudflare_config
+        6)
+            certbot_create_cloudflare_config
             ;;
-        0) echo "Exiting..."
+        0)
+            echo "Exiting..."
             return 0
             ;;
-        *) echo "Invalid choice."
+        *)
+            echo "Invalid choice."
             ;;
         esac
     done
@@ -2251,16 +2257,20 @@ manage_users() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1) list_users
+        1)
+            list_users
             ;;
-        2) list_groups
+        2)
+            list_groups
             ;;
         3) ;;
         4) ;;
-        0) echo "Exiting..."
+        0)
+            echo "Exiting..."
             return 0
             ;;
-        *) echo "Invalid choice."
+        *)
+            echo "Invalid choice."
             ;;
         esac
     done
@@ -2279,14 +2289,18 @@ manage_rsync() {
         read -p "Enter your choice: " choice
 
         case $choice in
-        1) install_rsync
+        1)
+            install_rsync
             ;;
-        2) rsync_push_letsencrypt
+        2)
+            rsync_push_letsencrypt
             ;;
-        0) echo "Exiting..."
+        0)
+            echo "Exiting..."
             return 0
             ;;
-        *) echo "Invalid choice."
+        *)
+            echo "Invalid choice."
             ;;
         esac
     done
