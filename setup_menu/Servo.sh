@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.7"
+servo_version="0.3.8"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -42,6 +42,17 @@ caching_nginx_snippet="/etc/nginx/snippets/caching-snippet.conf"
 # default_user="default"
 
 PHP_Versions=("7.4" "8.2")
+
+# Check if MariaDB is installed
+if command -v mariadb &> /dev/null; then
+    DB_CMD="mariadb"
+    DUMP_CMD="mariadb-dump"
+elif command -v mysql &> /dev/null; then
+    DB_CMD="mysql"
+    DUMP_CMD="mysqldump"
+else
+    echo "Neither MySQL nor MariaDB is installed on this system."
+fi
 
 #########################################
 
@@ -545,7 +556,6 @@ location ~ /\.(.*) {
     deny all;
 }
 
-
 # Deny access to xmlrpc.php - a common brute force target against Wordpress
 location = /xmlrpc.php {
     deny all;
@@ -743,7 +753,7 @@ restore_db() {
     esac
 
     # Restore the database dump
-    $decompress_command "$dump_file" | mariadb "$db_name"
+    $decompress_command "$dump_file" | $DB_CMD "$db_name"
 
     echo "Database '$db_name' restored from '$dump_file'."
 }
@@ -773,7 +783,7 @@ backup_db() {
     local dump_file="${db_name}_${timestamp}.sql.xz"
 
     # Create the database dump and compress it
-    mysqldump "$db_name" | xz -9 >"$save_location/$dump_file"
+    $DUMP_CMD "$db_name" | xz -9 >"$save_location/$dump_file"
 
     echo "Database dump saved as: $save_location/$dump_file"
 
@@ -787,10 +797,10 @@ create_db_user() {
     read -rp "Enter a password for the db user: " DB_USER_PASS
 
     # Create a new database and user
-    mariadb -e "CREATE DATABASE $DB_NAME;"
-    mariadb -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
-    mariadb -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-    mariadb -e "FLUSH PRIVILEGES;"
+    $DB_CMD -e "CREATE DATABASE $DB_NAME;"
+    $DB_CMD -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
+    $DB_CMD -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
+    $DB_CMD -e "FLUSH PRIVILEGES;"
 
     echo "Done."
 }
@@ -1050,12 +1060,12 @@ install_phpmyadmin() {
     echo "pmapass: $pmapass"
 
     # Create Database User for phpMyAdmin.
-    # mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+    # $DB_CMD -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
     # Fix for AWS managed databses (RDS):
-    mariadb -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+    $DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
 
     # Create Database User for phpMyAdmin management (for multi user use).
-    mariadb -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
+    $DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
 
     # Download and Extract phpMyAdmin archive
     mkdir -p "${INSTALL_DIR}"
@@ -1076,7 +1086,7 @@ install_phpmyadmin() {
     cp "${INSTALL_DIR}/config.sample.inc.php" "${INSTALL_DIR}/config.inc.php"
 
     # Load phpmyadmin database into the database
-    mariadb <"${INSTALL_DIR}/sql/create_tables.sql"
+    $DB_CMD <"${INSTALL_DIR}/sql/create_tables.sql"
 
     # Generate a random blowfish secret for enhanced security
     BLOWFISH_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
@@ -1320,6 +1330,11 @@ gpu_info=$(lspci | grep -i "VGA" | awk -F ': ' '{print $2}')
 # Get RAM information
 ram_info=$(free -h | grep "Mem:" | awk '{print $3 " / " $2}')
 
+# Get Machine information
+machine_info=$(dmidecode -t system)
+
+# lspci -nn | grep -i ethernet
+
 # Print the gathered information
 echo -e " \e[91mIP:\e[0m $IP_Add"
 echo -e " \e[91mOS:\e[0m $os_info"
@@ -1331,6 +1346,7 @@ echo -e " \e[91mDisk:\e[0m $disk_info"
 echo -e " \e[91mCPU:\e[0m $cpu_info"
 echo -e " \e[91mGPU:\e[0m $gpu_info"
 echo -e " \e[91mRAM:\e[0m $ram_info"
+echo -e " \e[91mMachine:\e[0m $machine_info"
 EOF
 
     echo "Script generated and saved as $sinfo_script"
@@ -1425,13 +1441,13 @@ read_mysql_config() {
     local param
     # Loop through each configuration parameter and retrieve its value
     for param in "${CONFIG_PARAMS[@]}"; do
-        local value=$(mariadb -BNe "SHOW VARIABLES LIKE '$param';" | awk '{print $2}')
+        local value=$($DB_CMD -BNe "SHOW VARIABLES LIKE '$param';" | awk '{print $2}')
         echo -e "\e[91m${param}=\e[0m $value"
     done
 
-    mariadb -e "SELECT user, host, plugin, password FROM mysql.user;"
-    grants_commands=$(mariadb -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
-    mariadb -e "$grants_commands"
+    $DB_CMD -e "SELECT user, host, plugin, password FROM mysql.user;"
+    grants_commands=$($DB_CMD -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
+    $DB_CMD -e "$grants_commands"
 }
 
 create_vhost() {
@@ -1712,7 +1728,7 @@ install_wordpress() {
     local WP_TITLE="Your Site Title"
 
     # Create MySQL database and user
-    mariadb <<MYSQL_SCRIPT
+    $DB_CMD <<MYSQL_SCRIPT
 CREATE DATABASE $DB_NAME DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
 GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
