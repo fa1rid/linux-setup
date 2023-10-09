@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.9"
+servo_version="0.4.0"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -500,7 +500,9 @@ install_nginx() {
 
     if [ ! -f "$nginx_cert" ] || [ ! -f "$nginx_key" ]; then
         echo -e "\nGenerating new self-signed cert for nginx.."
-        openssl req -x509 -nodes -days 3650 -newkey ed25519 \
+        # rsa:2048
+        # ec:<(openssl ecparam -name prime256v1)
+        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
             -keyout "$nginx_key" \
             -out "$nginx_cert" \
             -subj "/CN=$COMMON_NAME"
@@ -591,8 +593,13 @@ http {
     # ssl_dhparam ${nginx_dhparams2048};
     ssl_protocols TLSv1.2 TLSv1.3;
     proxy_ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers "TLS_AES_128_GCM_SHA256:TLS_AES_128_CCM_SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256";
+    ssl_prefer_server_ciphers off;
+    ssl_ciphers "TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-CHACHA20-POLY1305";
+
+    # Enable session resumption to improve performance
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1h;
+    ssl_session_tickets on;
 
     access_log /var/log/nginx/access.log;
     error_log /var/log/nginx/error.log;
@@ -834,6 +841,9 @@ install_mariadb_server() {
                 echo "Failed adding Mariadb repo"
                 return 1
             }
+            if [ -f "/etc/apt/sources.list.d/mariadb.list.old_1" ]; then
+                rm mariadb.list.old_1
+            fi
         fi
     fi
 
@@ -1770,9 +1780,10 @@ MYSQL_SCRIPT
         --admin_email="$WP_ADMIN_EMAIL"
 
     echo -e "\n Installing Plugins"
-    sudo -u ${local_user} -s wp plugin install all-in-one-seo-pack all-in-one-wp-migration amp google-analytics-for-wordpress jetpack w3-total-cache wp-mail-smtp taxopress --path="$install_dir"
+    # sudo -u ${local_user} -s wp plugin install all-in-one-seo-pack all-in-one-wp-migration amp google-analytics-for-wordpress jetpack w3-total-cache wp-mail-smtp --path="$install_dir"
+    sudo -u ${local_user} -s wp plugin install all-in-one-seo-pack amp google-analytics-for-wordpress wp-mail-smtp wordfence --path="$install_dir"
     echo -e "\n Activating Plugins"
-    sudo -u ${local_user} -s wp plugin activate jetpack --path="$install_dir"
+    # sudo -u ${local_user} -s wp plugin activate jetpack --path="$install_dir"
 
     cat >>"${install_dir}/wp-config.php" <<'EOFX'
 /**
