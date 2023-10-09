@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.3.8"
+servo_version="0.3.9"
 github_repo="fa1rid/linux-setup"
 script_name="Servo.sh"
 script_folder="setup_menu"
@@ -44,10 +44,10 @@ caching_nginx_snippet="/etc/nginx/snippets/caching-snippet.conf"
 PHP_Versions=("7.4" "8.2")
 
 # Check if MariaDB is installed
-if command -v mariadb &> /dev/null; then
+if command -v mariadb &>/dev/null; then
     DB_CMD="mariadb"
     DUMP_CMD="mariadb-dump"
-elif command -v mysql &> /dev/null; then
+elif command -v mysql &>/dev/null; then
     DB_CMD="mysql"
     DUMP_CMD="mysqldump"
 else
@@ -375,11 +375,11 @@ install_php() {
         # Enable JIT
         # ; tracing: An alias to the granular configuration 1254.
         # ; function: An alias to the granular configuration 1205.
-        enableJIT=$(echo "${phpVer} > 8" | bc)
-        if [ "$enableJIT" -eq 1 ]; then
-            sed -i "s/opcache.jit.*/opcache.jit=function/" "/etc/php/${phpVer}/mods-available/opcache.ini"
-            echo "opcache.jit_buffer_size = 256M" >>"/etc/php/${phpVer}/mods-available/opcache.ini"
-        fi
+        # enableJIT=$(echo "${phpVer} > 8" | bc)
+        # if [ "$enableJIT" -eq 1 ]; then
+        #     sed -i "s/opcache.jit.*/opcache.jit=function/" "/etc/php/${phpVer}/mods-available/opcache.ini"
+        #     echo "opcache.jit_buffer_size = 256M" >>"/etc/php/${phpVer}/mods-available/opcache.ini"
+        # fi
 
         # Set default time zone
         time_zone_escaped=$(printf '%s\n' "${time_zone}" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
@@ -480,7 +480,7 @@ install_nginx() {
         echo "$PACKAGE_NAME is already installed."
     else
         echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update && apt install -y $PACKAGE_NAME
+        apt update && apt install -y $PACKAGE_NAME || (echo "Failed to install $PACKAGE_NAME" && return 1)
         echo "$PACKAGE_NAME has been installed."
     fi
 
@@ -507,8 +507,8 @@ install_nginx() {
         # -subj "/C=$COUNTRY/ST=$STATE/L=$LOCALITY/O=$ORGANIZATION/OU=$ORG_UNIT/CN=$COMMON_NAME/emailAddress=$EMAIL"
     fi
 
-    # Configure nginx for production use
-    if [ -f "/etc/nginx/nginx.conf" ]; then
+    # Backup nginx configs if not already backed up
+    if [ ! -f "/etc/nginx/nginx.conf.backup" ]; then
         mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup
     fi
 
@@ -809,19 +809,32 @@ create_db_user() {
 install_mariadb_server() {
     local install_from
     local PACKAGE_NAME
-    local DB_USER
-    local DB_USER_PASS
-    local DB_NAME
     local grants_commands
+    local confirmation
+    local install_repo
 
     read -p $'Install from:\n 1. Mariadb repo\n 2. Debian repo\n Choice: ' install_from
     if [[ $install_from == "1" ]]; then
-        # Add MariaDB Repository
-        echo "Adding mariadb repo.."
-        curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {
-            echo "Failed adding Mariadb repo"
-            return 1
-        }
+        if [ -f "/etc/apt/sources.list.d/mariadb.list" ]; then
+            echo "mariadb Repo Exists"
+            read -p $'Reinstall repo? (y/n): ' confirmation
+            if [[ $confirmation != "y" ]]; then
+                echo "Skipping adding repo."
+            else
+                install_repo=1
+            fi
+        else
+            install_repo=1
+        fi
+
+        if [[ $install_repo == "1" ]]; then
+            # Add MariaDB Repository
+            echo "Adding mariadb repo.."
+            curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {
+                echo "Failed adding Mariadb repo"
+                return 1
+            }
+        fi
     fi
 
     PACKAGE_NAME="mariadb-server"
@@ -831,18 +844,12 @@ install_mariadb_server() {
         return
     else
         echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update && install -y $PACKAGE_NAME
+        apt update && apt install -y $PACKAGE_NAME || (echo "Failed to install $PACKAGE_NAME" && return 1)
         echo "$PACKAGE_NAME has been installed."
     fi
     # Prompt for variable values
     # read -p "Enter the InnoDB buffer pool size (e.g., 512M): " INNODB_BUFFER_POOL_SIZE
     # read -p "Enter the root password for MariaDB: " DB_ROOT_PASS
-
-    # Variables
-    # DB_ROOT_PASS="your_root_password"
-    # DB_USER="your_app_user"
-    # DB_USER_PASS="your_app_user_password"
-    # DB_NAME="your_db_name"
 
     # mysql_secure_installation
     # Secure MariaDB installation
@@ -898,7 +905,7 @@ install_mariadb_client() {
 
     # Install the MariaDB client
     echo "Installing MariaDB client..."
-    apt update && apt install -y mariadb-client
+    apt update && apt install -y mariadb-client || (echo "Failed to install mariadb-client" && return 1)
 
     read -p "Enter the MariaDB server hostname or IP (without port): " db_host
     read -p "Enter the database username: " db_user
@@ -1130,6 +1137,7 @@ cleanUp() {
 }
 
 install_standard_packages() {
+    local confirmation
 
     # Install the "standard" task automatically
     # apt install -y tasksel
@@ -1155,8 +1163,11 @@ install_standard_packages() {
         bc \
         jq
 
-    echo -e "\nRunning apt purge exim4-*\n"
-    apt -y purge exim4-*
+    read -p "Remove Exim4? (y/n) " confirmation
+    if [[ "$confirmation" == "y" ]]; then
+        echo -e "\nRunning apt purge exim4-*\n"
+        apt -y purge exim4-*
+    fi
 
     # The following additional packages will be installed:
     # bind9-host bind9-libs ca-certificates file git-man libcurl3-gnutls libcurl4 liberror-perl
@@ -2253,6 +2264,7 @@ rsync_push_letsencrypt() {
         user=root
     fi
     rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL /etc/letsencrypt/live/${domain} -e "ssh -p $port" ${user}@${host}:/etc/ssl/
+    echo "Log written to '/var/log/rsync/letsencrypt.log'"
 }
 
 # Function to display the menu
