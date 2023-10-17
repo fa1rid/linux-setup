@@ -1317,11 +1317,12 @@ config_system() {
     echo "PS1 prompt, aliases, exports, and history settings have been updated for all users."
 
     cat >"/etc/issue" <<EOFX
-\e{lightblue}\s \m \r (Time: \t\e{reset})
+\e{lightblue}\s \m \r (Server Time: \t\e{reset})
 \e{lightblue}\S{PRETTY_NAME} \v\e{reset}
 \e{lightgreen}\n.\o : \4\e{reset}
 EOFX
-    echo "" >/etc/motd
+    echo -n "" >/etc/motd
+    chmod -x /etc/update-motd.d/10-uname
 
     local sinfo_script="/usr/local/bin/sinfo"
     # Use a here document to create the script content
