@@ -1,6 +1,6 @@
 #!/bin/bash
 
-servo_version="0.4.1"
+servo_version="0.4.2"
 
 # Check if the script is run as root
 if [[ $EUID -ne 0 ]]; then
@@ -431,7 +431,7 @@ remove_php() {
     for phpVer in "${PHP_Versions[@]}"; do
 
         # Purge PHP packages
-        apt purge "php${phpVer}-*" && apt autoremove
+        apt purge "php${phpVer}-"* && apt autoremove
 
     done
 
@@ -1553,7 +1553,7 @@ create_vhost() {
     mkdir -p "${basedir}/${domain}/public/"
     chmod 710 "${basedir}"
     chown "${vuser}:www-data" "${basedir}"
-    chown -R "${vuser}:users" "${basedir}*"
+    chown -R "${vuser}:users" "${basedir}"*
 
     # Generate php config
     generate_php_conf "${vuser}" "${domain}" "${phpVer}"
