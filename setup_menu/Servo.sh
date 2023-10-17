@@ -305,7 +305,6 @@ manage_php() {
 
 # Function to install PHP
 install_php() {
-
     local memory_limit
     local time_zone
     local upload_max_filesize
@@ -2341,11 +2340,6 @@ main() {
             clear # Clear the screen
             echo -e "\033[93m===== Farid's Setup Menu v${servo_version} =====\033[92m"
 
-            # Iterate through the options array and display menu options
-            # for ((i = 0; i < ${#options[@]}; i++)); do
-            #     echo "$((i)). ${options[i]}"
-            # done
-
             # Iterate through the menu array and display menu options with numbers
             local index
             for index in "${!menu[@]}"; do
@@ -2363,23 +2357,14 @@ main() {
             local choice
             read -rp "Enter your choice (0-$((${#menu[@]} - 1))): " choice
             if [[ ! $choice =~ ^[0-9]+$ ]]; then
-                # echo "Invalid choice. Please enter a valid option."
                 continue
             fi
             ((choice = 10#$choice))
             # Check if the choice is within a valid range
-            if [ "$choice" -ge 0 ] && [ "$choice" -lt ${#menu[@]} ]; then
-                if [ -n "${menu[choice]}" ]; then
-                    selected_option="${menu[choice]}"
-                    function_name=$(echo "$selected_option" | sed -E 's/ +\| */\t/g' | cut -f 1)
-                    $function_name
-                    read -n 1 -srp "Press any key to continue..."
-                else
-                    echo "Invalid choice. Please enter a valid option."
-                    read -n 1 -srp "Press any key to continue..."
-                fi
-            else
-                echo "Invalid choice. Please enter a valid option."
+            if [ "$choice" -lt ${#menu[@]} ]; then
+                selected_option="${menu[choice]}"
+                function_name=$(echo "$selected_option" | sed -E 's/ +\| */\t/g' | cut -f 1)
+                $function_name
                 read -n 1 -srp "Press any key to continue..."
             fi
         done
