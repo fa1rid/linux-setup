@@ -2195,11 +2195,7 @@ comp_manage() {
 }
 
 sys_manage() {
-    # Check if the 'members' command is available
-    if ! command -v members >/dev/null 2>&1; then
-        echo "The 'members' command is not installed. Installing..."
-        return 1
-    fi
+    
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
@@ -2254,6 +2250,9 @@ sys_list_users() {
 }
 
 sys_list_groups() {
+    # Check if the 'members' command is available
+    validate_command "members" || return 1
+
     local GREEN='\033[1;32m'
     local YELLOW='\033[1;33m'
     local RESET='\033[0m'
