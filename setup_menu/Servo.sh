@@ -2195,7 +2195,7 @@ comp_manage() {
 }
 
 sys_manage() {
-    
+
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
@@ -2379,17 +2379,16 @@ sys_config_setup() {
     echo "Setting server's timezone to Asia/Dubai"
     timedatectl set-timezone Asia/Dubai || echo "Failed to set timezone"
     echo ""
-    read -rp "Do you want to restore the original configuration from the backup? (y/n): " restore_choice
-    if [ "$restore_choice" == "y" ]; then
-        # Check if Backup exist
-        if [ -e "${bashrc}.backup" ]; then
+
+    # Check if Backup exist
+    if [ -e "${bashrc}.backup" ]; then
+        read -rp "Do you want to restore the original configuration from the backup? (y/n): " restore_choice
+        if [ "$restore_choice" == "y" ]; then
             if cp ${bashrc}.backup ${bashrc}; then
                 echo "Original configuration has been restored."
             else
                 echo "Failed to restore original configuration."
             fi
-        else
-            echo "Backup file '${bashrc}.backup' doesn't exists."
         fi
         return
     fi
@@ -2450,7 +2449,7 @@ sys_config_setup() {
 \e{lightblue}\S{PRETTY_NAME} \v\e{reset}
 \e{lightgreen}\n.\o : \4\e{reset}
 EOFX
-    
+
     # Backup the original configuration
     if [ -e "/etc/motd.backup" ]; then
         echo "Skipping Backup (already exists) '/etc/motd.backup'."
