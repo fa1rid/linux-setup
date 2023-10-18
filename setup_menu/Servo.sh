@@ -46,6 +46,8 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     }
     complete -F _completion Servo.sh
     return
+    # complete -p Servo.sh
+    # complete -r Servo.sh
 fi
 # Check if the script is run as root
 # if [[ $EUID -ne 0 ]]; then
@@ -2096,7 +2098,7 @@ compress() {
 decompress() {
     # Validate the availability of compression methods
     # Validate the availability of compression methods
-    local commands=("zip" "tar" "gzip" "bzip2" "xz" "7z")
+    local commands=("unzip" "tar" "gzip" "bzip2" "xz" "7z")
     for cmd in "${commands[@]}"; do
         validate_command "$cmd" || return 1
     done
@@ -2196,7 +2198,7 @@ sys_manage() {
     # Check if the 'members' command is available
     if ! command -v members >/dev/null 2>&1; then
         echo "The 'members' command is not installed. Installing..."
-        apt update && apt-get install -y members
+        return 1
     fi
     while true; do
         echo -e "\033[33m"
@@ -2285,11 +2287,13 @@ sys_cleanUp() {
 sys_std_pkg_install() {
     local confirmation
 
+    apt-config dump | grep -we Recommends -e Suggests | sed s/1/0/ | tee /etc/apt/apt.conf.d/99no-recommends
+
     # Install the "standard" task automatically
     # apt install -y tasksel
     # echo "standard" | tasksel install
 
-    apt update && apt install -y \
+    apt update && apt upgrade && apt install --no-install-recommends -y \
         bash-completion \
         curl \
         wget \
@@ -2307,13 +2311,15 @@ sys_std_pkg_install() {
         cron \
         logrotate \
         ncurses-term \
-        mime-support
-
-    iproute2 \
+        mime-support \
+        iproute2 \
         pciutils \
         bc \
         jq \
-        dmidecode
+        dmidecode \
+        members \
+        xz-utils \
+        ca-certificates
 
     read -rp "Remove Exim4? (y/n) " confirmation
     if [[ "$confirmation" == "y" ]]; then
@@ -2619,7 +2625,33 @@ main() {
 }
 
 main "$@"
+##########################################################################
+# APT
+# apt list --installed
+# dpkg -s package_name
+# apt list package_name
+# apt show package_name
+# --no-install-recommends
+# apt-config dump | grep Install-Recommends
+# zgrep 'install iptables' /var/log/dpkg.log*
 
+# dpkg-query -f '${binary:Package}\n' -W > packages_list.txt
+# xargs -a packages_list.txt apt install
+
+# dpkg --purge $(dpkg -l | awk '/^rc/ { print $2 }')
+# dpkg -l | grep '^rc' | awk '{print $2}' | xargs dpkg --purge
+# ii: The package is installed and has all its files.
+# rc: The package was removed, but its configuration files are still present on the system.
+# rc stands for "removed, configuration files"
+
+# package_name="$1"
+# # Use dpkg to query the package status
+# if dpkg -l | grep -q "^ii\s*$package_name\s"; then
+#     echo "$package_name is installed."
+# else
+#     echo "$package_name is not installed."
+# fi
+##########################################################################
 # Wordpress
 # define('WP_MEMORY_LIMIT', '256M');
 # wp plugin list
@@ -2632,7 +2664,7 @@ main "$@"
 # define('WP_DEBUG_LOG', true);
 # define('WP_DEBUG_DISPLAY', false);
 # @ini_set('display_errors',0);
-
+##########################################################################
 # Using grep
 # grep -- (`--` tells grep that there are no more options following it)
 # -E,    PATTERNS are extended regular expressions
@@ -2640,7 +2672,7 @@ main "$@"
 # -w,    match only whole words
 # -x,    match only whole lines
 # -v,    select non-matching lines
-
+##########################################################################
 # Using sudo
 # useradd -m -s /bin/bash rootuser
 # passwd rootuser
