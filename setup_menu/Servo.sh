@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.4.3"
+servo_version="0.4.4"
 # curl -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2450,6 +2450,14 @@ sys_config_setup() {
 \e{lightblue}\S{PRETTY_NAME} \v\e{reset}
 \e{lightgreen}\n.\o : \4\e{reset}
 EOFX
+    
+    # Backup the original configuration
+    if [ -e "/etc/motd.backup" ]; then
+        echo "Skipping Backup (already exists) '/etc/motd.backup'."
+    else
+        echo -e "Creating backup (/etc/motd.backup)...\n"
+        cp /etc/motd /etc/motd.backup
+    fi
     echo -n "" >/etc/motd
     chmod -x /etc/update-motd.d/10-uname
 
