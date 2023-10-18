@@ -1,17 +1,63 @@
 #!/bin/bash
+# shellcheck disable=SC2016,SC2119,SC2155,SC2206,SC2207,SC2254,SC2086
+# Shellcheck ignore list:
+#  - SC2016: Expressions don't expand in single quotes, use double quotes for that.
+#  - SC2119: Use foo "$@" if function's $1 should mean script's $1.
+#  - SC2155: Declare and assign separately to avoid masking return values.
+#  - SC2206: Quote to prevent word splitting, or split robustly with mapfile or read -a.
+#  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
+#  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
+#
+servo_version="0.4.3"
+# curl -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
-servo_version="0.4.2"
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    # Bash programmable completion
+    _completion() {
+        local cur prev cword opts #words
+        # COMPREPLY=($words)
+        # return
+        _init_completion -n = || return
 
-# Check if the script is run as root
-if [[ $EUID -ne 0 ]]; then
-    echo "This script must be run as root."
-    exit 1
+        opts="compress decompress db_backup db_restore perm_set gen_pass"
+        if ((cword == 1)); then
+            COMPREPLY=($(compgen -W "$opts" -- "$cur"))
+            return
+        fi
+
+        if ((cword == 2)); then
+            case "${prev}" in
+            compress)
+                local formats="zip tar gz bz2 xz 7z"
+                COMPREPLY=($(compgen -W "${formats}" -- ${cur}))
+                return
+                ;;
+                # decompress)
+                #     # printf "Hint: You need to pass the path.\n"
+                #     # Implement dynamic completions here based on available files
+                #     return
+                # ;;
+            *) ;;
+            esac
+        fi
+        _filedir
+        # COMPREPLY+=($(compgen -o plusdirs -A file "$cur"))
+
+    }
+    complete -F _completion Servo.sh
+    return
 fi
-
+# Check if the script is run as root
+# if [[ $EUID -ne 0 ]]; then
+#     echo "This script must be run as root."
+#     exit 1
+# fi
+if [[ ! -e /usr/share/bash-completion/completions/Servo.sh ]]; then
+    ln -s /usr/local/bin/Servo.sh /usr/share/bash-completion/completions/
+fi
 #########################################
 
 cron_dir="/root/cron/"
-mkdir -p ${cron_dir}
 cloudflare_config_dir="/etc/letsencrypt/cloudflare"
 ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
 common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
@@ -32,27 +78,31 @@ fi
 
 #########################################
 
-# Function to check for updates
-check_for_update() {
-    local github_repo="fa1rid/linux-setup"
-    local script_name="Servo.sh"
-    local script_folder="setup_menu"
-    local local_script_path="/usr/local/bin/"
-
-    if ! command -v curl &>/dev/null; then
-        apt update && apt install curl
-    fi
-    latest_version=$(curl -s "https://raw.githubusercontent.com/${github_repo}/main/${script_folder}/version.txt")
-    echo "Latest Version: ($latest_version)"
-    if [ "$latest_version" != "$servo_version" ]; then
-        echo "A newer version ($latest_version) is available. Updating..."
-        curl -so "${local_script_path}${script_name}" "https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name" || echo "Failed to connect"
-        chmod +x "${local_script_path}${script_name}"
-        echo "Update complete. Please run the script again."
-        exit 0
+path_exists() {
+    local path=$1
+    if [ -e "$path" ]; then
+        return 0
     else
-        echo "You have the latest version ($servo_version) of the script."
+        return 1
     fi
+}
+
+file_exists() {
+    local file_path=$1
+    if [ -f "$file_path" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Validate if a command is available on the system
+validate_command() {
+    if ! command -v "$1" &>/dev/null; then
+        echo "Error: $1 is not installed on this system."
+        return 1
+    fi
+    retirn 0
 }
 
 is_valid_domain() {
@@ -134,7 +184,7 @@ gen_pass() {
 }
 
 # Function to generate a random password
-generate_password() {
+generate_pass() {
     local LENGTH="$1"
     if [[ -z "$LENGTH" ]]; then
         LENGTH=20 # Default password length
@@ -198,105 +248,154 @@ select_from_dir() {
     done
 }
 
-generate_php_conf() {
-    local username=$1
-    local domain=$2
-    local phpVer=$3
-    local memory_limit
-    local time_zone
-    local time_zone
-    local upload_max_filesize
-    local post_max_size
+# Function to fix files and folders permissions
+perm_set() {
 
-    # memory_limit
-    read -rp "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
-    # Use the user input if provided, or the default value if the input is empty
-    if [ -z "$memory_limit" ]; then
-        memory_limit=256
+    # chown -R user:group TARGET
+    # find TARGET -type d -exec chmod 775 {} \;
+    # find TARGET -type f -exec chmod 664 {} \;
+    # chmod 640 TARGET/wp-config.php
+
+    local target="$1"
+    local user="$2"
+    local group="$3"
+
+    # Prompt for input if any argument is missing
+    if [ -z "$target" ]; then
+        read -rp "Enter the target directory: " target
     fi
-    echo "Memory_limit is: ${memory_limit}"
 
-    # time_zone
-    read -rp "Enter time_zone (or press Enter to use the default 'Asia/Dubai'): " time_zone
-    # Use the user input if provided, or the default value if the input is empty
-    if [ -z "$time_zone" ]; then
-        time_zone="Asia/Dubai"
+    if [ -z "$user" ]; then
+        read -rp "Enter the user: " user
     fi
-    echo "time_zone is: ${time_zone}"
 
-    # upload_max_filesize
-    read -rp "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
-    # Use the user input if provided, or the default value if the input is upload_max_filesize
-    if [ -z "$upload_max_filesize" ]; then
-        upload_max_filesize=100
+    if [ -z "$group" ]; then
+        read -rp "Enter the group: " group
     fi
-    echo "upload_max_filesize is: ${upload_max_filesize}"
-    sleep 1
-    # Calculate post_max_size
-    post_max_size=$((upload_max_filesize + 1))
 
-    cat >"/etc/php/${phpVer}/fpm/pool.d/${username}-${domain}.conf" <<EOF
-[${domain}]
-user = ${username}
-group = users
-listen = /run/php/${phpVer}-fpm-${domain}.sock
-listen.owner = www-data
-listen.group = www-data
-listen.mode = 0660
+    # Check if all arguments are provided
+    if [ -z "$target" ] || [ -z "$user" ] || [ -z "$group" ]; then
+        echo "Usage: ${FUNCNAME[0]} <target> <user> <group>"
+        return 1
+    fi
 
-pm = dynamic
-pm.max_children = 15
-pm.start_servers = 10
-pm.min_spare_servers = 10
-pm.max_spare_servers = 10
-pm.max_requests = 5000
-request_terminate_timeout = 300
-pm.process_idle_timeout = 10s
-chdir = /
-catch_workers_output = yes
+    # Fix ownership
+    chown -R "$user:$group" "$target"
 
-php_value[memory_limit] = ${memory_limit}M
-php_value[upload_max_filesize] = ${upload_max_filesize}M
-php_value[post_max_size] = ${post_max_size}M
+    # Set directory permissions to 775 and file permissions to 664
+    find "$target" -type d -exec chmod 775 {} \;
+    find "$target" -type f -exec chmod 664 {} \;
 
-php_value[open_basedir] = "/var/www/${username}/${domain}/:/tmp/:/usr/share/GeoIP/"
-php_value[date.timezone] = "${time_zone}"
-php_value[disable_functions] = "opcache_get_status"
-php_value[error_reporting] = "E_ALL & ~E_DEPRECATED & ~E_STRICT"
-php_value[expose_php] = off
-php_value[max_execution_time] = 300
-php_value[output_buffering] = 8192
-
-php_value[session.gc_probability] = 1
-php_value[session.sid_length] = 100
-php_value[session.name] = "SID"
-
-php_value[opcache.huge_code_pages] = 1
-php_value[opcache.max_wasted_percentage] = 10
-php_value[opcache.interned_strings_buffer] = 64
-php_value[opcache.memory_consumption] = 384
-php_value[opcache.max_accelerated_files] = 16229
-php_value[opcache.revalidate_path] = 0
-php_value[opcache.revalidate_freq] = 60
-
-; [opcache.jit]
-; A value of 50-100% of the current Opcache shared memory for Opcode might be the ideal value for opcache.jit_buffer_size.
-EOF
-    systemctl restart "php${phpVer}-fpm"
+    echo "Permissions fixed for '$target'."
 }
 
-manage_php() {
+# Function to comment or uncomment lines in a config file
+comment_uncomment() {
+    local search_pattern="$1"
+    local config_file="$2"
+    local comment_uncomment="$3"
+
+    # Check if the config file exists
+    if [ ! -f "$config_file" ]; then
+        echo "Error: Config file '$config_file' not found."
+        return 1
+    fi
+
+    # Define the AWK script
+    local awk_script='
+  {
+    # Count leading whitespace (tabs or spaces)
+    whitespace_count = match($0, /^[ \t]*/)
+    whitespace = substr($0, RSTART, RLENGTH)
+    line = substr($0, RLENGTH + 1)
+
+    # Check if the line matches the search pattern
+    if ($0 ~ search_pattern) {
+      if (comment_uncomment == "comment" && substr(line, 1, 1) != "#") {
+        # Comment the line and add a space after the comment symbol if needed
+        if (substr(line, 1, 1) != " ") {
+          line = " " line
+        }
+        $0 = whitespace "#" line
+      } else if (comment_uncomment == "uncomment") {
+        # Uncomment the line and remove all preceding comment symbols and spaces
+        sub(whitespace "[# ]*", whitespace, $0)
+      }
+    }
+
+    # Print the modified line
+    print
+  }
+  '
+
+    # Use AWK to process the config file and redirect the output to a temporary file
+    awk -v search_pattern="$search_pattern" -v comment_uncomment="$comment_uncomment" "$awk_script" "$config_file" >"$config_file.tmp" || {
+        echo " Error in awk in comment_uncomment IN '$config_file'"
+        return 1
+    }
+
+    # Replace the original config file with the temporary file
+    mv "$config_file.tmp" "$config_file" || {
+        echo " Error in mv in comment_uncomment IN '$config_file'"
+        return 1
+    }
+
+    # echo "Success ${comment_uncomment}ing IN '$config_file'"
+    echo "Success"
+
+    # Example usage:
+    # comment_uncomment "search_pattern" "/path/to/config/file" "comment"
+    # comment_uncomment "search_pattern" "/path/to/config/file" "uncomment"
+}
+
+# Function to add a new line under a pattern with correct indentation
+add_line_under_pattern() {
+    local pattern_to_match="$1"
+    local config_file="$2"
+    local new_line="$3"
+
+    # Check if the config file exists
+    if [ ! -f "$config_file" ]; then
+        echo "Config file not found: $config_file"
+        return 1
+    fi
+
+    # Escape special characters in the pattern
+    local escaped_pattern
+    escaped_pattern=$(sed 's/[][\/.^$*]/\\&/g' <<<"$pattern_to_match")
+
+    # Get the indentation of the pattern line
+    local indentation
+    indentation=$(sed -n "/$escaped_pattern/{s/^\([[:space:]]*\).*$/\1/;p;q}" "$config_file")
+
+    # Check if the new line already exists after the pattern line
+    if grep -qFx "${indentation}${new_line}" "$config_file"; then
+        echo "The new line already exists after the pattern. No duplicate line added."
+    else
+        # Use sed to insert the new line under the pattern with the same indentation
+        sed -i "\%$escaped_pattern%a\\${indentation}${new_line}" "$config_file" && echo "Success" || echo "Failed: ADDING '$new_line' UNDER '$pattern_to_match' IN '$config_file' "
+
+    fi
+
+    # Example usage:
+    # add_line_under_pattern "include /etc/nginx/snippets/ssl" /path/to/your/config/file.conf "new_line_to_append"
+
+}
+
+php_manage() {
     while true; do
         echo "Choose an option:"
         echo "1. Install PHP"
         echo "2. Remove (purge) PHP"
+        echo "3. Install PHPMyAdmin"
         echo "0. Quit"
 
         read -rp "Enter your choice: " choice
 
         case $choice in
-        1) install_php ;;
-        2) remove_php ;;
+        1) php_install ;;
+        2) php_remove ;;
+        3) php_install_myadmin ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -304,7 +403,7 @@ manage_php() {
 }
 
 # Function to install PHP
-install_php() {
+php_install() {
     local memory_limit
     local time_zone
     local upload_max_filesize
@@ -419,7 +518,7 @@ install_php() {
 }
 
 # Function to remove PHP
-remove_php() {
+php_remove() {
     local confirm
     read -rp "This will purge PHP and its configuration.. Are you sure? (y/n): " confirm
 
@@ -441,7 +540,222 @@ remove_php() {
     echo "PHP and its configuration have been purged."
 }
 
-manage_nginx() {
+php_conf_generate() {
+    local username=$1
+    local domain=$2
+    local phpVer=$3
+    local memory_limit
+    local time_zone
+    local time_zone
+    local upload_max_filesize
+    local post_max_size
+
+    # memory_limit
+    read -rp "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
+    # Use the user input if provided, or the default value if the input is empty
+    if [ -z "$memory_limit" ]; then
+        memory_limit=256
+    fi
+    echo "Memory_limit is: ${memory_limit}"
+
+    # time_zone
+    read -rp "Enter time_zone (or press Enter to use the default 'Asia/Dubai'): " time_zone
+    # Use the user input if provided, or the default value if the input is empty
+    if [ -z "$time_zone" ]; then
+        time_zone="Asia/Dubai"
+    fi
+    echo "time_zone is: ${time_zone}"
+
+    # upload_max_filesize
+    read -rp "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
+    # Use the user input if provided, or the default value if the input is upload_max_filesize
+    if [ -z "$upload_max_filesize" ]; then
+        upload_max_filesize=100
+    fi
+    echo "upload_max_filesize is: ${upload_max_filesize}"
+    sleep 1
+    # Calculate post_max_size
+    post_max_size=$((upload_max_filesize + 1))
+
+    cat >"/etc/php/${phpVer}/fpm/pool.d/${username}-${domain}.conf" <<EOF
+[${domain}]
+user = ${username}
+group = users
+listen = /run/php/${phpVer}-fpm-${domain}.sock
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+
+pm = dynamic
+pm.max_children = 15
+pm.start_servers = 10
+pm.min_spare_servers = 10
+pm.max_spare_servers = 10
+pm.max_requests = 5000
+request_terminate_timeout = 300
+pm.process_idle_timeout = 10s
+chdir = /
+catch_workers_output = yes
+
+php_value[memory_limit] = ${memory_limit}M
+php_value[upload_max_filesize] = ${upload_max_filesize}M
+php_value[post_max_size] = ${post_max_size}M
+
+php_value[open_basedir] = "/var/www/${username}/${domain}/:/tmp/:/usr/share/GeoIP/"
+php_value[date.timezone] = "${time_zone}"
+php_value[disable_functions] = "opcache_get_status"
+php_value[error_reporting] = "E_ALL & ~E_DEPRECATED & ~E_STRICT"
+php_value[expose_php] = off
+php_value[max_execution_time] = 300
+php_value[output_buffering] = 8192
+
+php_value[session.gc_probability] = 1
+php_value[session.sid_length] = 100
+php_value[session.name] = "SID"
+
+php_value[opcache.huge_code_pages] = 1
+php_value[opcache.max_wasted_percentage] = 10
+php_value[opcache.interned_strings_buffer] = 64
+php_value[opcache.memory_consumption] = 384
+php_value[opcache.max_accelerated_files] = 16229
+php_value[opcache.revalidate_path] = 0
+php_value[opcache.revalidate_freq] = 60
+
+; [opcache.jit]
+; A value of 50-100% of the current Opcache shared memory for Opcode might be the ideal value for opcache.jit_buffer_size.
+EOF
+    systemctl restart "php${phpVer}-fpm"
+}
+
+# Function to install PHPMyAdmin
+php_install_myadmin() {
+    local vuser
+    local domain
+    local web_dir
+    local PHPMYADMIN_VERSION
+    local INSTALL_DIR
+    local dbadmin_pass
+    local pmapass
+    local BLOWFISH_SECRET
+
+    while true; do
+        # Prompt for the username
+        read -rp "Enter vhost username: " vuser
+        # Prompt for the domain name
+        read -rp "Enter vhost domain name (e.g., example.com): " domain
+
+        web_dir="/var/www/${vuser}/${domain}"
+
+        # Check if the username contains only alphanumeric characters
+        if [[ ! -d "$web_dir" ]]; then
+            echo "Directory doesn't exit."
+            exit 1
+        else
+            break
+        fi
+    done
+
+    read -rp "Enter new password for dbadmin user: " dbadmin_pass
+    read -rp "Make sure mariadb connection is configured and press enter to start installation"
+
+    PHPMYADMIN_VERSION="5.2.1" # Update this to the desired phpMyAdmin version
+    INSTALL_DIR="${web_dir}/public/dbadmin"
+    # read -rp "Enter new password for management user (pma)" pmapass
+    # Generate a password with default length
+    pmapass=$(gen_pass)
+    echo "pmapass: $pmapass"
+
+    # Create Database User for phpMyAdmin.
+    # $DB_CMD -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+    # Fix for AWS managed databses (RDS):
+    $DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+
+    # Create Database User for phpMyAdmin management (for multi user use).
+    $DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
+
+    # Download and Extract phpMyAdmin archive
+    mkdir -p "${INSTALL_DIR}"
+
+    if [ ! -f "phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz" ]; then
+        wget "https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz"
+
+    fi
+
+    if tar -xzvf "phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz" --strip-components=1 -C "${INSTALL_DIR}" >/dev/null 2>&1; then
+        echo "Extraction successful."
+    else
+        echo "Extraction failed."
+        return
+    fi
+
+    # Create config file
+    cp "${INSTALL_DIR}/config.sample.inc.php" "${INSTALL_DIR}/config.inc.php"
+
+    # Load phpmyadmin database into the database
+    $DB_CMD <"${INSTALL_DIR}/sql/create_tables.sql"
+
+    # Generate a random blowfish secret for enhanced security
+    BLOWFISH_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+    sed -i "s|cfg\['blowfish_secret'\] = ''|cfg\['blowfish_secret'\] = '${BLOWFISH_SECRET}'|" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting blowfish_secret"
+
+    # Set pma password
+    sed -i "s/pmapass/${pmapass}/" "${INSTALL_DIR}/config.inc.php" || echo "Error on pma password"
+
+    # Uncomment all $cfg['Servers'] to enable configuration storage, a database and several tables used by the administrative pma database user. These tables enable a number of features in phpMyAdmin, including Bookmarks, comments, PDF generation, and more.
+    sed -i '/^\/\/.*Servers/s/^\/\/ //' "${INSTALL_DIR}/config.inc.php" || echo "Error on Uncomment all \$cfg['Servers']"
+
+    # Make a new directory where phpMyAdmin will store its temporary files
+    # mkdir -p /var/lib/phpmyadmin/tmp
+    # chown -R www-data:www-data /var/lib/phpmyadmin
+
+    # Set uplaod, save, and tmp Dir
+    # mkdir -p "${INSTALL_DIR}/tmp"
+    sed -i "s/\$cfg\['UploadDir'\] = '';/\$cfg\['UploadDir'\] = 'tmp';/" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting UploadDir"
+    sed -i "s/\$cfg\['SaveDir'\] = '';/\$cfg\['SaveDir'\] = 'tmp';/" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting SaveDir"
+    echo "\$cfg['TempDir'] = '${INSTALL_DIR}/tmp';" >>"${INSTALL_DIR}/config.inc.php"
+
+    # Allow access from specific IP addresses (replace with your IP addresses)
+    # echo "\$cfg['Servers'][\$i]['AllowDeny']['rules'] = array('allow' => array('your_ip_address')); " >> $phpmyadmin_config
+
+    # Allow access from any IP addresses
+    sed -e '/controlhost/ s/^\/*/\/\/ /' -i "${INSTALL_DIR}/config.inc.php" || echo "Error on setting controlhost"
+    sed -e '/controlport/ s/^\/*/\/\/ /' -i "${INSTALL_DIR}/config.inc.php" || echo "Error on setting controlport"
+
+    # Adjust permissions
+    chown -R "${vuser}:users" "${INSTALL_DIR}"
+    # chmod -R 770 "${INSTALL_DIR}"
+    chmod 660 "${INSTALL_DIR}/config.inc.php"
+
+}
+
+nginx_manage() {
+
+    nginx_conf_domain_get() {
+        local path="$1"
+
+        # Extract the base filename
+        local domain_name="${path##*/}"
+
+        # Remove the file extension
+        domain_name="${domain_name%.*}"
+
+        # Get domain with subomain
+        # domain_name="${base_filename##*-}"
+
+        # Get domain only - Use awk to split the string by hyphen and capture the last part after the last dot
+        domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
+
+        domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
+
+        if is_valid_domain "$domain_name"; then
+            echo "$domain_name"
+            return 0
+        else
+            echo "${domain_name} is not a valid domain."
+            return 1
+        fi
+    }
+
     local choice
     while true; do
         echo "Choose an option:"
@@ -449,15 +763,19 @@ manage_nginx() {
         echo "2. Remove (purge) nginx"
         echo "3. Create vhost"
         echo "4. Add cloudflare IPs (nginx) SYNC script with cron job"
+        echo "5. Install Cert"
+        echo "6. Uninstall Cert"
         echo "0. Quit"
 
         read -rp "Enter your choice: " choice
 
         case $choice in
-        1) install_nginx ;;
-        2) remove_nginx ;;
-        3) create_vhost ;;
-        4) add_cloudflare ;;
+        1) nginx_install ;;
+        2) nginx_remove ;;
+        3) nginx_vhost_create ;;
+        4) nginx_cloudflare_add ;;
+        5) nginx_cert_install ;;
+        6) nginx_cert_uninstall ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -465,7 +783,7 @@ manage_nginx() {
 }
 
 # Function to install Nginx
-install_nginx() {
+nginx_install() {
 
     local COMMON_NAME="localhost"
 
@@ -671,7 +989,7 @@ EOFX
 }
 
 # Function to remove Nginx
-remove_nginx() {
+nginx_remove() {
     local confirmation
     # Ask for confirmation
     read -rp "This will purge Nginx and its configuration.. Are you sure? (y/n): " confirmation
@@ -693,12 +1011,299 @@ remove_nginx() {
     echo "Nginx and its configuration have been purged."
 }
 
-manage_mariadb() {
+nginx_cloudflare_add() {
+    local cloudflare_script="/usr/local/bin/cloudflare_sync"
+    cat >"$cloudflare_script" <<'EOFX'
+#!/bin/bash
+
+CLOUDFLARE_FILE_PATH=/etc/nginx/conf.d/cloudflare.conf
+
+echo "#Cloudflare" > $CLOUDFLARE_FILE_PATH;
+echo "" >> $CLOUDFLARE_FILE_PATH;
+
+echo "# - IPv4" >> $CLOUDFLARE_FILE_PATH;
+for i in `curl https://www.cloudflare.com/ips-v4`; do
+        echo "set_real_ip_from $i;" >> $CLOUDFLARE_FILE_PATH;
+done
+
+echo "" >> $CLOUDFLARE_FILE_PATH;
+echo "# - IPv6" >> $CLOUDFLARE_FILE_PATH;
+for i in `curl https://www.cloudflare.com/ips-v6`; do
+        echo "set_real_ip_from $i;" >> $CLOUDFLARE_FILE_PATH;
+done
+
+echo "" >> $CLOUDFLARE_FILE_PATH;
+echo "real_ip_header CF-Connecting-IP;" >> $CLOUDFLARE_FILE_PATH;
+
+#test configuration and reload nginx
+nginx -t && systemctl reload nginx
+EOFX
+
+    chmod 700 "$cloudflare_script"
+
+    echo "Fetching IPs from cloudflare.."
+    cloudflare_sync
+    # Add daily cron job
+    echo "Adding cron job.."
+
+    echo "30 1 * * * root ${cloudflare_script}" >"${cron_dir}cloudflare"
+    chmod 660 "${cron_dir}cloudflare"
+    cat "${cron_dir}"* | crontab -
+    echo -e "Loaded cron jobs:\n"
+    crontab -l
+    # Jobs inside "/etc/cron.d/" directory are monitored for changes
+    # /etc/init.d/cron reload
+    # systemctl restart cron
+    # /var/spool/cron/crontabs
+}
+
+nginx_cert_install() {
+    local nginx_conf_dir="/etc/nginx/sites-available"
+    local ssl_dir="/etc/ssl"
+
+    nginx_config=$(select_from_dir "$nginx_conf_dir")
+    echo "Selected config: $nginx_config"
+
+    local domain_name
+    domain_name=$(nginx_conf_domain_get "${nginx_config}")
+    [[ -n $domain_name ]] || {
+        echo "$domain_name"
+        return 1
+    }
+
+    echo -e "\n Domain: ${domain_name}\n"
+
+    mkdir -p "/etc/nginx/snippets/"
+    snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+
+    cat >"$snippet_path" <<EOFX
+ssl_certificate $ssl_dir/$domain_name/fullchain.pem;
+ssl_certificate_key $ssl_dir/$domain_name/privkey.pem;
+EOFX
+
+    # Add or update the include line in the nginx configuration
+    if grep -q "include $snippet_path;" "$nginx_config"; then
+        comment_uncomment "include $snippet_path;" "$nginx_config" uncomment
+    else
+        add_line_under_pattern "include ${ssl_nginx_snippet};" "$nginx_config" "include $snippet_path;"
+    fi
+    comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" comment
+    nginx -t && systemctl reload nginx
+}
+
+# Function to revert to self-signed certificate
+nginx_cert_uninstall() {
+    # read -rp "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
+    echo "Select nginx config"
+    local nginx_config
+    nginx_config=$(select_from_dir "/etc/nginx/sites-available/")
+    echo "Selected config: $nginx_config"
+
+    local domain_name
+    domain_name=$(nginx_conf_domain_get "${nginx_config}")
+    [[ -n $domain_name ]] || {
+        echo "$domain_name"
+        return 1
+    }
+
+    # nginx_config="/etc/nginx/sites-available/$domain_name"
+
+    if [ -f "$nginx_config" ]; then
+        local snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+
+        # echo "Commenting: include $snippet_path;"
+        comment_uncomment "include $snippet_path;" "$nginx_config" comment
+
+        comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" uncomment
+        nginx -t && systemctl reload nginx
+
+        # echo "Reverted $domain_name to use the self-signed certificate."
+    else
+        echo "Nginx configuration file not found."
+    fi
+}
+
+nginx_vhost_create() {
+    local domain
+    local vuser
+    local REPLY
+    local PS3
+
+    while true; do
+        # Prompt for the domain name
+        read -rp "Enter the domain name (e.g., example.com): " domain
+
+        # Check if the domain name follows common rules
+        if [[ "$domain" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            break
+        else
+            echo "Invalid domain name format. Please enter a valid domain name (e.g., example.com)."
+        fi
+    done
+
+    while true; do
+        # Prompt for the username
+        read -rp "Enter new username: " vuser
+        # Check if the username contains only alphanumeric characters
+        if [[ "$vuser" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            break
+        else
+            echo "Username should only contain letters (uppercase and lowercase), numbers, underscores, and hyphens. Please try again."
+        fi
+    done
+
+    if id "${vuser}" &>/dev/null; then
+        echo "User ${vuser} exists."
+    else
+        echo "User ${vuser} does not exist."
+        useradd -N -m -s "$(which bash)" -d "/var/www/${vuser}" "${vuser}"
+        rm -rf /var/www/"${vuser}"/{.bashrc,.profile,.bash_logout}
+        passwd -l "$vuser"
+    fi
+
+    # Prompt the user to choose between two options
+    PS3="Please select PHP version: "
+
+    # Define the options
+    options=("PHP 7.4" "PHP 8.2" "Quit")
+
+    # Display the options and prompt for a choice
+    select choice in "${options[@]}"; do
+        case $REPLY in
+        1)
+            phpVer=7.4
+            break
+            ;;
+        2)
+            phpVer=8.2
+            break
+            ;;
+        3)
+            echo "Exiting the script."
+            return 0
+            ;;
+        *) echo "Invalid choice. Please choose 1 or 2." ;;
+        esac
+    done
+
+    # Create vhost directories
+    basedir="/var/www/${vuser}/"
+    mkdir -p "${basedir}/logs/${domain}"
+    mkdir -p "${basedir}/${domain}/public/"
+    chmod 710 "${basedir}"
+    chown "${vuser}:www-data" "${basedir}"
+    chown -R "${vuser}:users" "${basedir}"*
+
+    # Generate php config
+    php_conf_generate "${vuser}" "${domain}" "${phpVer}"
+
+    # Generate nginx config
+    nginx_conf_generate "${vuser}" "${domain}" "${phpVer}"
+
+    # Enable nginx site
+    if [ -L "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
+        echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists."
+    else
+        if [ -e "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
+            echo -e "\nqFile or directory with the name '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists. Cannot create the symbolic link."
+        else
+            ln -s "/etc/nginx/sites-available/${vuser}-${domain}.conf" /etc/nginx/sites-enabled/
+            echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' created to '/etc/nginx/sites-available/${vuser}-${domain}.conf'"
+        fi
+    fi
+    nginx -t && systemctl reload nginx
+}
+
+nginx_conf_generate() {
+    local vuser="$1"
+    local domain="$2"
+    local phpVer="$3"
+    local server_name
+    local is_default
+
+    read -rp "Is this default domain? (y/n) " is_default
+    if [[ "$is_default" == "y" ]]; then
+        server_name="server_name _"
+    else
+        server_name="server_name $domain www.${domain}"
+    fi
+
+    cat >"/etc/nginx/sites-available/${vuser}-${domain}.conf" <<EOTX
+server {
+    listen 80;
+    ${server_name};
+    # root /var/www/${vuser}/${domain}/public;
+    # access_log /var/www/${vuser}/logs/${domain}/access.log;
+    # error_log /var/www/${vuser}/logs/${domain}/error.log error;
+    # error_page 404 /404.html;
+
+    # Redirect www to non-www
+    if (\$host ~* ^www\.(.*)) {
+        set \$redirect_host \$1;
+        rewrite ^(.*)\$ https://\$redirect_host\$request_uri permanent;
+    }
+
+    # Redirect HTTP to HTTPS
+    return 301 https://\$host\$request_uri;
+
+    # client_max_body_size 1M;
+    # location / {
+    #     # First attempt to serve request as file, then as directory, then fall back to displaying a 404.
+    #     try_files \$uri \$uri/ =404;
+    # }
+
+    # include ${common_nginx_snippet};
+}
+
+server {
+    listen 443 ssl http2;
+    ${server_name};
+    root /var/www/${vuser}/${domain}/public;
+    include ${ssl_nginx_snippet};
+    include ${common_nginx_snippet};
+    include ${caching_nginx_snippet};
+    access_log /var/www/${vuser}/logs/${domain}/ssl_access.log;
+    error_log /var/www/${vuser}/logs/${domain}/ssl_error.log error;
+    # error_page 404 /404.html;
+
+    client_max_body_size 102M;
+
+    # Redirect www to non-www
+    if (\$host ~* ^www\.(.*)) {
+        set \$redirect_host \$1;
+        rewrite ^(.*)\$ https://\$redirect_host\$request_uri permanent;
+    }
+
+    # Limiting the Rate of Requests: each unique IP address is limited to 10 requests per second with 5 requests bursting.
+    # location /login/ {
+    #     limit_req zone=one burst=5;
+    # }
+
+    # Limiting the Number of Connections: limit the number of connections that can be opened by a unique IP address.
+    # limit_conn_zone \$binary_remote_addr zone=addr:10m;
+    # location /something/ {
+    #     limit_conn addr 10;
+    # }
+
+   location ~ \.php(/.*)?$ {
+        fastcgi_pass unix:/run/php/${phpVer}-fpm-${domain}.sock;
+        include snippets/fastcgi-php.conf;
+        fastcgi_read_timeout 300;
+    }
+
+    location / {
+       try_files \$uri \$uri/ /index.php\$is_args\$args;
+    }
+}
+EOTX
+}
+
+mariadb_manage() {
     local choice
     while true; do
         echo "Choose an option:"
-        echo "1. install_mariadb_server"
-        echo "2. install_mariadb_client"
+        echo "1. Install mariadb server"
+        echo "2. Install mariadb client"
         echo "3. Remove (purge) mariadb"
         echo "4. Backup Database (Dump)"
         echo "5. Restore Database (Dump)"
@@ -708,13 +1313,13 @@ manage_mariadb() {
 
         read -rp "Enter your choice: " choice
         case $choice in
-        1) install_mariadb_server ;;
-        2) install_mariadb_client ;;
-        3) remove_mariadb ;;
-        4) backup_db ;;
-        5) restore_db ;;
-        6) create_db_user ;;
-        7) read_mysql_config ;;
+        1) mariadb_server_install ;;
+        2) mariadb_client_install ;;
+        3) mariadb_remove ;;
+        4) db_backup ;;
+        5) db_restore ;;
+        6) db_create ;;
+        7) db_config_read ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -730,96 +1335,8 @@ manage_mariadb() {
     # mysql -D bitnami_app < backup.sql
 }
 
-# Function to restore a database from a dump
-restore_db() {
-    local db_name="$1"
-    local dump_file="$2"
-
-    # Check if both arguments are provided
-    if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
-        read -rp "Enter the database name to restore to: " db_name
-        read -rp "Enter the path to the database dump file (supported: gz,xz,zip, or raw): " dump_file
-
-        # Check again if they are empty
-        if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
-            echo "Both database name and dump file path are required."
-            return 1
-        fi
-    fi
-
-    # Check if the dump file exists
-    if [ ! -f "$dump_file" ]; then
-        echo "Dump file '$dump_file' does not exist."
-        return 1
-    fi
-
-    # Determine the compression format based on file extension
-    local ext="${dump_file##*.}"
-    local decompress_command="cat" # Default to no decompression
-
-    case "$ext" in
-    gz) decompress_command="gzip -dc" ;;
-    xz) decompress_command="xz -dc" ;;
-    zip) decompress_command="unzip -p" ;;
-    esac
-
-    # Restore the database dump
-    $decompress_command "$dump_file" | $DB_CMD "$db_name"
-
-    echo "Database '$db_name' restored from '$dump_file'."
-}
-
-# Function to create a database dump with a timestamped filename
-backup_db() {
-
-    local db_name="$1"
-    local save_location="$2"
-    local timestamp
-    local dump_file
-
-    # Check if both arguments are provided
-    if [ -z "$db_name" ] || [ -z "$save_location" ]; then
-        read -rp "Enter the database name: " db_name
-        read -rp "Enter the save location (e.g., /path/to/save): " save_location
-
-        # Check again if they are empty
-        if [ -z "$db_name" ] || [ -z "$save_location" ]; then
-            echo "Both database name and save location are required."
-            return 1
-        fi
-    fi
-
-    # Generate a timestamp with underscores
-    timestamp=$(date +"%Y_%m_%d_%H_%M_%S")
-
-    # Define the dump file name
-    dump_file="${db_name}_${timestamp}.sql.xz"
-
-    # Create the database dump and compress it
-    $DUMP_CMD "$db_name" | xz -9 >"$save_location/$dump_file"
-
-    echo "Database dump saved as: $save_location/$dump_file"
-
-    # Call the function with command-line arguments if provided
-    # Backup_Database "$1" "$2"
-}
-
-create_db_user() {
-    read -rp "Enter a name for the database: " DB_NAME
-    read -rp "Enter a db username: " DB_USER
-    read -rp "Enter a password for the db user: " DB_USER_PASS
-
-    # Create a new database and user
-    $DB_CMD -e "CREATE DATABASE $DB_NAME;"
-    $DB_CMD -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
-    $DB_CMD -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-    $DB_CMD -e "FLUSH PRIVILEGES;"
-
-    echo "Done."
-}
-
 # Function to install MariaDB Server
-install_mariadb_server() {
+mariadb_server_install() {
     local install_from
     local PACKAGE_NAME
     local grants_commands
@@ -914,7 +1431,7 @@ install_mariadb_server() {
 }
 
 # Function to install MariaDB Client
-install_mariadb_client() {
+mariadb_client_install() {
     local db_host
     local db_user
     local db_pass
@@ -945,7 +1462,7 @@ EOF
 }
 
 # Function to remove MariaDB
-remove_mariadb() {
+mariadb_remove() {
     local confirmation
     local confirmation2
     # Ask for confirmation
@@ -978,462 +1495,96 @@ remove_mariadb() {
     echo -e "\nMariaDB has been purged from the system. All databases and configuration files have been deleted."
 }
 
-manage_memcached() {
-    local choice
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install memcached"
-        echo "2. Remove (purge) memcached"
-        echo "0. Quit"
+# Function to restore a database from a dump
+db_restore() {
+    local db_name="$1"
+    local dump_file="$2"
 
-        read -rp "Enter your choice: " choice
+    # Check if both arguments are provided
+    if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
+        read -rp "Enter the database name to restore to: " db_name
+        read -rp "Enter the path to the database dump file (supported: gz,xz,zip, or raw): " dump_file
 
-        case $choice in
-        1) install_memcached ;;
-        2) remove_memcached ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
-}
-
-# Function to install Memcached
-install_memcached() {
-    # Install Memcached and required dependencies
-    apt update && apt install -y memcached libmemcached-tools || (echo "Failed" && return 1)
-
-    # Configure Memcached
-    # echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
-    # echo "-l 127.0.0.1" >>/etc/memcached.conf # Bind to localhost
-    # echo "-p 11211" >>/etc/memcached.conf     # Use port 11211
-    # echo "-U 0" >>/etc/memcached.conf         # Run as the root user
-    # echo "-t 4" >>/etc/memcached.conf         # Use 4 threads
-
-    # Restart Memcached
-    systemctl restart memcached
-
-    # Enable Memcached to start on system boot
-    systemctl enable memcached
-
-    echo "Memcached installation and configuration complete"
-}
-
-# Function to remove Memcached
-remove_memcached() {
-    local confirmation
-
-    # Ask for confirmation
-    read -rp "This will purge Memcached and its configuration.. Are you sure? (y/n): " confirmation
-
-    if [[ $confirmation != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
-    # Stop Memcached service
-    systemctl stop memcached
-
-    # Purge Memcached data
-    rm -rf /var/lib/memcached/*
-
-    # Remove Memcached configuration files
-    apt remove --purge memcached
-
-    # Also remove configuration files
-    rm -rf /etc/memcached.conf
-
-    echo "Memcached purged and configuration files removed."
-}
-
-# Function to install PHPMyAdmin
-install_phpmyadmin() {
-    local vuser
-    local domain
-    local web_dir
-    local PHPMYADMIN_VERSION
-    local INSTALL_DIR
-    local dbadmin_pass
-    local pmapass
-    local BLOWFISH_SECRET
-
-    while true; do
-        # Prompt for the username
-        read -rp "Enter vhost username: " vuser
-        # Prompt for the domain name
-        read -rp "Enter vhost domain name (e.g., example.com): " domain
-
-        web_dir="/var/www/${vuser}/${domain}"
-
-        # Check if the username contains only alphanumeric characters
-        if [[ ! -d "$web_dir" ]]; then
-            echo "Directory doesn't exit."
-            exit 1
-        else
-            break
+        # Check again if they are empty
+        if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
+            echo "Both database name and dump file path are required."
+            return 1
         fi
-    done
-
-    PHPMYADMIN_VERSION="5.2.1" # Update this to the desired phpMyAdmin version
-    INSTALL_DIR="${web_dir}/public/dbadmin"
-
-    read -rp "Make sure mariadb connection is configured and press enter"
-    read -rp "Enter new password for dbadmin user: " dbadmin_pass
-    # read -rp "Enter new password for management user (pma)" pmapass
-    # Generate a password with default length
-    pmapass=$(gen_pass)
-    echo "pmapass: $pmapass"
-
-    # Create Database User for phpMyAdmin.
-    # $DB_CMD -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
-    # Fix for AWS managed databses (RDS):
-    $DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
-
-    # Create Database User for phpMyAdmin management (for multi user use).
-    $DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
-
-    # Download and Extract phpMyAdmin archive
-    mkdir -p "${INSTALL_DIR}"
-
-    if [ ! -f "phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz" ]; then
-        wget "https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz"
-
     fi
 
-    if tar -xzvf "phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz" --strip-components=1 -C "${INSTALL_DIR}" >/dev/null 2>&1; then
-        echo "Extraction successful."
-    else
-        echo "Extraction failed."
-        return
+    # Check if the dump file exists
+    if [ ! -f "$dump_file" ]; then
+        echo "Dump file '$dump_file' does not exist."
+        return 1
     fi
 
-    # Create config file
-    cp "${INSTALL_DIR}/config.sample.inc.php" "${INSTALL_DIR}/config.inc.php"
+    # Determine the compression format based on file extension
+    local ext="${dump_file##*.}"
+    local decompress_command="cat" # Default to no decompression
 
-    # Load phpmyadmin database into the database
-    $DB_CMD <"${INSTALL_DIR}/sql/create_tables.sql"
+    case "$ext" in
+    gz) decompress_command="gzip -dc" ;;
+    xz) decompress_command="xz -dc" ;;
+    zip) decompress_command="unzip -p" ;;
+    esac
 
-    # Generate a random blowfish secret for enhanced security
-    BLOWFISH_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-    sed -i "s|cfg\['blowfish_secret'\] = ''|cfg\['blowfish_secret'\] = '${BLOWFISH_SECRET}'|" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting blowfish_secret"
+    # Restore the database dump
+    $decompress_command "$dump_file" | $DB_CMD "$db_name"
 
-    # Set pma password
-    sed -i "s/pmapass/${pmapass}/" "${INSTALL_DIR}/config.inc.php" || echo "Error on pma password"
-
-    # Uncomment all $cfg['Servers'] to enable configuration storage, a database and several tables used by the administrative pma database user. These tables enable a number of features in phpMyAdmin, including Bookmarks, comments, PDF generation, and more.
-    sed -i '/^\/\/.*Servers/s/^\/\/ //' "${INSTALL_DIR}/config.inc.php" || echo "Error on Uncomment all \$cfg['Servers']"
-
-    # Make a new directory where phpMyAdmin will store its temporary files
-    # mkdir -p /var/lib/phpmyadmin/tmp
-    # chown -R www-data:www-data /var/lib/phpmyadmin
-
-    # Set uplaod, save, and tmp Dir
-    # mkdir -p "${INSTALL_DIR}/tmp"
-    sed -i "s/\$cfg\['UploadDir'\] = '';/\$cfg\['UploadDir'\] = 'tmp';/" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting UploadDir"
-    sed -i "s/\$cfg\['SaveDir'\] = '';/\$cfg\['SaveDir'\] = 'tmp';/" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting SaveDir"
-    echo "\$cfg['TempDir'] = '${INSTALL_DIR}/tmp';" >>"${INSTALL_DIR}/config.inc.php"
-
-    # Allow access from specific IP addresses (replace with your IP addresses)
-    # echo "\$cfg['Servers'][\$i]['AllowDeny']['rules'] = array('allow' => array('your_ip_address')); " >> $phpmyadmin_config
-
-    # Allow access from any IP addresses
-    sed -e '/controlhost/ s/^\/*/\/\/ /' -i "${INSTALL_DIR}/config.inc.php" || echo "Error on setting controlhost"
-    sed -e '/controlport/ s/^\/*/\/\/ /' -i "${INSTALL_DIR}/config.inc.php" || echo "Error on setting controlport"
-
-    # Adjust permissions
-    chown -R "${vuser}:users" "${INSTALL_DIR}"
-    # chmod -R 770 "${INSTALL_DIR}"
-    chmod 660 "${INSTALL_DIR}/config.inc.php"
-
+    echo "Database '$db_name' restored from '$dump_file'."
 }
 
-cleanUp() {
-    apt autoremove
-    apt autoclean
-    apt update
-    apt clean
-}
+# Function to create a database dump with a timestamped filename
+db_backup() {
 
-install_std_packages() {
-    local confirmation
+    local db_name="$1"
+    local save_location="$2"
+    local timestamp
+    local dump_file
 
-    # Install the "standard" task automatically
-    # apt install -y tasksel
-    # echo "standard" | tasksel install
+    # Check if both arguments are provided
+    if [ -z "$db_name" ] || [ -z "$save_location" ]; then
+        read -rp "Enter the database name: " db_name
+        read -rp "Enter the save location (e.g., /path/to/save): " save_location
 
-    apt update && apt install -y \
-        curl \
-        wget \
-        git \
-        nano \
-        unzip \
-        htop \
-        net-tools \
-        nftables \
-        bind9-dnsutils \
-        cron \
-        logrotate \
-        ncurses-term \
-        mime-support \
-        bzip2 \
-        iproute2 \
-        pciutils \
-        bc \
-        jq \
-        dmidecode
-
-    read -rp "Remove Exim4? (y/n) " confirmation
-    if [[ "$confirmation" == "y" ]]; then
-        echo -e "\nRunning apt purge exim4-*\n"
-        apt -y purge exim4-*
-    fi
-
-    # The following additional packages will be installed:
-    # bind9-host bind9-libs ca-certificates file git-man libcurl3-gnutls libcurl4 liberror-perl
-    # libfstrm0 libgdbm-compat4 libgdbm6 libjemalloc2 libldap-2.5-0 libldap-common liblmdb0
-    # libmagic-mgc libmagic1 libmaxminddb0 libnghttp2-14 libnl-3-200 libnl-genl-3-200 libperl5.36
-    # libprotobuf-c1 libpsl5 librtmp1 libsasl2-2 libsasl2-modules libsasl2-modules-db libssh2-1 libuv1
-    # mailcap media-types openssl patch perl perl-modules-5.36 publicsuffix xz-utils
-    # Need to get 25.6 MB of archives.
-    # After this operation, 132 MB of additional disk space will be used.
-
-    # Clean up
-    apt autoremove -y
-    apt clean
-
-    echo "Standard packages installation complete."
-}
-
-install_configure_SSH() {
-    local sshd_config="/etc/ssh/sshd_config"
-
-    # Update package lists & Install SSH server
-    apt update && apt install openssh-server -y || return 1
-
-    # Backup the original configuration
-    if [ -e "${sshd_config}_backup" ]; then
-        echo "Backup file '${sshd_config}_backup' already exists."
-    else
-        cp "$sshd_config" "${sshd_config}_backup"
-    fi
-
-    # Enable root login (not recommended for production)
-    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
-    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
-
-    # Disable root's ability to use password-based authentication
-    # sed -i 's/PermitRootLogin yes/PermitRootLogin without-password/' "$sshd_config"
-
-    # Set SSH port to 4444
-    sed -i 's/#Port 22/Port 4444/' "$sshd_config"
-
-    # Disable password authentication (use key-based authentication)
-    # sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' "$sshd_config"
-
-    # Enable PasswordAuthentication
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' "$sshd_config"
-    sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
-    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
-
-    # Allow only specific users or groups to log in via SSH (replace with your username)
-    # echo "AllowUsers your_username" >> "$sshd_config"
-
-    # Restart SSH service (for changes to take effect immediately)
-    systemctl restart sshd
-
-}
-
-config_system() {
-    local restore_choice
-    local bashrc="/etc/bash.bashrc"
-
-    echo "Setting server's timezone to Asia/Dubai"
-    timedatectl set-timezone Asia/Dubai || echo "Failed to set timezone"
-    echo ""
-    read -rp "Do you want to restore the original configuration from the backup? (y/n): " restore_choice
-    if [ "$restore_choice" == "y" ]; then
-        # Check if Backup exist
-        if [ -e "${bashrc}.backup" ]; then
-            if cp ${bashrc}.backup ${bashrc}; then
-                echo "Original configuration has been restored."
-            else
-                echo "Failed to restore original configuration."
-            fi
-        else
-            echo "Backup file '${bashrc}.backup' doesn't exists."
+        # Check again if they are empty
+        if [ -z "$db_name" ] || [ -z "$save_location" ]; then
+            echo "Both database name and save location are required."
+            return 1
         fi
-        return
     fi
 
-    # Backup the original configuration
-    if [ -e "${bashrc}.backup" ]; then
-        echo "Skipping Backup (already exists) '${bashrc}.backup'."
-    else
-        echo -e "Creating backup (bash.bashrc.backup)...\n"
-        cp ${bashrc} ${bashrc}.backup
-    fi
+    # Generate a timestamp with underscores
+    timestamp=$(date +"%Y_%m_%d_%H_%M_%S")
 
-    # Define the new PS1 prompt with color codes
-    # hetzner uses red yeloow cyan yellow pink
-    # Define colors using ANSI escape codes
-    local RED="\[\033[01;31m\]"
-    local GREEN="\[\033[01;32m\]"
-    local YELLOW="\[\033[01;33m\]"
-    local PINK="\[\033[01;35m\]"
-    local CYAN="\[\033[01;36m\]"
-    local RESET="\[\033[0m\]"
+    # Define the dump file name
+    dump_file="${db_name}_${timestamp}.sql.xz"
 
-    # Set the customized PS1 variable
-    local CUSTOM_PS1="'\${debian_chroot:+(\$debian_chroot)}${RED}\\u${YELLOW}@${CYAN}\\h ${YELLOW}\\w ${PINK}\\\$ ${RESET}'"
-    local escaped_PS1
-    escaped_PS1=$(echo "$CUSTOM_PS1" | sed 's/[\/&]/\\&/g')
+    # Create the database dump and compress it
+    $DUMP_CMD "$db_name" | xz -9 >"$save_location/$dump_file"
 
-    # Replace the old PS1 line with the new one
-    sed -i "s/PS1=.*/PS1=${escaped_PS1}/" ${bashrc}
+    echo "Database dump saved as: $save_location/$dump_file"
 
-    # "echo \"IP: \$(hostname -I | awk '{print \$1}') \$(ip -o -4 route show to default | awk '{print $5}')\""
-
-    local aliases=(
-        "alias ls='ls --color=auto'"
-        "alias ll='ls -lh'"
-        "alias la='ls -A'"
-        "alias l='ls -CF'"
-        "alias grep='grep --color=auto'"
-        "alias fgrep='fgrep --color=auto'"
-        "alias egrep='egrep --color=auto'"
-        "export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'"
-        "HISTSIZE=10000"
-        "HISTFILESIZE=20000"
-        "IP_Add=\"\$(hostname -I | awk '{print \$1}') \$(ip -o -4 route show to default)\""
-        # "echo -e \" \\e[91mIP:\\e[0m \${IP_Add}\""
-        "sinfo"
-    )
-    for value in "${aliases[@]}"; do
-        # local escaped_value=$(printf '%s\n' "$value" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
-        if ! grep -qF "$value" "${bashrc}"; then
-            echo "$value" >>"${bashrc}"
-        fi
-    done
-
-    # Notify user about the changes
-    echo "PS1 prompt, aliases, exports, and history settings have been updated for all users."
-
-    cat >"/etc/issue" <<EOFX
-\e{lightblue}\s \m \r (Server Time: \t\e{reset})
-\e{lightblue}\S{PRETTY_NAME} \v\e{reset}
-\e{lightgreen}\n.\o : \4\e{reset}
-EOFX
-    echo -n "" >/etc/motd
-    chmod -x /etc/update-motd.d/10-uname
-
-    local sinfo_script="/usr/local/bin/sinfo"
-    # Use a here document to create the script content
-    cat >"$sinfo_script" <<'EOF'
-#!/bin/bash
-
-# Get Script version
-script_version=$(Servo.sh version)
-
-# Get IP and Route
-IP_Add="$(hostname -I | awk '{print $1}') $(ip -o -4 route show to default)"
-
-# Get OS information
-os_info=$(lsb_release -d -s 2>/dev/null || cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2- | tr -d '"')' '$(cat /etc/debian_version)
-
-# Get kernel information
-kernel_info=$(uname -smr)
-
-# Get uptime
-uptime_info=$(uptime -p | sed 's/up //')
-
-# Get package count
-package_count=$(dpkg -l | grep -c '^ii' 2>/dev/null || rpm -qa --last | wc -l 2>/dev/null)
-
-# Get shell information
-shell_info=$($SHELL --version 2>&1 | head -n 1)
-
-# Get disk usage
-disk_info=$(df -h / | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')
-
-# Get CPU information
-cpu_info=$(lscpu | awk -F ': ' '/^Model name/ {gsub(/^[ \t]+/, "", $2); print $2}')
-
-# Get GPU information
-gpu_info=$(lspci | grep -i "VGA" | awk -F ': ' '{print $2}')
-
-# Get RAM information
-ram_info=$(free -h | grep "Mem:" | awk '{print $3 " / " $2}')
-
-# Get Machine information
-machine_info=$(dmidecode -t system | grep -E "Manufacturer:|Product Name:" | awk -F': ' '{print $2}' | tr '\n' ' ')
-
-# lspci -nn | grep -i ethernet
-
-# Print the gathered information
-echo -e " \e[91mServo V:\e[0m $script_version"
-echo -e " \e[91mIP:\e[0m $IP_Add"
-echo -e " \e[91mOS:\e[0m $os_info"
-echo -e " \e[91mKernel:\e[0m $kernel_info"
-echo -e " \e[91mUptime:\e[0m $uptime_info"
-echo -e " \e[91mPackages:\e[0m $package_count"
-echo -e " \e[91mShell:\e[0m $shell_info"
-echo -e " \e[91mDisk:\e[0m $disk_info"
-echo -e " \e[91mCPU:\e[0m $cpu_info"
-echo -e " \e[91mGPU:\e[0m $gpu_info"
-echo -e " \e[91mRAM:\e[0m $ram_info"
-echo -e " \e[91mMachine:\e[0m $machine_info"
-EOF
-
-    echo "Script generated and saved as $sinfo_script"
-    chmod +x "$sinfo_script"
-
+    # Call the function with command-line arguments if provided
+    # Backup_Database "$1" "$2"
 }
 
-add_cloudflare() {
-    local cloudflare_script="/usr/local/bin/cloudflare_sync"
-    cat >"$cloudflare_script" <<'EOFX'
-#!/bin/bash
+db_create() {
+    local DB_NAME DB_USER DB_USER_PASS
+    read -rp "Enter a name for the database: " DB_NAME
+    read -rp "Enter a db username: " DB_USER
+    read -rp "Enter a password for the db user: " DB_USER_PASS
 
-CLOUDFLARE_FILE_PATH=/etc/nginx/conf.d/cloudflare.conf
+    # Create a new database and user
+    $DB_CMD -e "CREATE DATABASE $DB_NAME;"
+    $DB_CMD -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
+    $DB_CMD -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
+    $DB_CMD -e "FLUSH PRIVILEGES;"
 
-echo "#Cloudflare" > $CLOUDFLARE_FILE_PATH;
-echo "" >> $CLOUDFLARE_FILE_PATH;
-
-echo "# - IPv4" >> $CLOUDFLARE_FILE_PATH;
-for i in `curl https://www.cloudflare.com/ips-v4`; do
-        echo "set_real_ip_from $i;" >> $CLOUDFLARE_FILE_PATH;
-done
-
-echo "" >> $CLOUDFLARE_FILE_PATH;
-echo "# - IPv6" >> $CLOUDFLARE_FILE_PATH;
-for i in `curl https://www.cloudflare.com/ips-v6`; do
-        echo "set_real_ip_from $i;" >> $CLOUDFLARE_FILE_PATH;
-done
-
-echo "" >> $CLOUDFLARE_FILE_PATH;
-echo "real_ip_header CF-Connecting-IP;" >> $CLOUDFLARE_FILE_PATH;
-
-#test configuration and reload nginx
-nginx -t && systemctl reload nginx
-EOFX
-
-    chmod 700 "$cloudflare_script"
-
-    echo "Fetching IPs from cloudflare.."
-    cloudflare_sync
-    # Add daily cron job
-    echo "Adding cron job.."
-
-    echo "30 1 * * * root ${cloudflare_script}" >"${cron_dir}cloudflare"
-    chmod 660 "${cron_dir}cloudflare"
-    cat "${cron_dir}"* | crontab -
-    echo -e "Loaded cron jobs:\n"
-    crontab -l
-    # Jobs inside "/etc/cron.d/" directory are monitored for changes
-    # /etc/init.d/cron reload
-    # systemctl restart cron
-    # /var/spool/cron/crontabs
+    echo "Done."
 }
 
-read_mysql_config() {
+db_config_read() {
     # Array of configuration parameters to check
     local CONFIG_PARAMS=(
         "bind_address"
@@ -1484,188 +1635,73 @@ read_mysql_config() {
     $DB_CMD -e "$grants_commands"
 }
 
-create_vhost() {
-    local domain
-    local vuser
-    local REPLY
-    local PS3
-
+memcached_manage() {
+    local choice
     while true; do
-        # Prompt for the domain name
-        read -rp "Enter the domain name (e.g., example.com): " domain
+        echo "Choose an option:"
+        echo "1. Install memcached"
+        echo "2. Remove (purge) memcached"
+        echo "0. Quit"
 
-        # Check if the domain name follows common rules
-        if [[ "$domain" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-            break
-        else
-            echo "Invalid domain name format. Please enter a valid domain name (e.g., example.com)."
-        fi
-    done
+        read -rp "Enter your choice: " choice
 
-    while true; do
-        # Prompt for the username
-        read -rp "Enter new username: " vuser
-        # Check if the username contains only alphanumeric characters
-        if [[ "$vuser" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-            break
-        else
-            echo "Username should only contain letters (uppercase and lowercase), numbers, underscores, and hyphens. Please try again."
-        fi
-    done
-
-    if id "${vuser}" &>/dev/null; then
-        echo "User ${vuser} exists."
-    else
-        echo "User ${vuser} does not exist."
-        useradd -N -m -s "$(which bash)" -d "/var/www/${vuser}" "${vuser}"
-        rm -rf /var/www/"${vuser}"/{.bashrc,.profile,.bash_logout}
-        passwd -l "$vuser"
-    fi
-
-    # Prompt the user to choose between two options
-    PS3="Please select PHP version: "
-
-    # Define the options
-    options=("PHP 7.4" "PHP 8.2" "Quit")
-
-    # Display the options and prompt for a choice
-    select choice in "${options[@]}"; do
-        case $REPLY in
-        1)
-            phpVer=7.4
-            break
-            ;;
-        2)
-            phpVer=8.2
-            break
-            ;;
-        3)
-            echo "Exiting the script."
-            return 0
-            ;;
-        *) echo "Invalid choice. Please choose 1 or 2." ;;
+        case $choice in
+        1) memcached_install ;;
+        2) memcached_remove ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
         esac
     done
+}
 
-    # Create vhost directories
-    basedir="/var/www/${vuser}/"
-    mkdir -p "${basedir}/logs/${domain}"
-    mkdir -p "${basedir}/${domain}/public/"
-    chmod 710 "${basedir}"
-    chown "${vuser}:www-data" "${basedir}"
-    chown -R "${vuser}:users" "${basedir}"*
+# Function to install Memcached
+memcached_install() {
+    # Install Memcached and required dependencies
+    apt update && apt install -y memcached libmemcached-tools || (echo "Failed" && return 1)
 
-    # Generate php config
-    generate_php_conf "${vuser}" "${domain}" "${phpVer}"
+    # Configure Memcached
+    # echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
+    # echo "-l 127.0.0.1" >>/etc/memcached.conf # Bind to localhost
+    # echo "-p 11211" >>/etc/memcached.conf     # Use port 11211
+    # echo "-U 0" >>/etc/memcached.conf         # Run as the root user
+    # echo "-t 4" >>/etc/memcached.conf         # Use 4 threads
 
-    # Generate nginx config
-    generate_nginx_vhost "${vuser}" "${domain}" "${phpVer}"
+    # Restart Memcached
+    systemctl restart memcached
 
-    # Enable nginx site
-    if [ -L "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
-        echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists."
-    else
-        if [ -e "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
-            echo -e "\nqFile or directory with the name '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists. Cannot create the symbolic link."
-        else
-            ln -s "/etc/nginx/sites-available/${vuser}-${domain}.conf" /etc/nginx/sites-enabled/
-            echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' created to '/etc/nginx/sites-available/${vuser}-${domain}.conf'"
-        fi
+    # Enable Memcached to start on system boot
+    systemctl enable memcached
+
+    echo "Memcached installation and configuration complete"
+}
+
+# Function to remove Memcached
+memcached_remove() {
+    local confirmation
+
+    # Ask for confirmation
+    read -rp "This will purge Memcached and its configuration.. Are you sure? (y/n): " confirmation
+
+    if [[ $confirmation != "y" ]]; then
+        echo "Aborting."
+        return 0
     fi
-    nginx -t && systemctl reload nginx
+    # Stop Memcached service
+    systemctl stop memcached
+
+    # Purge Memcached data
+    rm -rf /var/lib/memcached/*
+
+    # Remove Memcached configuration files
+    apt remove --purge memcached
+
+    # Also remove configuration files
+    rm -rf /etc/memcached.conf
+
+    echo "Memcached purged and configuration files removed."
 }
 
-generate_nginx_vhost() {
-    local vuser="$1"
-    local domain="$2"
-    local phpVer="$3"
-    local server_name
-    local is_default
-
-    read -rp "Is this default domain? (y/n) " is_default
-    if [[ "$is_default" == "y" ]]; then
-        server_name="server_name _"
-    else
-        server_name="server_name $domain www.${domain}"
-    fi
-
-    cat >"/etc/nginx/sites-available/${vuser}-${domain}.conf" <<EOTX
-server {
-    listen 80;
-    ${server_name};
-    # root /var/www/${vuser}/${domain}/public;
-    # access_log /var/www/${vuser}/logs/${domain}/access.log;
-    # error_log /var/www/${vuser}/logs/${domain}/error.log error;
-    # error_page 404 /404.html;
-
-    # Redirect www to non-www
-    if (\$host ~* ^www\.(.*)) {
-        set \$redirect_host \$1;
-        rewrite ^(.*)\$ https://\$redirect_host\$request_uri permanent;
-    }
-
-    # Redirect HTTP to HTTPS
-    return 301 https://\$host\$request_uri;
-
-    # client_max_body_size 1M;
-    # location / {
-    #     # First attempt to serve request as file, then as directory, then fall back to displaying a 404.
-    #     try_files \$uri \$uri/ =404;
-    # }
-
-    # include ${common_nginx_snippet};
-}
-
-server {
-    listen 443 ssl http2;
-    ${server_name};
-    root /var/www/${vuser}/${domain}/public;
-    include ${ssl_nginx_snippet};
-    include ${common_nginx_snippet};
-    include ${caching_nginx_snippet};
-    access_log /var/www/${vuser}/logs/${domain}/ssl_access.log;
-    error_log /var/www/${vuser}/logs/${domain}/ssl_error.log error;
-    # error_page 404 /404.html;
-
-    client_max_body_size 102M;
-
-    # Redirect www to non-www
-    if (\$host ~* ^www\.(.*)) {
-        set \$redirect_host \$1;
-        rewrite ^(.*)\$ https://\$redirect_host\$request_uri permanent;
-    }
-
-    # Limiting the Rate of Requests: each unique IP address is limited to 10 requests per second with 5 requests bursting.
-    # location /login/ {
-    #     limit_req zone=one burst=5;
-    # }
-
-    # Limiting the Number of Connections: limit the number of connections that can be opened by a unique IP address.
-    # limit_conn_zone \$binary_remote_addr zone=addr:10m;
-    # location /something/ {
-    #     limit_conn addr 10;
-    # }
-
-   location ~ \.php(/.*)?$ {
-        fastcgi_pass unix:/run/php/${phpVer}-fpm-${domain}.sock;
-        include snippets/fastcgi-php.conf;
-        fastcgi_read_timeout 300;
-    }
-
-    location / {
-       try_files \$uri \$uri/ /index.php\$is_args\$args;
-    }
-}
-EOTX
-}
-
-install_more_packages() {
-    apt update && apt install -y build-essential software-properties-common python3 python3-pip
-
-    echo "More Packages installation complete."
-}
-
-install_docker() {
+docker_install() {
     # Add Docker's official GPG key:
     apt-get update && apt-get install -y ca-certificates curl gnupg
     install -m 0755 -d /etc/apt/keyrings
@@ -1683,7 +1719,7 @@ install_docker() {
     apt update && apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 }
 
-remove_docker() {
+docker_remove() {
     # Remove the official docker
     apt purge docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     # for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do apt-get -y remove $pkg; done
@@ -1693,7 +1729,7 @@ remove_docker() {
 
 }
 
-manage_docker() {
+docker_manage() {
     local choice
     while true; do
         echo "Choose an option:"
@@ -1704,15 +1740,15 @@ manage_docker() {
         read -rp "Enter your choice: " choice
 
         case $choice in
-        1) install_docker ;;
-        2) remove_docker ;;
+        1) docker_install ;;
+        2) docker_remove ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
 }
 
-manage_wordpress() {
+wordpress_manage() {
     local choice
     while true; do
         echo "Choose an option:"
@@ -1721,14 +1757,14 @@ manage_wordpress() {
 
         read -rp "Enter your choice: " choice
         case $choice in
-        1) install_wordpress ;;
+        1) wordpress_install ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
 }
 
-install_wordpress() {
+wordpress_install() {
     local install_dir
     local local_user
     local wpURL
@@ -1837,140 +1873,39 @@ EOFX
 
 }
 
-# Function to fix files and folders permissions
-fix_permissions() {
+certbot_manage() {
+    local choice
+    while true; do
+        echo -e "\033[33m"
+        echo "Choose an option:"
+        echo "1. Install Certbot"
+        echo "2. Get/Renew Certificate"
+        echo "5. List cloudflare configs"
+        echo "6. Create cloudflare config"
+        echo "0. Quit"
+        echo -e "\033[0m"
 
-    # chown -R user:group TARGET
-    # find TARGET -type d -exec chmod 775 {} \;
-    # find TARGET -type f -exec chmod 664 {} \;
-    # chmod 640 TARGET/wp-config.php
+        read -rp "Enter your choice: " choice
 
-    local target="$1"
-    local user="$2"
-    local group="$3"
-
-    # Prompt for input if any argument is missing
-    if [ -z "$target" ]; then
-        read -rp "Enter the target directory: " target
-    fi
-
-    if [ -z "$user" ]; then
-        read -rp "Enter the user: " user
-    fi
-
-    if [ -z "$group" ]; then
-        read -rp "Enter the group: " group
-    fi
-
-    # Check if all arguments are provided
-    if [ -z "$target" ] || [ -z "$user" ] || [ -z "$group" ]; then
-        echo "Usage: fix_permissions <target> <user> <group>"
-        return 1
-    fi
-
-    # Fix ownership
-    chown -R "$user:$group" "$target"
-
-    # Set directory permissions to 775 and file permissions to 664
-    find "$target" -type d -exec chmod 775 {} \;
-    find "$target" -type f -exec chmod 664 {} \;
-
-    echo "Permissions fixed for '$target'."
+        case $choice in
+        1) certbot_install ;;
+        2) certbot_certificate_get ;;
+        5) certbot_list_cloudflare_config ;;
+        6) certbot_create_cloudflare_config ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
+        esac
+    done
 }
 
-# Function to comment or uncomment lines in a config file
-comment_uncomment() {
-    local search_pattern="$1"
-    local config_file="$2"
-    local comment_uncomment="$3"
-
-    # Check if the config file exists
-    if [ ! -f "$config_file" ]; then
-        echo "Error: Config file '$config_file' not found."
-        return 1
+certbot_install() {
+    # Check if Certbot is installed
+    if ! command -v certbot &>/dev/null; then
+        echo "Certbot is not installed. Installing Certbot..."
+        apt-get update && apt-get -y install certbot python3-certbot-dns-cloudflare
     fi
-
-    # Define the AWK script
-    local awk_script='
-  {
-    # Count leading whitespace (tabs or spaces)
-    whitespace_count = match($0, /^[ \t]*/)
-    whitespace = substr($0, RSTART, RLENGTH)
-    line = substr($0, RLENGTH + 1)
-
-    # Check if the line matches the search pattern
-    if ($0 ~ search_pattern) {
-      if (comment_uncomment == "comment" && substr(line, 1, 1) != "#") {
-        # Comment the line and add a space after the comment symbol if needed
-        if (substr(line, 1, 1) != " ") {
-          line = " " line
-        }
-        $0 = whitespace "#" line
-      } else if (comment_uncomment == "uncomment") {
-        # Uncomment the line and remove all preceding comment symbols and spaces
-        sub(whitespace "[# ]*", whitespace, $0)
-      }
-    }
-
-    # Print the modified line
-    print
-  }
-  '
-
-    # Use AWK to process the config file and redirect the output to a temporary file
-    awk -v search_pattern="$search_pattern" -v comment_uncomment="$comment_uncomment" "$awk_script" "$config_file" >"$config_file.tmp" || {
-        echo " Error in awk in comment_uncomment IN '$config_file'"
-        return 1
-    }
-
-    # Replace the original config file with the temporary file
-    mv "$config_file.tmp" "$config_file" || {
-        echo " Error in mv in comment_uncomment IN '$config_file'"
-        return 1
-    }
-
-    # echo "Success ${comment_uncomment}ing IN '$config_file'"
-    echo "Success"
-
-    # Example usage:
-    # comment_uncomment "search_pattern" "/path/to/config/file" "comment"
-    # comment_uncomment "search_pattern" "/path/to/config/file" "uncomment"
 }
 
-# Function to add a new line under a pattern with correct indentation
-add_line_under_pattern() {
-    local pattern_to_match="$1"
-    local config_file="$2"
-    local new_line="$3"
-
-    # Check if the config file exists
-    if [ ! -f "$config_file" ]; then
-        echo "Config file not found: $config_file"
-        return 1
-    fi
-
-    # Escape special characters in the pattern
-    local escaped_pattern
-    escaped_pattern=$(sed 's/[][\/.^$*]/\\&/g' <<<"$pattern_to_match")
-
-    # Get the indentation of the pattern line
-    local indentation
-    indentation=$(sed -n "/$escaped_pattern/{s/^\([[:space:]]*\).*$/\1/;p;q}" "$config_file")
-
-    # Check if the new line already exists after the pattern line
-    if grep -qFx "${indentation}${new_line}" "$config_file"; then
-        echo "The new line already exists after the pattern. No duplicate line added."
-    else
-        # Use sed to insert the new line under the pattern with the same indentation
-        sed -i "\%$escaped_pattern%a\\${indentation}${new_line}" "$config_file" && echo "Success" || echo "Failed: ADDING '$new_line' UNDER '$pattern_to_match' IN '$config_file' "
-
-    fi
-
-    # Example usage:
-    # add_line_under_pattern "include /etc/nginx/snippets/ssl" /path/to/your/config/file.conf "new_line_to_append"
-
-}
-######### Certbot Start #########
 # Function to configure Cloudflare
 certbot_create_cloudflare_config() {
     local cloudflare_email
@@ -2006,7 +1941,7 @@ certbot_list_cloudflare_config() {
 }
 
 # Function to get a new or renew a certificate
-get_certbot_certificate() {
+certbot_certificate_get() {
     local domain_name
     read -rp "Enter your domain name (e.g., example.com): " domain_name
 
@@ -2031,215 +1966,7 @@ get_certbot_certificate() {
 
 }
 
-set_nginx_cert() {
-
-    local nginx_conf_dir="/etc/nginx/sites-available"
-    local ssl_dir="/etc/ssl"
-
-    nginx_config=$(select_from_dir "$nginx_conf_dir")
-    echo "Selected config: $nginx_config"
-
-    local domain_name
-    domain_name=$(get_domain_from_nginx_conf_path "${nginx_config}")
-    [[ -n $domain_name ]] || {
-        echo "$domain_name"
-        return 1
-    }
-
-    echo -e "\n Domain: ${domain_name}\n"
-
-    mkdir -p "/etc/nginx/snippets/"
-    snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
-
-    cat >"$snippet_path" <<EOFX
-ssl_certificate $ssl_dir/$domain_name/fullchain.pem;
-ssl_certificate_key $ssl_dir/$domain_name/privkey.pem;
-EOFX
-
-    # Add or update the include line in the nginx configuration
-    if grep -q "include $snippet_path;" "$nginx_config"; then
-        comment_uncomment "include $snippet_path;" "$nginx_config" uncomment
-    else
-        add_line_under_pattern "include ${ssl_nginx_snippet};" "$nginx_config" "include $snippet_path;"
-    fi
-    comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" comment
-    nginx -t && systemctl reload nginx
-}
-
-get_domain_from_nginx_conf_path() {
-    local path="$1"
-
-    # Extract the base filename
-    local domain_name="${path##*/}"
-
-    # Remove the file extension
-    domain_name="${domain_name%.*}"
-
-    # Get domain with subomain
-    # domain_name="${base_filename##*-}"
-
-    # Get domain only - Use awk to split the string by hyphen and capture the last part after the last dot
-    domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
-
-    domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
-
-    if is_valid_domain "$domain_name"; then
-        echo "$domain_name"
-        return 0
-    else
-        echo "${domain_name} is not a valid domain."
-        return 1
-    fi
-}
-
-# Function to revert to self-signed certificate
-revert_to_self_signed() {
-    # read -rp "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
-    echo "Select nginx config"
-    local nginx_config
-    nginx_config=$(select_from_dir "/etc/nginx/sites-available/")
-    echo "Selected config: $nginx_config"
-
-    local domain_name
-    domain_name=$(get_domain_from_nginx_conf_path "${nginx_config}")
-    [[ -n $domain_name ]] || {
-        echo "$domain_name"
-        return 1
-    }
-
-    # nginx_config="/etc/nginx/sites-available/$domain_name"
-
-    if [ -f "$nginx_config" ]; then
-        local snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
-
-        # echo "Commenting: include $snippet_path;"
-        comment_uncomment "include $snippet_path;" "$nginx_config" comment
-
-        comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" uncomment
-        nginx -t && systemctl reload nginx
-
-        # echo "Reverted $domain_name to use the self-signed certificate."
-    else
-        echo "Nginx configuration file not found."
-    fi
-}
-
-install_certbot() {
-    # Check if Certbot is installed
-    if ! command -v certbot &>/dev/null; then
-        echo "Certbot is not installed. Installing Certbot..."
-        apt-get update && apt-get -y install certbot python3-certbot-dns-cloudflare
-    fi
-}
-
-manage_certbot() {
-    local choice
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. Install Certbot"
-        echo "2. Get/Renew Certificate"
-        echo "3. Set nginx Cert"
-        echo "4. Revert nginx to Self-Signed Certificate"
-        echo "5. List cloudflare configs"
-        echo "6. Create cloudflare config"
-        echo "0. Quit"
-        echo -e "\033[0m"
-
-        read -rp "Enter your choice: " choice
-
-        case $choice in
-        1) install_certbot ;;
-        2) get_certbot_certificate ;;
-        3) set_nginx_cert ;;
-        4) revert_to_self_signed ;;
-        5) certbot_list_cloudflare_config ;;
-        6) certbot_create_cloudflare_config ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
-}
-######### Certbot END #########
-
-list_users() {
-    local RED='\033[1;31m'
-    local GREEN='\033[1;32m'
-    local YELLOW='\033[1;33m'
-    local RESET='\033[0m'
-    local login_status
-    local can_login
-
-    # Create a header for the table
-    printf "${GREEN}%-20s%-20s%-20s%-20s%-20s${RESET}\n" "Username" "User ID" "Group ID" "Home Directory" "Can Login"
-
-    # Use the awk command to extract user information and format it
-    awk -F: 'BEGIN {OFS="\t"} {print $1, $3, $4, $6}' /etc/passwd |
-        while IFS=$'\t' read -r username uid gid home; do
-            can_login=$(awk -F: -v user="$username" '$1 == user {print $2}' /etc/shadow)
-            if [[ "$can_login" == *":"* || "$can_login" == "!"* ]]; then
-                login_status="${RED}No${RESET}"
-            else
-                login_status="${GREEN}Yes${RESET}"
-            fi
-            printf "${YELLOW}%-20s${RESET}%-20s%-20s%-20s${login_status}\n" "$username" "$uid" "$gid" "$home"
-        done
-
-}
-
-list_groups() {
-    local GREEN='\033[1;32m'
-    local YELLOW='\033[1;33m'
-    local RESET='\033[0m'
-    local gid
-    local members
-
-    # Create a header for the table
-    printf "${GREEN}%-20s%-20s%-20s${RESET}\n" "Group Name" "Group ID" "Group Members"
-
-    # Iterate through each group, list members, and sort by group name
-    for groupname in $(cut -d: -f1 /etc/group | sort); do
-        gid=$(getent group "$groupname" | cut -d: -f3)
-        members=$(members "$groupname" 2>/dev/null)
-
-        if [ -z "$members" ]; then
-            members="N/A"
-        fi
-
-        printf "${YELLOW}%-20s${RESET}%-20s${members}\n" "$groupname" "$gid"
-    done
-
-}
-
-manage_users() {
-
-    # Check if the 'members' command is available
-    if ! command -v members >/dev/null 2>&1; then
-        echo "The 'members' command is not installed. Installing..."
-        apt update && apt-get install -y members
-    fi
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. List Users"
-        echo "2. List Groups"
-        echo "3. "
-        echo "0. Quit"
-        echo -e "\033[0m"
-
-        read -rp "Enter your choice: " choice
-
-        case $choice in
-        1) list_users ;;
-        2) list_groups ;;
-        3) ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
-}
-
-manage_rsync() {
+rsync_manage() {
 
     while true; do
         echo -e "\033[33m"
@@ -2252,7 +1979,7 @@ manage_rsync() {
         read -rp "Enter your choice: " choice
 
         case $choice in
-        1) install_rsync ;;
+        1) rsync_install ;;
         2) rsync_push_letsencrypt ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
@@ -2260,7 +1987,7 @@ manage_rsync() {
     done
 }
 
-install_rsync() {
+rsync_install() {
     # Check if the 'rsync' command is available
     if ! command -v rsync >/dev/null 2>&1; then
         echo "The 'rsync' command is not installed. Installing..."
@@ -2301,11 +2028,532 @@ rsync_push_letsencrypt() {
     echo "Log written to '/var/log/rsync/letsencrypt.log'"
 }
 
+compress() {
+    # Validate the availability of compression methods
+    local commands=("zip" "tar" "gzip" "bzip2" "xz" "7z")
+    for cmd in "${commands[@]}"; do
+        validate_command "$cmd" || return 1
+    done
+
+    if [ "$#" -ne 2 ]; then
+        echo "Insufficient number of arguments. Usage: $0 compress [format] [path]"
+        exit 1
+    fi
+
+    local format=$1
+    local path=$2
+
+    # Remove quotes if present in the input path
+    path=${path//\"/}
+    # Remove trailing slash if present in the input path
+    path=${path%/}
+
+    # local base_name=$(basename "$path")
+    # local dir_name=$(dirname "$path")
+
+    if ! path_exists "$path"; then
+        echo "Path doesn't exist"
+        return 1
+    fi
+
+    # "$base_name.tar" -C "$dir_name" "$base_name"
+
+    case $format in
+    "zip")
+        if [ -d "$path" ]; then
+            zip -r "$path.zip" "$path"
+        else
+            zip "$path.zip" "$path"
+        fi
+        ;;
+    "tar") tar -cvf "$path.tar" "$path" ;;
+    "gz")
+        if [ -d "$path" ]; then
+            tar -czvf "$path.tar.gz" "$path"
+        else
+            gzip -c "$path" >"$path.gz"
+        fi
+        ;;
+    "bz2")
+        if [ -d "$path" ]; then
+            tar -cjvf "$path.tar.bz2" "$path"
+        else
+            bzip2 -c "$path" >"$path.bz2"
+        fi
+        ;;
+    "xz")
+        if [ -d "$path" ]; then
+            tar -cJvf "$path.tar.xz" "$path"
+        else
+            xz -c "$path" >"$path.xz"
+        fi
+        ;;
+    "7z") 7z a "$path.7z" "$path" ;;
+    *) echo "Invalid compression format." ;;
+    esac
+}
+
+decompress() {
+    # Validate the availability of compression methods
+    # Validate the availability of compression methods
+    local commands=("zip" "tar" "gzip" "bzip2" "xz" "7z")
+    for cmd in "${commands[@]}"; do
+        validate_command "$cmd" || return 1
+    done
+
+    if [ "$#" -ne 1 ]; then
+        echo "Insufficient number of arguments. Usage: $0 decompress [path]"
+        exit 1
+    fi
+    detect_format() {
+        local file_path=$1
+        local extension="${file_path##*.}"
+
+        case $extension in
+        "zip") echo "zip" ;;
+        "tar") echo "tar" ;;
+        "gz") echo "gz" ;;
+        "bz2") echo "bz2" ;;
+        "xz") echo "xz" ;;
+        "7z") echo "7z" ;;
+        *)
+            local file_type=$(file -b "$file_path" | awk '{print $1}')
+
+            case $file_type in
+            "Zip") echo "zip" ;;
+            "POSIX") echo "tar" ;;
+            "gzip") echo "gz" ;;
+            "bzip2") echo "bz2" ;;
+            "XZ") echo "xz" ;;
+            "7-zip") echo "7z" ;;
+            *) echo "Unknown" ;;
+            esac
+            ;;
+        esac
+    }
+    local format path=$1
+
+    if ! file_exists "$path"; then
+        echo "File doesn't exist"
+        return 1
+    fi
+
+    format=$(detect_format "$path")
+    if [ "$format" == "Unknown" ]; then
+        echo "Unknown compression format. Decompression aborted."
+        return 1
+    fi
+
+    case $format in
+    "zip") unzip "$path" ;;
+    "tar") tar -xvf "$path" ;;
+    "gz") tar -xzvf "$path" ;;
+    "bz2") tar -xjvf "$path" ;;
+    "xz") tar -xJvf "$path" ;;
+    "7z") 7z x "$path" ;;
+    *) echo "Invalid compression format." ;;
+    esac
+}
+
+comp_manage() {
+
+    while true; do
+        echo -e "\033[33m"
+        echo "Choose an option:"
+        echo "1. Compress"
+        echo "2. Decompress"
+        echo "0. Exit"
+        echo -e "\033[0m"
+        read -rp "Enter your choice: " choice
+
+        case $choice in
+        0) return 0 ;;
+        1)
+            while true; do
+                read -rp "Enter compression format (zip, tar, gz, bz2, xz, 7z): " format
+                case $format in
+                "zip" | "tar" | "gz" | "bz2" | "xz" | "7z") break ;;
+                *)
+                    echo "Invalid compression format."
+                    ;;
+                esac
+            done
+            read -rp "Enter path to file/directory: " path
+            compress "$format" "$path"
+            ;;
+        2)
+            read -rp "Enter path to compressed file: " path
+            decompress "$path"
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
+        esac
+    done
+}
+
+sys_manage() {
+    # Check if the 'members' command is available
+    if ! command -v members >/dev/null 2>&1; then
+        echo "The 'members' command is not installed. Installing..."
+        apt update && apt-get install -y members
+    fi
+    while true; do
+        echo -e "\033[33m"
+        echo "Choose an option:"
+        echo "1. List Users"
+        echo "2. List Groups"
+        echo "3. Clean up (autoremove, autoclean, update)"
+        echo "4. Install Standard Packages"
+        echo "5. Install & configure SSH (port 4444, enable root)"
+        echo "6. Configure terminal and system banners"
+        echo "7. Install (build-essential software-properties-common python3)"
+        echo "0. Quit"
+        echo -e "\033[0m"
+        read -rp "Enter your choice: " choice
+
+        case $choice in
+        1) sys_list_users ;;
+        2) sys_list_groups ;;
+        3) sys_cleanUp ;;
+        4) sys_std_pkg_install ;;
+        5) sys_SSH_install ;;
+        6) sys_config_setup ;;
+        7) sys_more_pkg_install ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
+        esac
+    done
+}
+
+sys_list_users() {
+    local RED='\033[1;31m'
+    local GREEN='\033[1;32m'
+    local YELLOW='\033[1;33m'
+    local RESET='\033[0m'
+    local login_status
+    local can_login
+
+    # Create a header for the table
+    printf "${GREEN}%-20s%-20s%-20s%-20s%-20s${RESET}\n" "Username" "User ID" "Group ID" "Home Directory" "Can Login"
+
+    # Use the awk command to extract user information and format it
+    awk -F: 'BEGIN {OFS="\t"} {print $1, $3, $4, $6}' /etc/passwd |
+        while IFS=$'\t' read -r username uid gid home; do
+            can_login=$(awk -F: -v user="$username" '$1 == user {print $2}' /etc/shadow)
+            if [[ "$can_login" == *":"* || "$can_login" == "!"* ]]; then
+                login_status="${RED}No${RESET}"
+            else
+                login_status="${GREEN}Yes${RESET}"
+            fi
+            printf "${YELLOW}%-20s${RESET}%-20s%-20s%-20s${login_status}\n" "$username" "$uid" "$gid" "$home"
+        done
+
+}
+
+sys_list_groups() {
+    local GREEN='\033[1;32m'
+    local YELLOW='\033[1;33m'
+    local RESET='\033[0m'
+    local gid
+    local members
+
+    # Create a header for the table
+    printf "${GREEN}%-20s%-20s%-20s${RESET}\n" "Group Name" "Group ID" "Group Members"
+
+    # Iterate through each group, list members, and sort by group name
+    for groupname in $(cut -d: -f1 /etc/group | sort); do
+        gid=$(getent group "$groupname" | cut -d: -f3)
+        members=$(members "$groupname" 2>/dev/null)
+
+        if [ -z "$members" ]; then
+            members="N/A"
+        fi
+
+        printf "${YELLOW}%-20s${RESET}%-20s${members}\n" "$groupname" "$gid"
+    done
+
+}
+
+sys_cleanUp() {
+    apt autoremove
+    apt autoclean
+    apt update
+    apt clean
+}
+
+sys_std_pkg_install() {
+    local confirmation
+
+    # Install the "standard" task automatically
+    # apt install -y tasksel
+    # echo "standard" | tasksel install
+
+    apt update && apt install -y \
+        bash-completion \
+        curl \
+        wget \
+        git \
+        nano \
+        zip \
+        unzip \
+        p7zip-full \
+        bzip2 \
+        gzip \
+        htop \
+        net-tools \
+        nftables \
+        bind9-dnsutils \
+        cron \
+        logrotate \
+        ncurses-term \
+        mime-support
+
+    iproute2 \
+        pciutils \
+        bc \
+        jq \
+        dmidecode
+
+    read -rp "Remove Exim4? (y/n) " confirmation
+    if [[ "$confirmation" == "y" ]]; then
+        echo -e "\nRunning apt purge exim4-*\n"
+        apt -y purge exim4-*
+    fi
+
+    # Clean up
+    apt autoremove -y
+    apt clean
+
+    echo "Standard packages installation complete."
+}
+
+sys_SSH_install() {
+    local sshd_config="/etc/ssh/sshd_config"
+
+    # Update package lists & Install SSH server
+    apt update && apt install openssh-server -y || return 1
+
+    # Backup the original configuration
+    if [ -e "${sshd_config}_backup" ]; then
+        echo "Backup file '${sshd_config}_backup' already exists."
+    else
+        cp "$sshd_config" "${sshd_config}_backup"
+    fi
+
+    # Enable root login (not recommended for production)
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
+    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
+
+    # Disable root's ability to use password-based authentication
+    # sed -i 's/PermitRootLogin yes/PermitRootLogin without-password/' "$sshd_config"
+
+    # Set SSH port to 4444
+    sed -i 's/#Port 22/Port 4444/' "$sshd_config"
+
+    # Disable password authentication (use key-based authentication)
+    # sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' "$sshd_config"
+
+    # Enable PasswordAuthentication
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' "$sshd_config"
+    sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
+    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
+
+    # Allow only specific users or groups to log in via SSH (replace with your username)
+    # echo "AllowUsers your_username" >> "$sshd_config"
+
+    # Restart SSH service (for changes to take effect immediately)
+    systemctl restart sshd
+
+}
+
+sys_config_setup() {
+    local restore_choice
+    local bashrc="/etc/bash.bashrc"
+
+    echo "Setting server's timezone to Asia/Dubai"
+    timedatectl set-timezone Asia/Dubai || echo "Failed to set timezone"
+    echo ""
+    read -rp "Do you want to restore the original configuration from the backup? (y/n): " restore_choice
+    if [ "$restore_choice" == "y" ]; then
+        # Check if Backup exist
+        if [ -e "${bashrc}.backup" ]; then
+            if cp ${bashrc}.backup ${bashrc}; then
+                echo "Original configuration has been restored."
+            else
+                echo "Failed to restore original configuration."
+            fi
+        else
+            echo "Backup file '${bashrc}.backup' doesn't exists."
+        fi
+        return
+    fi
+
+    # Backup the original configuration
+    if [ -e "${bashrc}.backup" ]; then
+        echo "Skipping Backup (already exists) '${bashrc}.backup'."
+    else
+        echo -e "Creating backup (bash.bashrc.backup)...\n"
+        cp ${bashrc} ${bashrc}.backup
+    fi
+
+    # Define the new PS1 prompt with color codes
+    # hetzner uses red yeloow cyan yellow pink
+    # Define colors using ANSI escape codes
+    local RED="\[\033[01;31m\]"
+    local GREEN="\[\033[01;32m\]"
+    local YELLOW="\[\033[01;33m\]"
+    local PINK="\[\033[01;35m\]"
+    local CYAN="\[\033[01;36m\]"
+    local RESET="\[\033[0m\]"
+
+    # Set the customized PS1 variable
+    local CUSTOM_PS1="'\${debian_chroot:+(\$debian_chroot)}${RED}\\u${YELLOW}@${CYAN}\\h ${YELLOW}\\w ${PINK}\\\$ ${RESET}'"
+    local escaped_PS1
+    escaped_PS1=$(echo "$CUSTOM_PS1" | sed 's/[\/&]/\\&/g')
+
+    # Replace the old PS1 line with the new one
+    sed -i "s/PS1=.*/PS1=${escaped_PS1}/" ${bashrc}
+
+    # "echo \"IP: \$(hostname -I | awk '{print \$1}') \$(ip -o -4 route show to default | awk '{print $5}')\""
+
+    local aliases=(
+        "alias ls='ls --color=auto'"
+        "alias ll='ls -lh'"
+        "alias la='ls -A'"
+        "alias l='ls -CF'"
+        "alias grep='grep --color=auto'"
+        "alias fgrep='fgrep --color=auto'"
+        "alias egrep='egrep --color=auto'"
+        "export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'"
+        "HISTSIZE=10000"
+        "HISTFILESIZE=20000"
+        "sinfo"
+    )
+    for value in "${aliases[@]}"; do
+        # local escaped_value=$(printf '%s\n' "$value" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
+        if ! grep -qF "$value" "${bashrc}"; then
+            echo "$value" >>"${bashrc}"
+        fi
+    done
+
+    # Notify user about the changes
+    echo "PS1 prompt, aliases, exports, and history settings have been updated for all users."
+
+    cat >"/etc/issue" <<EOFX
+\e{lightblue}\s \m \r (Server Time: \t\e{reset})
+\e{lightblue}\S{PRETTY_NAME} \v\e{reset}
+\e{lightgreen}\n.\o : \4\e{reset}
+EOFX
+    echo -n "" >/etc/motd
+    chmod -x /etc/update-motd.d/10-uname
+
+    local sinfo_script="/usr/local/bin/sinfo"
+    # Use a here document to create the script content
+    cat >"$sinfo_script" <<'EOF'
+#!/bin/bash
+
+# Get Script version
+script_version=$(Servo.sh version)
+
+# Get IP and Route
+IP_Add="$(hostname -I | awk '{print $1}') $(ip -o -4 route show to default)"
+
+# Get OS information
+os_info=$(lsb_release -d -s 2>/dev/null || cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2- | tr -d '"')' '$(cat /etc/debian_version)
+
+# Get kernel information
+kernel_info=$(uname -smr)
+
+# Get uptime
+uptime_info=$(uptime -p | sed 's/up //')
+
+# Get package count
+package_count=$(dpkg -l | grep -c '^ii' 2>/dev/null || rpm -qa --last | wc -l 2>/dev/null)
+
+# Get shell information
+shell_info=$($SHELL --version 2>&1 | head -n 1)
+
+# Get disk usage
+disk_info=$(df -h / | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')
+
+# Get CPU information
+cpu_info=$(lscpu | awk -F ': ' '/^Model name/ {gsub(/^[ \t]+/, "", $2); print $2}')
+
+# Get GPU information
+gpu_info=$(lspci | grep -i "VGA" | awk -F ': ' '{print $2}')
+
+# Get RAM information
+ram_info=$(free -h | grep "Mem:" | awk '{print $3 " / " $2}')
+
+# Get Machine information
+machine_info="Supper User Required"
+if [[ $EUID -eq 0 ]]; then
+machine_info=$(dmidecode -t system | grep -E "Manufacturer:|Product Name:" | awk -F': ' '{print $2}' | tr '\n' ' ')
+fi
+
+# lspci -nn | grep -i ethernet
+
+# Print the gathered information
+echo -e " \e[91mServo V:\e[0m $script_version"
+echo -e " \e[91mIP:\e[0m $IP_Add"
+echo -e " \e[91mOS:\e[0m $os_info"
+echo -e " \e[91mKernel:\e[0m $kernel_info"
+echo -e " \e[91mUptime:\e[0m $uptime_info"
+echo -e " \e[91mPackages:\e[0m $package_count"
+echo -e " \e[91mShell:\e[0m $shell_info"
+echo -e " \e[91mDisk:\e[0m $disk_info"
+echo -e " \e[91mCPU:\e[0m $cpu_info"
+echo -e " \e[91mGPU:\e[0m $gpu_info"
+echo -e " \e[91mRAM:\e[0m $ram_info"
+echo -e " \e[91mMachine:\e[0m $machine_info"
+EOF
+
+    echo "Script generated and saved as $sinfo_script"
+    chmod +x "$sinfo_script"
+
+}
+
+sys_more_pkg_install() {
+    apt update && apt install -y build-essential software-properties-common python3 python3-pip
+
+    echo "More Packages installation complete."
+}
+
+# Function to check for updates
+update_check() {
+    local github_repo="fa1rid/linux-setup"
+    local script_name="Servo.sh"
+    local script_folder="setup_menu"
+    local local_script_path="/usr/local/bin/"
+
+    if ! command -v curl &>/dev/null; then
+        apt update && apt install curl
+    fi
+    latest_version=$(curl -sS "https://raw.githubusercontent.com/${github_repo}/main/${script_folder}/version.txt")
+    echo "Latest Version: ($latest_version)"
+    if [ "$latest_version" != "$servo_version" ]; then
+        echo "A newer version ($latest_version) is available. Updating..."
+        curl -so "${local_script_path}${script_name}" "https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name" || echo "Failed to connect"
+        chmod +x "${local_script_path}${script_name}"
+        echo "Update complete. Please run the script again."
+        exit 0
+    else
+        echo "You have the latest version ($servo_version) of the script."
+    fi
+}
+
 version() {
     echo ${servo_version}
 }
 
 main() {
+    if [[ $EUID -eq 0 ]]; then
+        if [[ ! -d "$cron_dir" ]]; then
+            mkdir -p "${cron_dir}"
+        fi
+    fi
+
     if [ $# -ge 1 ]; then
         local function_name="$1"
         shift # Remove the function name from the argument list
@@ -2314,23 +2562,18 @@ main() {
         # Define an array where each element contains "function|option"
         local menu=(
             "exit                       | Exit"
-            "check_for_update           | Update script"
-            "install_configure_SSH      | Install & configure SSH (port 4444, enable root)"
-            "install_std_packages       | Install Standard Packages"
-            "config_system              | Configure terminal and system banners"
-            "manage_php                 | Manage PHP 7 and 8"
-            "manage_nginx               | Manage Nginx"
-            "manage_mariadb             | Manage MariaDB"
-            "manage_memcached           | Manage Memcached"
-            "install_phpmyadmin         | Install PHPMyAdmin"
-            "manage_docker              | Manage Docker"
-            "manage_wordpress           | Manage Wordpress"
-            "install_more_packages      | Install (build-essential software-properties-common python3)"
-            "fix_permissions            | Set Files/Folders Permissions"
-            "manage_certbot             | Manage Certbot"
-            "manage_users               | Manage Users"
-            "manage_rsync               | Manage Rsync"
-            "cleanUp                    | Clean up (autoremove, autoclean, update)"
+            "update_check               | Update Script"
+            "comp_manage                | Compression"
+            "wordpress_manage           | Wordpress"
+            "sys_manage                 | System"
+            "nginx_manage               | Nginx"
+            "mariadb_manage             | Database"
+            "php_manage                 | PHP"
+            "certbot_manage             | Certbot"
+            "rsync_manage               | Rsync"
+            "memcached_manage           | Memcached"
+            "docker_manage              | Docker"
+            "perm_set                   | Files/Folders Permissions"
         )
         # Alternative way of spliting menu
         # awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//'
@@ -2339,6 +2582,9 @@ main() {
         # Display the menu
         while true; do
             clear # Clear the screen
+            if [[ $EUID -ne 0 ]]; then
+                echo -e "\033[91m===== Warning: running as non root =====\033[0m"
+            fi
             echo -e "\033[93m===== Farid's Setup Menu v${servo_version} =====\033[92m"
 
             # Iterate through the menu array and display menu options with numbers
@@ -2349,9 +2595,9 @@ main() {
             done
 
             echo -e "\033[93mAvailable functions:\033[94m"
-            echo "  backup_db [database_name] [save_location]"
-            echo "  restore_db [database_name] [db_filename]"
-            echo "  fix_permissions <target> <user> <group>"
+            echo "  db_backup [database_name] [save_location]"
+            echo "  db_restore [database_name] [db_filename]"
+            echo "  perm_set <target> <user> <group>"
             echo -e "\033[93m===============================\033[0m"
 
             # Prompt the user for a choice
@@ -2373,6 +2619,7 @@ main() {
 }
 
 main "$@"
+
 # Wordpress
 # define('WP_MEMORY_LIMIT', '256M');
 # wp plugin list
@@ -2385,3 +2632,18 @@ main "$@"
 # define('WP_DEBUG_LOG', true);
 # define('WP_DEBUG_DISPLAY', false);
 # @ini_set('display_errors',0);
+
+# Using grep
+# grep -- (`--` tells grep that there are no more options following it)
+# -E,    PATTERNS are extended regular expressions
+# -F,    PATTERNS are strings
+# -w,    match only whole words
+# -x,    match only whole lines
+# -v,    select non-matching lines
+
+# Using sudo
+# useradd -m -s /bin/bash rootuser
+# passwd rootuser
+# usermod -aG sudo rootuser
+# visudo
+# rootuser ALL=(ALL) NOPASSWD: ALL
