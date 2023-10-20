@@ -2095,7 +2095,7 @@ compress() {
         ;;
     "7z")
         while true; do
-            read -rp "Enter compression level for 7z: [0 | 1 | 3 | 5 | 7 | 9 ]" level
+            read -rp "Enter compression level for 7z: [0|1|3|5|7|9]: " level
             case $level in
             0) break ;;
             1) break ;;
@@ -2107,7 +2107,7 @@ compress() {
             esac
         done
 
-        7z mx=$level a "$path.7z" "$path"
+        7z -mx=$level a "$path.7z" "$path"
         ;;
     *) echo "Invalid compression format." ;;
     esac
