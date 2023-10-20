@@ -2392,8 +2392,8 @@ sys_config_setup() {
             else
                 echo "Failed to restore original configuration."
             fi
+            return
         fi
-        return
     fi
 
     # Backup the original configuration
