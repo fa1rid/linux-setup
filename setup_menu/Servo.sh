@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.4.4"
+servo_version="0.4.5"
 # curl -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -72,9 +72,13 @@ PHP_Versions=("7.4" "8.2")
 # Check if MariaDB is installed
 if command -v mariadb &>/dev/null; then
     DB_CMD="mariadb"
-    DUMP_CMD="mariadb-dump"
 elif command -v mysql &>/dev/null; then
     DB_CMD="mysql"
+fi
+
+if command -v mariadb-dump &>/dev/null; then
+    DUMP_CMD="mariadb-dump"
+elif command -v mysqldump &>/dev/null; then
     DUMP_CMD="mysqldump"
 fi
 
@@ -1501,7 +1505,7 @@ mariadb_remove() {
 db_restore() {
     local db_name="$1"
     local dump_file="$2"
-
+    $DB_CMD -e "SHOW DATABASES"
     # Check if both arguments are provided
     if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
         read -rp "Enter the database name to restore to: " db_name
@@ -1538,12 +1542,11 @@ db_restore() {
 
 # Function to create a database dump with a timestamped filename
 db_backup() {
-
     local db_name="$1"
     local save_location="$2"
     local timestamp
     local dump_file
-
+    $DB_CMD -e "SHOW DATABASES"
     # Check if both arguments are provided
     if [ -z "$db_name" ] || [ -z "$save_location" ]; then
         read -rp "Enter the database name: " db_name
@@ -1573,10 +1576,10 @@ db_backup() {
 
 db_create() {
     local DB_NAME DB_USER DB_USER_PASS
+    $DB_CMD -e "SHOW DATABASES"
     read -rp "Enter a name for the database: " DB_NAME
     read -rp "Enter a db username: " DB_USER
     read -rp "Enter a password for the db user: " DB_USER_PASS
-
     # Create a new database and user
     $DB_CMD -e "CREATE DATABASE $DB_NAME;"
     $DB_CMD -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
