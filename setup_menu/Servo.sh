@@ -2044,9 +2044,9 @@ compress() {
         echo "Insufficient number of arguments. Usage: $0 compress [format] [path]"
         exit 1
     fi
-
     local format=$1
     local path=$2
+    local level
 
     # Remove quotes if present in the input path
     path=${path//\"/}
@@ -2093,7 +2093,22 @@ compress() {
             xz -c "$path" >"$path.xz"
         fi
         ;;
-    "7z") 7z a "$path.7z" "$path" ;;
+    "7z")
+        while true; do
+            read -rp "Enter compression level for 7z: [0 | 1 | 3 | 5 | 7 | 9 ]" level
+            case $level in
+            0) break ;;
+            1) break ;;
+            3) break ;;
+            5) break ;;
+            7) break ;;
+            9) break ;;
+            *) echo "Invalid choice." ;;
+            esac
+        done
+
+        7z mx=$level a "$path.7z" "$path"
+        ;;
     *) echo "Invalid compression format." ;;
     esac
 }
