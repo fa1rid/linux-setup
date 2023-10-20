@@ -108,7 +108,7 @@ validate_command() {
         echo "Error: $1 is not installed on this system."
         return 1
     fi
-    retirn 0
+    return 0
 }
 
 is_valid_domain() {
