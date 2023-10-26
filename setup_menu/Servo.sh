@@ -8,8 +8,8 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.4.5"
-# curl -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
+servo_version="0.4.6"
+# curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     # Bash programmable completion
@@ -2063,13 +2063,17 @@ compress() {
 
     # "$base_name.tar" -C "$dir_name" "$base_name"
 
+        # - to backup a directory : tar cf - directory | 7za a -si directory.tar.7z  
+        # - to restore your backup : 7za x -so directory.tar.7z | tar xf - 
+
     case $format in
     "zip")
-        if [ -d "$path" ]; then
-            zip -r "$path.zip" "$path"
-        else
-            zip "$path.zip" "$path"
-        fi
+        # if [ -d "$path" ]; then
+        #     zip -r "$path.zip" "$path"
+        # else
+        #     zip "$path.zip" "$path"
+        # fi
+        7z a -tzip -mx=5 "$path.zip" "$path" # mx5 still better and faster than zip -9
         ;;
     "tar") tar -cvf "$path.tar" "$path" ;;
     "gz")
@@ -2303,13 +2307,13 @@ sys_cleanUp() {
 
 sys_std_pkg_install() {
     local confirmation
-
-    apt-config dump | grep -we Recommends -e Suggests | sed s/1/0/ | tee /etc/apt/apt.conf.d/99no-recommends
+    # Disable Install Recommends & Suggests
+    # apt-config dump | grep -we Recommends -e Suggests | sed s/1/0/ | tee /etc/apt/apt.conf.d/99no-recommends
 
     # Install the "standard" task automatically
     # apt install -y tasksel
     # echo "standard" | tasksel install
-
+    # /etc/apt/apt.conf.d/00InstallRecommends
     apt update && apt upgrade && apt install --no-install-recommends -y \
         bash-completion \
         curl \
@@ -2512,6 +2516,7 @@ cpu_info=$(lscpu | awk -F ': ' '/^Model name/ {gsub(/^[ \t]+/, "", $2); print $2
 
 # Get GPU information
 gpu_info=$(lspci | grep -i "VGA" | awk -F ': ' '{print $2}')
+# lshw -C display
 
 # Get RAM information
 ram_info=$(free -h | grep "Mem:" | awk '{print $3 " / " $2}')
