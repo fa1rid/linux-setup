@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.4.6"
+servo_version="0.4.7"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2063,8 +2063,8 @@ compress() {
 
     # "$base_name.tar" -C "$dir_name" "$base_name"
 
-        # - to backup a directory : tar cf - directory | 7za a -si directory.tar.7z  
-        # - to restore your backup : 7za x -so directory.tar.7z | tar xf - 
+    # - to backup a directory : tar cf - directory | 7za a -si directory.tar.7z
+    # - to restore your backup : 7za x -so directory.tar.7z | tar xf -
 
     case $format in
     "zip")
@@ -2228,6 +2228,8 @@ sys_manage() {
         echo "5. Install & configure SSH (port 4444, enable root)"
         echo "6. Configure terminal and system banners"
         echo "7. Install (build-essential software-properties-common python3)"
+        echo "8. Add SWAP memory"
+        echo "9. Read APT Config"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -2240,10 +2242,69 @@ sys_manage() {
         5) sys_SSH_install ;;
         6) sys_config_setup ;;
         7) sys_more_pkg_install ;;
+        8) sys_swap_add ;;
+        9) sys_read_apt_config ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+sys_swap_add() {
+
+    #!/bin/bash
+
+    # Ask user for swap size in MB (default: 2048MB)
+    read -rp "Enter swap size in MB [2048]: " swap_size
+    swap_size=${swap_size:-2048}
+
+    # Ask user for swap file location (default: /swapfile)
+    read -rp "Enter swap file location [/swapfile]: " swap_location
+    swap_location=${swap_location:-/swapfile}
+
+    # Calculate buffer size for dd (in 2MB blocks)
+    buffer_size=$((swap_size / 10))
+
+    # Create swap file
+    echo "Creating ${swap_size}MB swap file at ${swap_location}..."
+    dd if=/dev/zero of=$swap_location bs=10M count=$buffer_size
+
+    if [ -e "$swap_location" ]; then
+        # Set permissions
+        chmod 600 $swap_location
+
+        # Set up swap space
+        mkswap $swap_location
+
+        # Activate the swap file
+        swapon $swap_location
+
+        # Check if swap was successfully added
+        if grep -q "$swap_location" /proc/swaps; then
+            echo "Swap file has been created and activated."
+
+            echo "Setting vm.swappiness=20 ..."
+            # Set swappiness to 20
+            sysctl vm.swappiness=20
+            # Make the swappiness setting persistent across reboots
+            echo "vm.swappiness = 20" | tee -a /etc/sysctl.conf
+
+            # Ask user if they want to add entry to /etc/fstab for persistence
+            read -rp "Add entry to /etc/fstab for persistence? (y/n): " add_to_fstab
+            if [ "$add_to_fstab" == "y" ] || [ "$add_to_fstab" == "Y" ]; then
+                # Add entry to /etc/fstab for persistence
+                echo "$swap_location none swap sw 0 0" | tee -a /etc/fstab
+                echo "Entry added to /etc/fstab for persistence."
+            else
+                echo "Entry not added to /etc/fstab. Swap file will not be persistent across reboots."
+            fi
+        else
+            echo "Failed to activate swap file. Please check the configuration."
+        fi
+    else
+        echo "Failed to create swap file. Please check if you have necessary permissions and free disk space."
+    fi
+
 }
 
 sys_list_users() {
@@ -2303,6 +2364,10 @@ sys_cleanUp() {
     apt autoclean
     apt update
     apt clean
+}
+
+sys_read_apt_config() {
+    apt-config dump | grep -we Recommends -e Suggests
 }
 
 sys_std_pkg_install() {
@@ -2682,13 +2747,14 @@ main "$@"
 # fi
 ##########################################################################
 # Wordpress
-# define('WP_MEMORY_LIMIT', '256M');
+# wp user update admin --user_pass=newpassword
 # wp plugin list
 # wp plugin deactivate --all
 # wp plugin deactivate [plugin_name]
 # wp theme activate twentynineteen
 # "plugins" folder change the folder name to something like "plugins_disabled"
 # To identify the problematic plugin, (e.g., plugin-name to _plugin-name)
+# define('WP_MEMORY_LIMIT', '256M');
 # define('WP_DEBUG', true);
 # define('WP_DEBUG_LOG', true);
 # define('WP_DEBUG_DISPLAY', false);
