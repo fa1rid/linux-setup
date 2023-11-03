@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.4.7"
+servo_version="0.4.8"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2290,7 +2290,8 @@ sys_swap_add() {
             echo "vm.swappiness = 20" | tee -a /etc/sysctl.conf
 
             # Ask user if they want to add entry to /etc/fstab for persistence
-            read -rp "Add entry to /etc/fstab for persistence? (y/n): " add_to_fstab
+            read -rp "Add entry to /etc/fstab for persistence? (Y/n): " add_to_fstab
+            add_to_fstab=${add_to_fstab:-Y}
             if [ "$add_to_fstab" == "y" ] || [ "$add_to_fstab" == "Y" ]; then
                 # Add entry to /etc/fstab for persistence
                 echo "$swap_location none swap sw 0 0" | tee -a /etc/fstab
@@ -2625,21 +2626,42 @@ update_check() {
     local github_repo="fa1rid/linux-setup"
     local script_name="Servo.sh"
     local script_folder="setup_menu"
-    local local_script_path="/usr/local/bin/"
+    local SCRIPT_URL="https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name"
+    local TMP_SCRIPT="/tmp/${script_name}"
+    local BACKUP_SCRIPT="$0.bak"
+    local new_version
+    local answer
 
-    if ! command -v curl &>/dev/null; then
-        apt update && apt install curl
+    if ! command -v wget &>/dev/null; then
+        apt update && apt install wget
     fi
-    latest_version=$(curl -sS "https://raw.githubusercontent.com/${github_repo}/main/${script_folder}/version.txt")
-    echo "Latest Version: ($latest_version)"
-    if [ "$latest_version" != "$servo_version" ]; then
-        echo "A newer version ($latest_version) is available. Updating..."
-        curl -so "${local_script_path}${script_name}" "https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name" || echo "Failed to connect"
-        chmod +x "${local_script_path}${script_name}"
-        echo "Update complete. Please run the script again."
-        exit 0
+
+    echo "Checking for updates..."
+    if ! wget --quiet -O "$TMP_SCRIPT" "$SCRIPT_URL"; then
+        echo "Failed to download the latest version."
+        rm -f "$TMP_SCRIPT"
+        echo "Cleanup done."
+        return 1
+    fi
+
+    new_version=$(grep -o 'servo_version="[0-9.]*"' "$TMP_SCRIPT" | cut -d '"' -f 2)
+
+    if [ "$new_version" != "$servo_version" ]; then
+        echo "New version available (v$new_version)."
+        read -rp "Do you want to update? (Y/n): " answer
+        answer=${answer:-Y}
+        if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
+            echo "Updating to version $new_version..."
+            mv "$0" "$BACKUP_SCRIPT"
+            mv "$TMP_SCRIPT" "$0"
+            chmod +x "$0"
+            echo "Update complete. Please run the script again."
+            exit 0
+        else
+            echo "Skipping update."
+        fi
     else
-        echo "You have the latest version ($servo_version) of the script."
+        echo "No updates available."
     fi
 }
 
