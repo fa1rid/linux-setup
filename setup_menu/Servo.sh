@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.4.8"
+servo_version="0.4.9"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -815,7 +815,28 @@ nginx_install() {
     systemctl enable nginx
 
     # Add log rotation for nginx
-    sed -i "s/^\/var\/log\/nginx\/\*\.log/\/var\/www\/*\/logs\/*\/*.log/" /etc/logrotate.d/nginx
+    # sed -i "s/^\/var\/log\/nginx\/\*\.log/\/var\/www\/*\/logs\/*\/*.log/" /etc/logrotate.d/nginx
+
+    cat >"/etc/logrotate.d/nginx" <<'EOFX'
+/var/www/*/logs/*/*.log {
+	size 50M
+	missingok
+	rotate 15
+	compress
+	delaycompress
+	notifempty
+	create 0640 www-data adm
+	sharedscripts
+	prerotate
+		if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+			run-parts /etc/logrotate.d/httpd-prerotate; \
+		fi \
+	endscript
+	postrotate
+		invoke-rc.d nginx rotate >/dev/null 2>&1
+	endscript
+}
+EOFX
 
     # Create log folder for the main profile
     rm -rf /var/www/html
@@ -850,8 +871,8 @@ nginx_install() {
         echo "SSL snippet file generated at $ssl_nginx_snippet"
     fi
 
-    cat >"${caching_nginx_snippet}" <<EOFX
-location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)\$ {
+    cat >"${caching_nginx_snippet}" <<'EOFX'
+location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)$ {
     # expires 30d;
     add_header Cache-Control "max-age=2592000, public";
     open_file_cache max=3000 inactive=120s;
@@ -861,7 +882,7 @@ location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)\$ {
 }
 EOFX
 
-    cat >"${common_nginx_snippet}" <<EOFX
+    cat >"${common_nginx_snippet}" <<'EOFX'
 index index.html index.htm index.php;
 # index "index.html" "index.cgi" "index.pl" "index.php" "index.xhtml" "index.htm" "index.shtml";
 
@@ -2002,7 +2023,7 @@ rsync_install() {
     echo -e "\nAdding log rotation.."
     cat >/etc/logrotate.d/rsync <<EOFX
 /var/log/rsync/*.log {
-    daily
+    size 20M
     missingok
     rotate 7
     compress
@@ -2230,6 +2251,7 @@ sys_manage() {
         echo "7. Install (build-essential software-properties-common python3)"
         echo "8. Add SWAP memory"
         echo "9. Read APT Config"
+        echo "10. Install rsnapshot"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -2244,10 +2266,35 @@ sys_manage() {
         7) sys_more_pkg_install ;;
         8) sys_swap_add ;;
         9) sys_read_apt_config ;;
+        10) sys_rsnapshot_install ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+sys_rsnapshot_install() {
+    # Check if rsnapshot is installed
+    if ! command -v rsnapshot &>/dev/null; then
+        echo "rsnapshot is not installed. Installing rsnapshot..."
+        apt-get update && apt-get -y install rsnapshot
+    fi
+
+    echo -e "\nAdding log rotation.."
+    cat >/etc/logrotate.d/rsnapshot <<EOFX
+/opt/backup/*/*.log {
+    size 20M
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 640 root root
+}
+EOFX
+    mkdir -p /opt/backup
+    chown root:root /opt/backup
+    chmod 640 /opt/backup
 }
 
 sys_swap_add() {
