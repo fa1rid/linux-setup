@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.4.9"
+servo_version="0.5.0"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1526,9 +1526,9 @@ mariadb_remove() {
 db_restore() {
     local db_name="$1"
     local dump_file="$2"
-    $DB_CMD -e "SHOW DATABASES"
     # Check if both arguments are provided
     if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
+        db_show_databases
         read -rp "Enter the database name to restore to: " db_name
         read -rp "Enter the path to the database dump file (supported: gz,xz,zip, or raw): " dump_file
 
@@ -1567,9 +1567,9 @@ db_backup() {
     local save_location="$2"
     local timestamp
     local dump_file
-    $DB_CMD -e "SHOW DATABASES"
     # Check if both arguments are provided
     if [ -z "$db_name" ] || [ -z "$save_location" ]; then
+        db_show_databases
         read -rp "Enter the database name: " db_name
         read -rp "Enter the save location (e.g., /path/to/save): " save_location
 
@@ -1595,9 +1595,14 @@ db_backup() {
     # Backup_Database "$1" "$2"
 }
 
+db_show_databases() {
+    # $DB_CMD -e "SHOW DATABASES" | grep -Ev "(Database|information_schema|mysql|performance_schema|phpmyadmin|sys)"
+    $DB_CMD -e "SELECT SCHEMA_NAME AS 'DATABASES' FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'phpmyadmin', 'sys');"
+}
+
 db_create() {
     local DB_NAME DB_USER DB_USER_PASS
-    $DB_CMD -e "SHOW DATABASES"
+    db_show_databases
     read -rp "Enter a name for the database: " DB_NAME
     read -rp "Enter a db username: " DB_USER
     read -rp "Enter a password for the db user: " DB_USER_PASS
@@ -1657,8 +1662,17 @@ db_config_read() {
     done
 
     $DB_CMD -e "SELECT user, host, plugin, password FROM mysql.user;"
+
     grants_commands=$($DB_CMD -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
-    $DB_CMD -e "$grants_commands"
+
+    if command -v lynx &>/dev/null; then
+        $DB_CMD -e "$grants_commands" --html --silent | lynx -stdin -dump
+    else
+        $DB_CMD -e "$grants_commands"
+    fi
+
+    # List databases
+    db_show_databases
 }
 
 memcached_manage() {
@@ -2453,7 +2467,8 @@ sys_std_pkg_install() {
         dmidecode \
         members \
         xz-utils \
-        ca-certificates
+        ca-certificates \
+        lynx
 
     read -rp "Remove Exim4? (y/n) " confirmation
     if [[ "$confirmation" == "y" ]]; then
