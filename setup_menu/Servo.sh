@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.0"
+servo_version="0.5.1"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -59,7 +59,7 @@ if [[ ! -e /usr/share/bash-completion/completions/Servo.sh ]]; then
 fi
 #########################################
 
-cron_dir="/root/cron/"
+cron_dir="/etc/cron.d/"
 cloudflare_config_dir="/etc/letsencrypt/cloudflare"
 ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
 common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
@@ -1044,26 +1044,66 @@ nginx_cloudflare_add() {
 #!/bin/bash
 
 CLOUDFLARE_FILE_PATH=/etc/nginx/conf.d/cloudflare.conf
+TEMP_FILE=$(mktemp)
+HASH_FILE=/var/tmp/cloudflare_hash
 
-echo "#Cloudflare" > $CLOUDFLARE_FILE_PATH;
-echo "" >> $CLOUDFLARE_FILE_PATH;
+# Fetch new Cloudflare IPs and verify them
+new_ipv4=$(curl -sS https://www.cloudflare.com/ips-v4)
+new_ipv6=$(curl -sS https://www.cloudflare.com/ips-v6)
 
-echo "# - IPv4" >> $CLOUDFLARE_FILE_PATH;
-for i in `curl https://www.cloudflare.com/ips-v4`; do
-        echo "set_real_ip_from $i;" >> $CLOUDFLARE_FILE_PATH;
+if [[ -z $new_ipv4 || -z $new_ipv6 ]]; then
+    echo "Failed to fetch Cloudflare IPs. Aborting."
+    exit 1
+fi
+
+# Calculate hashes of the new IPs
+new_hash=$(echo -n "$new_ipv4$new_ipv6" | sha256sum | cut -d ' ' -f 1)
+
+# Check if the IPs have changed
+if [ -f $HASH_FILE ] && [ "$(cat $HASH_FILE)" = "$new_hash" ]; then
+    echo "Cloudflare IPs have not changed. No update needed."
+    exit 0
+fi
+
+# Write the new configuration to a temporary file
+echo "#Cloudflare" > $TEMP_FILE;
+echo "" >> $TEMP_FILE;
+
+echo "# - IPv4" >> $TEMP_FILE;
+echo "$new_ipv4" | while read -r i; do
+    echo "set_real_ip_from $i;" >> $TEMP_FILE;
 done
 
-echo "" >> $CLOUDFLARE_FILE_PATH;
-echo "# - IPv6" >> $CLOUDFLARE_FILE_PATH;
-for i in `curl https://www.cloudflare.com/ips-v6`; do
-        echo "set_real_ip_from $i;" >> $CLOUDFLARE_FILE_PATH;
+echo "" >> $TEMP_FILE;
+echo "# - IPv6" >> $TEMP_FILE;
+echo "$new_ipv6" | while read -r i; do
+    echo "set_real_ip_from $i;" >> $TEMP_FILE;
 done
 
-echo "" >> $CLOUDFLARE_FILE_PATH;
-echo "real_ip_header CF-Connecting-IP;" >> $CLOUDFLARE_FILE_PATH;
+echo "" >> $TEMP_FILE;
+echo "real_ip_header CF-Connecting-IP;" >> $TEMP_FILE;
 
-#test configuration and reload nginx
-nginx -t && systemctl reload nginx
+if [[ -f "$CLOUDFLARE_FILE_PATH" ]]; then
+    mv "$CLOUDFLARE_FILE_PATH" "${CLOUDFLARE_FILE_PATH}.bak"
+fi
+mv $TEMP_FILE $CLOUDFLARE_FILE_PATH
+
+# Test the new configuration
+nginx -t
+
+if [ $? -eq 0 ]; then
+    # Update the hash file with the new hash
+    echo "$new_hash" > $HASH_FILE
+
+    echo "Cloudflare IPs updated successfully."
+    systemctl reload nginx
+else
+    echo "New configuration test failed. Rolling back."
+    if [[ -f "${CLOUDFLARE_FILE_PATH}.bak" ]]; then
+        mv "${CLOUDFLARE_FILE_PATH}.bak" "$CLOUDFLARE_FILE_PATH"
+    fi
+    exit 1
+fi
 EOFX
 
     chmod 700 "$cloudflare_script"
@@ -1073,11 +1113,17 @@ EOFX
     # Add daily cron job
     echo "Adding cron job.."
 
-    echo "30 1 * * * root ${cloudflare_script}" >"${cron_dir}cloudflare"
+    if [[ ! -d "/var/log/nginx/" ]]; then
+        mkdir -p /var/log/nginx/
+    fi
+
+    echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >"${cron_dir}cloudflare"
+    echo "30 1 * * * root ${cloudflare_script} >> /var/log/nginx/${cloudflare_script}  2>&1" >"${cron_dir}cloudflare"
     chmod 660 "${cron_dir}cloudflare"
-    cat "${cron_dir}"* | crontab -
-    echo -e "Loaded cron jobs:\n"
-    crontab -l
+    # cat "${cron_dir}"* | crontab -
+    echo -e "cat ${cron_dir}cloudflare\n"
+    cat "${cron_dir}cloudflare"
+    # crontab -l
     # Jobs inside "/etc/cron.d/" directory are monitored for changes
     # /etc/init.d/cron reload
     # systemctl restart cron
@@ -2266,6 +2312,7 @@ sys_manage() {
         echo "8. Add SWAP memory"
         echo "9. Read APT Config"
         echo "10. Install rsnapshot"
+        echo "11. Reload Cron (root profile)"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -2281,10 +2328,17 @@ sys_manage() {
         8) sys_swap_add ;;
         9) sys_read_apt_config ;;
         10) sys_rsnapshot_install ;;
+        11) sys_cron_reload ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+sys_cron_reload() {
+    cat "${cron_dir}"* | crontab -
+    echo -e "Loaded cron jobs:\n"
+    crontab -l
 }
 
 sys_rsnapshot_install() {
@@ -2309,6 +2363,87 @@ EOFX
     mkdir -p /opt/backup
     chown root:root /opt/backup
     chmod 640 /opt/backup
+    mkdir -p /root/.config/rsnapshot/
+
+    echo "Writing config into /root/.config/rsnapshot/sample.conf..."
+    cat >"/root/.config/rsnapshot/sample.conf" <<'EOFX'
+# rsnapshot -c /root/.config/rsnapshot/test.conf sync && rsnapshot -c /root/.config/rsnapshot/test.conf hourly
+#################################################
+# This file requires tabs between elements      #
+# Directories require a trailing slash:         #
+#   right: /home/                               #
+#   wrong: /home                                #
+#################################################
+config_version	1.2
+
+snapshot_root	/opt/backup/test
+
+cmd_cp		/bin/cp
+cmd_rm		/bin/rm
+cmd_rsync	/usr/bin/rsync
+cmd_ssh	/usr/bin/ssh
+cmd_logger	/usr/bin/logger
+cmd_du		/usr/bin/du
+#cmd_preexec	/path/to/preexec/script
+#cmd_postexec	/path/to/postexec/script
+
+retain	hourly	4
+retain	daily	7
+retain	weekly	4
+retain	monthly	6
+
+verbose		2
+loglevel	3
+logfile	/opt/backup/test/log.log
+
+lockfile	/var/run/test.pid
+rsync_short_args	-ahz
+rsync_long_args	--delete --numeric-ids --delete-excluded --info=NAME,COPY,DEL,misc2,flist0 --stats
+ssh_args	-p 22
+# ssh_args	-o ConnectTimeout=5
+
+#include	???
+#exclude	???
+#include_file	/path/to/include/file
+#exclude_file	/path/to/exclude/file
+
+link_dest	1
+sync_first	1
+use_lazy_deletes	1
+rsync_numtries	20
+###############################
+backup_exec	/bin/date "+ backup of test started at %c"
+# backup_exec	Servo.sh db_backup db_xyz /root/
+# backup_exec	ssh -p 22 root@example.com "rm -f /var/www/user/example.com/*.sql.xz;Servo.sh db_backup db_xyz /var/www/user/example.com/"
+# backup	root@ip:/root/test/	./
+backup_exec	/bin/date "+ backup of test ended at %c"
+EOFX
+
+    echo "Writing cron into ${cron_dir}rsnapshot..."
+
+    cat >"${cron_dir}rsnapshot" <<'EOFX'
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Schedule backup every 6 hours
+13 */6 * * * root rsnapshot -c /root/.config/rsnapshot/test.conf sync && rsnapshot -c /root/.config/rsnapshot/test.conf hourly
+
+# Schedule backup every day at 1AM
+12 1 * * * root rsnapshot -c /root/.config/rsnapshot/test.conf daily
+
+# Schedule backup every Monday at 1AM
+11 1 * * 1 root rsnapshot -c /root/.config/rsnapshot/test.conf weekly
+
+# Schedule backup on the 1st day of every month at 1AM
+10 1 1 * * root rsnapshot -c /root/.config/rsnapshot/test.conf monthly
+
+#  ┌────────── minute (0 - 59)
+#  │ ┌──────── hour (0 - 23)
+#  │ │ ┌────── day of month (1 - 31)
+#  │ │ │ ┌──── month (1 - 12) OR jan,feb,mar,apr ...
+#  │ │ │ │ ┌── day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+#  ↓ ↓ ↓ ↓ ↓
+#  * * * * * user-name command to be executed
+EOFX
 }
 
 sys_swap_add() {
