@@ -2768,6 +2768,12 @@ sys_config_setup() {
     # Notify user about the changes
     echo "PS1 prompt, aliases, exports, and history settings have been updated for all users."
 
+    if [ -e "/etc/issue.backup" ]; then
+        echo "Skipping Backup (already exists) '/etc/issue.backup'."
+    else
+        echo -e "Creating backup (/etc/issue.backup)...\n"
+        cp /etc/issue /etc/issue.backup
+    fi
     cat >"/etc/issue" <<EOFX
 \e{lightblue}\s \m \r (Server Time: \t\e{reset})
 \e{lightblue}\S{PRETTY_NAME} \v\e{reset}
@@ -3035,3 +3041,13 @@ main "$@"
 ##########################################################################
 # iptables
 # iptables-save > /etc/iptables/rules.v4
+##########################################################################
+# Change System local/keyboard
+# localectl # check locale
+# nano /etc/default/keyboard
+# nano /etc/default/locale
+# source /etc/default/locale
+# setupcon
+# ----------OR----------
+# dpkg-reconfigure keyboard-configuration
+# dpkg-reconfigure locale
