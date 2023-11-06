@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.1"
+servo_version="0.5.2"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -461,7 +461,7 @@ php_install() {
         fi
 
         # Essential & Commonly Used Extensions Extensions
-        apt install -y bc php"${phpVer}"-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} || (echo "Failed to install" && return 1)
+        apt install -y bc php"${phpVer}"-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} || { echo "Failed to install" && return 1; }
         # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
@@ -808,7 +808,7 @@ nginx_install() {
         echo "$PACKAGE_NAME is already installed."
     else
         echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update && apt install -y $PACKAGE_NAME || (echo "Failed to install $PACKAGE_NAME" && return 1)
+        apt update && apt install -y $PACKAGE_NAME || { echo "Failed to install $PACKAGE_NAME" && return 1; }
         echo "$PACKAGE_NAME has been installed."
     fi
 
@@ -1118,7 +1118,7 @@ EOFX
     fi
 
     echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >"${cron_dir}cloudflare"
-    echo "30 1 * * * root ${cloudflare_script} >> /var/log/nginx/${cloudflare_script}  2>&1" >"${cron_dir}cloudflare"
+    echo "30 1 * * * root ${cloudflare_script} >> /var/log/nginx/cloudflare.log 2>&1" >>"${cron_dir}cloudflare"
     chmod 660 "${cron_dir}cloudflare"
     # cat "${cron_dir}"* | crontab -
     echo -e "cat ${cron_dir}cloudflare\n"
@@ -1140,6 +1140,7 @@ nginx_cert_install() {
     local domain_name
     domain_name=$(nginx_conf_domain_get "${nginx_config}")
     [[ -n $domain_name ]] || {
+        echo "Error: domain_name is empty"
         echo "$domain_name"
         return 1
     }
@@ -1175,6 +1176,7 @@ nginx_cert_uninstall() {
     local domain_name
     domain_name=$(nginx_conf_domain_get "${nginx_config}")
     [[ -n $domain_name ]] || {
+        echo "Error: domain_name is empty"
         echo "$domain_name"
         return 1
     }
@@ -1450,7 +1452,7 @@ mariadb_server_install() {
         return
     else
         echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update && apt install -y $PACKAGE_NAME || (echo "Failed to install $PACKAGE_NAME" && return 1)
+        apt update && apt install -y $PACKAGE_NAME || { echo "Failed to install $PACKAGE_NAME" && return 1; }
         echo "$PACKAGE_NAME has been installed."
     fi
     # Prompt for variable values
@@ -1511,7 +1513,7 @@ mariadb_client_install() {
 
     # Install the MariaDB client
     echo "Installing MariaDB client..."
-    apt update && apt install -y mariadb-client || (echo "Failed to install mariadb-client" && return 1)
+    apt update && apt install -y mariadb-client || { echo "Failed to install mariadb-client" && return 1; }
 
     read -rp "Enter the MariaDB server hostname or IP (without port): " db_host
     read -rp "Enter the database username: " db_user
@@ -1743,7 +1745,7 @@ memcached_manage() {
 # Function to install Memcached
 memcached_install() {
     # Install Memcached and required dependencies
-    apt update && apt install -y memcached libmemcached-tools || (echo "Failed" && return 1)
+    apt update && apt install -y memcached libmemcached-tools || { echo "Failed" && return 1; }
 
     # Configure Memcached
     # echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
@@ -2297,6 +2299,25 @@ comp_manage() {
     done
 }
 
+net_manage() {
+    ip tuntap add mode tap name soft
+    ip link set soft up
+    ip link delete soft
+    ip addr add 192.168.30.1/24 brd + dev soft
+
+cat >'/etc/network/interfaces.d/softether' <<'EOFX'
+auto soft0
+iface soft0 inet static
+    address 192.168.30.1
+    netmask 255.255.255.0
+    pre-up ip tuntap add mode tap soft0
+    up ip link set soft0 up
+    down ip link set soft0 down
+    post-down ip tuntap del tap soft0
+EOFX
+systemctl restart networking
+}
+
 sys_manage() {
 
     while true; do
@@ -2425,16 +2446,16 @@ EOFX
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Schedule backup every 6 hours
-13 */6 * * * root rsnapshot -c /root/.config/rsnapshot/test.conf sync && rsnapshot -c /root/.config/rsnapshot/test.conf hourly
+# 13 */6 * * * root rsnapshot -c /root/.config/rsnapshot/test.conf sync && rsnapshot -c /root/.config/rsnapshot/test.conf hourly
 
 # Schedule backup every day at 1AM
-12 1 * * * root rsnapshot -c /root/.config/rsnapshot/test.conf daily
+# 12 1 * * * root rsnapshot -c /root/.config/rsnapshot/test.conf daily
 
 # Schedule backup every Monday at 1AM
-11 1 * * 1 root rsnapshot -c /root/.config/rsnapshot/test.conf weekly
+# 11 1 * * 1 root rsnapshot -c /root/.config/rsnapshot/test.conf weekly
 
 # Schedule backup on the 1st day of every month at 1AM
-10 1 1 * * root rsnapshot -c /root/.config/rsnapshot/test.conf monthly
+# 10 1 1 * * root rsnapshot -c /root/.config/rsnapshot/test.conf monthly
 
 #  ┌────────── minute (0 - 59)
 #  │ ┌──────── hour (0 - 23)
@@ -2575,8 +2596,10 @@ sys_std_pkg_install() {
     # Install the "standard" task automatically
     # apt install -y tasksel
     # echo "standard" | tasksel install
+    # Hetzner disables InstallRecommends using this:
     # /etc/apt/apt.conf.d/00InstallRecommends
     apt update && apt upgrade && apt install --no-install-recommends -y \
+        netfilter-persistent \
         bash-completion \
         curl \
         wget \
@@ -2618,11 +2641,20 @@ sys_std_pkg_install() {
     echo "Standard packages installation complete."
 }
 
+config_set() {
+    local key="$1"
+    local val="$2"
+    local file="$3"
+    awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]+.*", key " " val); print}' "$file" | awk '!seen[$0]++' >"$file"
+}
+
 sys_SSH_install() {
     local sshd_config="/etc/ssh/sshd_config"
 
-    # Update package lists & Install SSH server
-    apt update && apt install openssh-server -y || return 1
+    if ! dpkg -l | grep -q "^ii\s*openssh-server\s"; then
+        # Update package lists & Install SSH server
+        apt update && apt install openssh-server -y || return 1
+    fi
 
     # Backup the original configuration
     if [ -e "${sshd_config}_backup" ]; then
@@ -2632,22 +2664,29 @@ sys_SSH_install() {
     fi
 
     # Enable root login (not recommended for production)
-    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
-    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
+    # sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
+    # sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
+    config_set PermitRootLogin yes "$sshd_config"
+
+    # Enable ClientAliveInterval
+    config_set ClientAliveInterval 120 "$sshd_config"
 
     # Disable root's ability to use password-based authentication
     # sed -i 's/PermitRootLogin yes/PermitRootLogin without-password/' "$sshd_config"
 
     # Set SSH port to 4444
-    sed -i 's/#Port 22/Port 4444/' "$sshd_config"
+    config_set Port 4444 "$sshd_config"
+    # sed -i 's/#Port 22/Port 4444/' "$sshd_config"
 
     # Disable password authentication (use key-based authentication)
     # sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' "$sshd_config"
 
     # Enable PasswordAuthentication
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' "$sshd_config"
-    sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
-    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
+    # sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' "$sshd_config"
+    # sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
+    # sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
+
+    config_set PasswordAuthentication yes "$sshd_config"
 
     # Allow only specific users or groups to log in via SSH (replace with your username)
     # echo "AllowUsers your_username" >> "$sshd_config"
@@ -2993,3 +3032,6 @@ main "$@"
 # usermod -aG sudo rootuser
 # visudo
 # rootuser ALL=(ALL) NOPASSWD: ALL
+##########################################################################
+# iptables
+# iptables-save > /etc/iptables/rules.v4
