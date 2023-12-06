@@ -60,7 +60,7 @@ fi
 #########################################
 
 cron_dir="/etc/cron.d/"
-cloudflare_config_dir="/etc/letsencrypt/cloudflare"
+cloudflare_config_dir="/etc/cloudflare"
 ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
 common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
 caching_nginx_snippet="/etc/nginx/snippets/caching-snippet.conf"
@@ -2043,7 +2043,7 @@ certbot_certificate_get() {
     # Request the certificate (For debugging add: --dry-run -vvv)
     if certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 60 --dns-cloudflare-credentials "${selected_config}"; then
         mkdir -p /etc/ssl
-        cp -r "/etc/letsencrypt/live/${domain_name}" /etc/ssl/
+        ln -s "/etc/letsencrypt/live/${domain_name}" /etc/ssl/
     fi
 
     # For CURL
@@ -2301,11 +2301,12 @@ comp_manage() {
 
 net_manage() {
     ip tuntap add mode tap name soft
-    ip link set soft up
+    ip link set dev soft up
     ip link delete soft
     ip addr add 192.168.30.1/24 brd + dev soft
+    ip addr add 192.168.30.1/24 brd + dev tap0
 
-cat >'/etc/network/interfaces.d/softether' <<'EOFX'
+    cat >'/etc/network/interfaces.d/softether' <<'EOFX'
 auto soft0
 iface soft0 inet static
     address 192.168.30.1
@@ -2315,7 +2316,28 @@ iface soft0 inet static
     down ip link set soft0 down
     post-down ip tuntap del tap soft0
 EOFX
-systemctl restart networking
+    systemctl restart networking
+}
+
+net_enable_ip_forward() {
+    echo "net.ipv4.ip_forward = 1" | tee /etc/sysctl.d/ip_forward.conf
+    echo "net.ipv6.conf.all.forwarding = 1" | tee -a /etc/sysctl.d/ip_forward.conf
+    sysctl --system
+}
+
+net_tune_kernel() {
+    # Tune Kernel
+    echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_congestion_control = bbr" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.core.default_qdisc = fq_codel" | tee -a /etc/sysctl.d/tune_kernel.conf
+
+    sysctl net.ipv4.tcp_max_syn_backlog
+    sysctl net.core.rmem_max
+    sysctl net.core.wmem_max
+    sysctl net.ipv4.tcp_tw_reuse
+    sysctl net.ipv4.tcp_tw_recycle
+    sysctl net.ipv4.tcp_window_scaling
+    sysctl net.ipv4.ip_local_port_range
 }
 
 sys_manage() {
@@ -3051,3 +3073,5 @@ main "$@"
 # ----------OR----------
 # dpkg-reconfigure keyboard-configuration
 # dpkg-reconfigure locale
+##########################################################################
+# rsync -uavhzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "root@host":/etc/ssl/
