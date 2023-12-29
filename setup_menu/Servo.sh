@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.2"
+servo_version="0.5.3"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2667,7 +2667,7 @@ config_set() {
     local key="$1"
     local val="$2"
     local file="$3"
-    awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]+.*", key " " val); print}' "$file" | awk '!seen[$0]++' >"$file"
+    awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]+.*", key " " val); print}' "$file" | awk '{if (NF > 0) {if (!seen[$0]++) print} else {print}}' >"${file}.tmp" && mv "${file}.tmp" "$file"
 }
 
 sys_SSH_install() {
