@@ -2327,7 +2327,8 @@ net_enable_ip_forward() {
 
 net_tune_kernel() {
     # Tune Kernel
-    echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
+    # echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.ip_local_port_range = 16384 60999" | tee /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.tcp_congestion_control = bbr" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.core.default_qdisc = fq_codel" | tee -a /etc/sysctl.d/tune_kernel.conf
 
@@ -2338,6 +2339,17 @@ net_tune_kernel() {
     sysctl net.ipv4.tcp_tw_recycle
     sysctl net.ipv4.tcp_window_scaling
     sysctl net.ipv4.ip_local_port_range
+
+    sysctl --system
+}
+
+tailscale_install() {
+    curl -fsSL https://tailscale.com/install.sh | sh
+}
+
+tailscale_configure() {
+    tailscale up --advertise-exit-node --advertise-routes=192.168.10.0/24,192.168.20.0/24
+    tailscale up --accept-routes
 }
 
 sys_manage() {
