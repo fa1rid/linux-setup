@@ -2866,7 +2866,13 @@ ram_info=$(free -h | grep "Mem:" | awk '{print $3 " / " $2}')
 # Get Machine information
 machine_info="Supper User Required"
 if [[ $EUID -eq 0 ]]; then
-machine_info=$(dmidecode -t system | grep -E "Manufacturer:|Product Name:" | awk -F': ' '{print $2}' | tr '\n' ' ')
+    machine_info=$(dmidecode -t system | grep -E "Manufacturer:|Product Name:" | awk -F': ' '{print $2}' | tr '\n' ' ')
+
+    if [ -z "$machine_info" ]; then
+        if [ -e "/sys/firmware/devicetree/base/model" ]; then
+            machine_info=$(cat /sys/firmware/devicetree/base/model)
+        fi
+    fi
 fi
 
 # lspci -nn | grep -i ethernet
