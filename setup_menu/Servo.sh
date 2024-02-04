@@ -2471,74 +2471,48 @@ cloudflared_manage() {
     done
 }
 
+get_cloudflared_arch() {
+    local arch
+    case "$(get_arch)" in
+    amd64) arch="amd64" ;;
+    i386) arch="386" ;;
+    arm64) arch="arm64" ;;
+    arm32) arch="arm" ;;
+    Unknown)
+        echo "Unsupported system architecture"
+        exit 1
+        ;;
+    esac
+    echo "$arch"
+}
+
 cloudflared_install() {
     local token
     read -rp "Enter tunnel token: " token
-    local sys_arch=$(get_arch)
-    case "$arch" in
-    amd64)
-        local arch="amd64"
-        ;;
-    i386)
-        local arch="386"
-        ;;
-    arm64)
-        local arch="arm64"
-        ;;
-    arm32)
-        local arch="arm"
-        ;;
-    Unknown)
-        echo "Unsupport system architecture"
-        return
-        ;;
-    esac
-    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb && dpkg -i cloudflared.deb && cloudflared service install ${token} && rm cloudflared.deb
-
+    local arch=$(get_cloudflared_arch)
+    curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb" &&
+        dpkg -i cloudflared.deb &&
+        cloudflared service install "${token}" &&
+        rm cloudflared.deb
 }
 
 cloudflared_update() {
-    sys_arch=$(get_arch)
-    case "$arch" in
-    amd64)
-        local arch="amd64"
-        ;;
-    i386)
-        local arch="386"
-        ;;
-    arm64)
-        local arch="arm64"
-        ;;
-    arm32)
-        local arch="arm"
-        ;;
-    Unknown)
-        echo "Unsupport system architecture"
-        return
-        ;;
-    esac
-    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb && dpkg -i cloudflared.deb && systemctl restart cloudflared.service
+    local arch=$(get_cloudflared_arch)
+    curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb" &&
+        dpkg -i cloudflared.deb &&
+        systemctl restart cloudflared.service &&
+        rm cloudflared.deb
 }
 
 get_arch() {
     # Check the architecture
     arch=$(uname -m)
     case "$arch" in
-    x86_64)
-        echo "amd64"
-        ;;
-    i386 | i686)
-        echo "i386"
-        ;;
-    aarch64)
-        echo "arm64"
-        ;;
-    armv7l)
-        echo "arm32"
-        ;;
-    *)
-        echo "Unknown"
-        ;;
+    x86_64) echo "amd64" ;;
+    i386 | i686) echo "i386" ;;
+    aarch64) echo "arm64" ;;
+    armv7l) echo "arm32" ;;
+    *) echo "Unknown" ;;
     esac
     # Check the system bitness
     # if [ "$(getconf LONG_BIT)" == "64" ]; then
@@ -2546,7 +2520,6 @@ get_arch() {
     # else
     #     bitness="32-bit"
     # fi
-
     # Return the values
     echo "$architecture"
 }
