@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.3"
+servo_version="0.5.4"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2055,7 +2055,7 @@ certbot_certificate_get() {
 }
 
 rsync_manage() {
-
+    local choice
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
@@ -2300,6 +2300,31 @@ comp_manage() {
 }
 
 net_manage() {
+    local choice
+    while true; do
+        echo -e "\033[33m"
+        echo "Choose an option:"
+        echo "1. Enable IP Forward"
+        echo "2. Tune Kernel"
+        echo "3. tailscale_manage"
+        echo "4. cloudflared_manage"
+
+        echo "0. Quit"
+        echo -e "\033[0m"
+        read -rp "Enter your choice: " choice
+
+        case $choice in
+        1) net_enable_ip_forward ;;
+        2) net_tune_kernel ;;
+        3) tailscale_manage ;;
+        4) cloudflared_manage ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
+        esac
+    done
+}
+
+softether_install() {
     ip tuntap add mode tap name soft
     ip link set dev soft up
     ip link delete soft
@@ -2343,17 +2368,191 @@ net_tune_kernel() {
     sysctl --system
 }
 
+tailscale_manage() {
+    local choice
+    while true; do
+        echo -e "\033[33m"
+        echo "Choose an option:"
+        echo "1. tailscale_install"
+        echo "2. tailscale_configure"
+
+        echo "0. Quit"
+        echo -e "\033[0m"
+        read -rp "Enter your choice: " choice
+
+        case $choice in
+        1) tailscale_install ;;
+        2) tailscale_configure ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
+        esac
+    done
+}
+
 tailscale_install() {
     curl -fsSL https://tailscale.com/install.sh | sh
 }
 
+# Function to prompt for yes/no question
+function prompt_yes_no() {
+    local answer
+    while true; do
+        read -rp "$1 (y/n): " yn
+        case $yn in
+        [Yy]*)
+            echo "yes"
+            break
+            ;;
+        [Nn]*)
+            echo "no"
+            break
+            ;;
+        *) echo "Please answer yes or no." ;;
+        esac
+    done
+}
+
 tailscale_configure() {
-    tailscale up --advertise-exit-node --advertise-routes=192.168.10.0/24,192.168.20.0/24
-    tailscale up --accept-routes
+    local advertise_exit_node
+    local advertise_routes_response
+    local advertise_routes
+    local accept_routes
+    # tailscale up --advertise-exit-node --advertise-routes=192.168.10.0/24,192.168.20.0/24 --accept-routes
+
+    # Prompt for advertise-exit-node
+    advertise_exit_node=$(prompt_yes_no "Do you want to advertise as exit node?")
+
+    # Prompt for advertise-routes
+    advertise_routes_response=$(prompt_yes_no "Do you want to advertise specific routes?")
+    if [ "$advertise_routes_response" == "yes" ]; then
+        read -rp "Enter the routes to advertise (e.g., 192.168.10.0/24,192.168.20.0/24): " advertise_routes
+    else
+        advertise_routes=""
+    fi
+
+    # Prompt for accept-routes
+    accept_routes=$(prompt_yes_no "Do you want to accept routes?")
+
+    # Construct the tailscale command
+    local tailscale_cmd="tailscale up"
+    if [ "$advertise_exit_node" == "yes" ]; then
+        tailscale_cmd+=" --advertise-exit-node"
+    fi
+    if [ -n "$advertise_routes" ]; then
+        tailscale_cmd+=" --advertise-routes=$advertise_routes"
+    fi
+    if [ "$accept_routes" == "yes" ]; then
+        tailscale_cmd+=" --accept-routes"
+    fi
+
+    # Execute the tailscale command
+    echo "Executing Tailscale command: $tailscale_cmd"
+    eval $tailscale_cmd
+}
+
+cloudflared_manage() {
+    local choice
+    while true; do
+        echo -e "\033[33m"
+        echo "Choose an option:"
+        echo "1. cloudflared_install"
+        echo "2. cloudflared_update"
+
+        echo "0. Quit"
+        echo -e "\033[0m"
+        read -rp "Enter your choice: " choice
+
+        case $choice in
+        1) cloudflared_install ;;
+        2) cloudflared_update ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
+        esac
+    done
+}
+
+cloudflared_install() {
+    local token
+    read -rp "Enter tunnel token: " token
+    local sys_arch=$(get_arch)
+    case "$arch" in
+    amd64)
+        local arch="amd64"
+        ;;
+    i386)
+        local arch="386"
+        ;;
+    arm64)
+        local arch="arm64"
+        ;;
+    arm32)
+        local arch="arm"
+        ;;
+    Unknown)
+        echo "Unsupport system architecture"
+        return
+        ;;
+    esac
+    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb && dpkg -i cloudflared.deb && cloudflared service install ${token} && rm cloudflared.deb
+
+}
+
+cloudflared_update() {
+    sys_arch=$(get_arch)
+    case "$arch" in
+    amd64)
+        local arch="amd64"
+        ;;
+    i386)
+        local arch="386"
+        ;;
+    arm64)
+        local arch="arm64"
+        ;;
+    arm32)
+        local arch="arm"
+        ;;
+    Unknown)
+        echo "Unsupport system architecture"
+        return
+        ;;
+    esac
+    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb && dpkg -i cloudflared.deb && systemctl restart cloudflared.service
+}
+
+get_arch() {
+    # Check the architecture
+    arch=$(uname -m)
+    case "$arch" in
+    x86_64)
+        echo "amd64"
+        ;;
+    i386 | i686)
+        echo "i386"
+        ;;
+    aarch64)
+        echo "arm64"
+        ;;
+    armv7l)
+        echo "arm32"
+        ;;
+    *)
+        echo "Unknown"
+        ;;
+    esac
+    # Check the system bitness
+    # if [ "$(getconf LONG_BIT)" == "64" ]; then
+    #     bitness="64-bit"
+    # else
+    #     bitness="32-bit"
+    # fi
+
+    # Return the values
+    echo "$architecture"
 }
 
 sys_manage() {
-
+    local choice
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
@@ -2967,9 +3166,10 @@ main() {
         local menu=(
             "exit                       | Exit"
             "update_check               | Update Script"
+            "sys_manage                 | System"
+            "net_manage                 | Network"
             "comp_manage                | Compression"
             "wordpress_manage           | Wordpress"
-            "sys_manage                 | System"
             "nginx_manage               | Nginx"
             "mariadb_manage             | Database"
             "php_manage                 | PHP"
