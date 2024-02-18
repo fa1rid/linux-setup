@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.4"
+servo_version="0.5.5"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2031,6 +2031,10 @@ certbot_list_cloudflare_config() {
 # Function to get a new or renew a certificate
 certbot_certificate_get() {
     local domain_name
+    local account_list
+    local index
+    local chosen_number
+    local account
     read -rp "Enter your domain name (e.g., example.com): " domain_name
 
     # Check if any Cloudflare configurations exist
@@ -2038,13 +2042,46 @@ certbot_certificate_get() {
     selected_config=$(select_from_dir "${cloudflare_config_dir}")
     echo "Selected file: $selected_config"
 
-    read -rp "Press Enter to continue..."
+    # Get a list of Certbot accounts
+    account_list=$(ls -1 /etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory)
+
+    if [ -z "$account_list" ]; then
+        echo "No Certbot accounts found."
+    else
+        # Display the list of accounts with numbers
+        echo "Available Certbot Accounts:"
+        index=1
+        for account in $account_list; do
+            echo "$index. $account"
+            ((index++))
+        done
+        while true; do
+            # Prompt user to choose an account
+            read -rp "Enter the number of the account to use: " chosen_number
+            # Validate user input
+            if ! [[ "$chosen_number" =~ ^[0-9]+$ ]] || [ "$chosen_number" -le 0 ] || [ "$chosen_number" -gt "$index" ]; then
+                echo "Invalid input. Please enter a valid account number."
+            else
+                break
+            fi
+        done
+        # Get the chosen account
+        chosen_account=$(echo "$account_list" | awk "NR==$chosen_number")
+        echo "Selected Account: $chosen_account"
+    fi
+    if [ -n "$chosen_account" ]; then
+        account="--account ${chosen_account}"
+    fi
+
+    read -rp "Press Enter to start..."
 
     # Request the certificate (For debugging add: --dry-run -vvv)
-    if certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 60 --dns-cloudflare-credentials "${selected_config}"; then
+    if certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 60 --dns-cloudflare-credentials "${selected_config}" ${account}; then
         mkdir -p /etc/ssl
         ln -s "/etc/letsencrypt/live/${domain_name}" /etc/ssl/
     fi
+
+    # --account <account-id or URI>
 
     # For CURL
     # zid 1c2a1aaa99b81e8ecfae3d1e81e52e60
@@ -3069,6 +3106,140 @@ EOF
 
 }
 
+media_manage() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. Install FFMPEG"
+        echo "2. Install go-chromecast"
+        echo "3. Install catt (Cast All The Things) using pipx for the current user"
+        echo "0. Quit"
+
+        read -rp "Enter your choice: " choice
+
+        case $choice in
+        1) ffmpeg_install ;;
+        2) go_chromecast_install ;;
+        3) pipx install catt ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
+        esac
+    done
+}
+
+go_chromecast_install() {
+    local arch
+    case "$(get_arch)" in
+    amd64) arch="amd64" ;;
+    i386) arch="386" ;;
+    arm64) arch="arm64" ;;
+    arm32) arch="armv7" ;;
+    Unknown)
+        echo "Unsupported system architecture"
+        exit 1
+        ;;
+    esac
+    echo "$arch"
+
+    wget https://github.com/vishen/go-chromecast/releases/download/v0.3.1/go-chromecast_0.3.1_linux_${arch}.tar.gz
+    tar -xzf go-chromecast_0.3.1_linux_${arch}.tar.gz go-chromecast
+    install ./go-chromecast /usr/bin/
+    rm -f ./go-chromecast go-chromecast_0.3.1_linux_${arch}.tar.gz
+
+}
+
+ffmpeg_install() {
+    local confirm
+    if command -v ffmpeg >/dev/null 2>&1; then
+        read -rp "FFMPEG is already installed, are you sure you want to continue? (y/n)" confirm
+        if [[ $confirm != "y" ]]; then
+            echo "Aborting."
+            return 0
+        fi
+    fi
+
+    if [ ! -f "/etc/apt/sources.list.d/deb-multimedia.list" ]; then
+        # Add Deb Multimedia repository
+        echo "Adding Deb Multimedia repository..."
+        echo "deb http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee /etc/apt/sources.list.d/deb-multimedia.list >/dev/null
+        # echo "deb-src http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee -a /etc/apt/sources.list.d/deb-multimedia.list > /dev/null
+    fi
+    # Install Deb Multimedia keyring
+    echo "Installing Deb Multimedia keyring..."
+    apt update -oAcquire::AllowInsecureRepositories=true
+    apt install -y deb-multimedia-keyring
+
+    # Install ffmpeg non-free
+    echo "Installing ffmpeg..."
+    apt install -y ffmpeg
+}
+
+nodejs_manage() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. Install Node.js"
+        echo "2. Remove (purge) Node.js"
+        echo "3. Create Node.js Service"
+        echo "0. Quit"
+
+        read -rp "Enter your choice: " choice
+
+        case $choice in
+        1) nodejs_install ;;
+        2) nodejs_remove ;;
+        3) nodejs_create_service ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
+        esac
+    done
+}
+
+nodejs_remove() {
+    local confirm
+    read -rp "This will purge Node.js.. Are you sure? (y/n): " confirm
+
+    if [[ $confirm != "y" ]]; then
+        echo "Aborting."
+        return 0
+    fi
+    # Purge PHP packages
+    apt purge nodejs && apt autoremove && echo "nodejs has been purged."
+}
+
+nodejs_install() {
+    local confirm
+    local VERSION
+    if command -v node >/dev/null 2>&1 || [ -f "/etc/apt/sources.list.d/nodesource.list" ]; then
+        read -rp "node/repo is already installed, are you sure you want to continue? (y/n)" confirm
+        if [[ $confirm != "y" ]]; then
+            echo "Aborting."
+            return 0
+        fi
+    fi
+
+    echo "Available Node.js versions:"
+    echo "1. Node 18x"
+    echo "2. Node 20x"
+    echo "3. Node 21x"
+    # Prompt user for version choice
+    read -rp "Enter the number corresponding to the Node.js version you want to install: " choice
+    case $choice in
+    1) VERSION="18" ;;
+    2) VERSION="20" ;;
+    3) VERSION="21" ;;
+    *)
+        echo "Invalid choice!"
+        nodejs_install
+        ;;
+    esac
+    # Add NodeSource repository
+    curl -fsSL https://deb.nodesource.com/setup_$VERSION.x | bash -s -- || {
+        echo "Failed adding repo"
+        return 1
+    }
+    # Install Node.js and npm
+    apt install -y nodejs && echo "Node.js version $VERSION.x has been installed."
+}
+
 sys_more_pkg_install() {
     apt update && apt install -y build-essential software-properties-common python3 python3-pip
 
@@ -3150,6 +3321,8 @@ main() {
             "rsync_manage               | Rsync"
             "memcached_manage           | Memcached"
             "docker_manage              | Docker"
+            "nodejs_manage              | Node.js"
+            "media_manage               | Media"
             "perm_set                   | Files/Folders Permissions"
         )
         # Alternative way of spliting menu
@@ -3174,6 +3347,9 @@ main() {
             echo -e "\033[93mAvailable functions:\033[94m"
             echo "  db_backup [database_name] [save_location]"
             echo "  db_restore [database_name] [db_filename]"
+            echo "  decompress [filename]"
+            echo "  compress [7z   bz2  gz   tar  xz   zip] [filename]"
+            echo "  gen_pass [length] [min_numbers] [min_special_chars]"
             echo "  perm_set <target> <user> <group>"
             echo -e "\033[93m===============================\033[0m"
 
