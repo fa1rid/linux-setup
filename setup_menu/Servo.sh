@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.5"
+servo_version="0.5.6"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -59,7 +59,8 @@ if [[ ! -e /usr/share/bash-completion/completions/Servo.sh ]]; then
 fi
 #########################################
 
-cron_dir="/etc/cron.d/"
+cron_dir="/etc/cron.d"
+cron_dir_user="$HOME/.cron"
 cloudflare_config_dir="/etc/cloudflare"
 ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
 common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
@@ -456,9 +457,9 @@ php_install() {
     for phpVer in "${PHP_Versions[@]}"; do
         echo -e "\nInstalling PHP ${phpVer}"
 
-        if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.disabled" ]; then
-            "mv /etc/php/${phpVer}/fpm/pool.d/www.disabled" "/etc/php/${phpVer}/fpm/pool.d/www.conf"
-        fi
+        # if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.disabled" ]; then
+        #     mv "/etc/php/${phpVer}/fpm/pool.d/www.disabled" "/etc/php/${phpVer}/fpm/pool.d/www.conf"
+        # fi
 
         # Essential & Commonly Used Extensions Extensions
         apt install -y bc php"${phpVer}"-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} || { echo "Failed to install" && return 1; }
@@ -509,10 +510,10 @@ php_install() {
     if [ -f "/usr/local/bin/composer" ]; then
         echo "Composer already installed"
     else
-        read -rp "Enter PHP version to install composer: (default 7.4) " composer_php_ver
+        read -rp "Enter PHP version to install composer: (default 8.2) " composer_php_ver
         # Use the user input if provided, or the default value if the input is empty
         if [ -z "$composer_php_ver" ]; then
-            composer_php_ver=7.4
+            composer_php_ver=8.2
         fi
         curl -sS https://getcomposer.org/installer | "php${composer_php_ver}"
         echo "Moving 'composer.phar' to '/usr/local/bin/composer'"
@@ -800,6 +801,14 @@ nginx_install() {
         echo -e "\nInstalling sury's nginx repo"
         curl -sSL https://packages.sury.org/nginx/README.txt | bash -x
         echo
+        # Create the pinning configuration file
+
+        local PIN_FILE="/etc/apt/preferences.d/sury-repo-pin"
+        tee "$PIN_FILE" >/dev/null <<EOLX
+Package: *
+Pin: origin packages.sury.org
+Pin-Priority: 1000
+EOLX
     fi
 
     local PACKAGE_NAME="nginx"
@@ -1117,12 +1126,12 @@ EOFX
         mkdir -p /var/log/nginx/
     fi
 
-    echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >"${cron_dir}cloudflare"
-    echo "30 1 * * * root ${cloudflare_script} >> /var/log/nginx/cloudflare.log 2>&1" >>"${cron_dir}cloudflare"
-    chmod 660 "${cron_dir}cloudflare"
-    # cat "${cron_dir}"* | crontab -
-    echo -e "cat ${cron_dir}cloudflare\n"
-    cat "${cron_dir}cloudflare"
+    echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >"${cron_dir}/cloudflare"
+    echo "30 1 * * * root ${cloudflare_script} >> /var/log/nginx/cloudflare.log 2>&1" >>"${cron_dir}/cloudflare"
+    chmod 644 "${cron_dir}/cloudflare"
+    # cat "${cron_dir}"/* | crontab -
+    echo -e "cat ${cron_dir}/cloudflare\n"
+    cat "${cron_dir}/cloudflare"
     # crontab -l
     # Jobs inside "/etc/cron.d/" directory are monitored for changes
     # /etc/init.d/cron reload
@@ -2600,7 +2609,7 @@ sys_manage() {
 }
 
 sys_cron_reload() {
-    cat "${cron_dir}"* | crontab -
+    cat "${cron_dir_user}"/* | crontab -
     echo -e "Loaded cron jobs:\n"
     crontab -l
 }
@@ -2683,9 +2692,9 @@ backup_exec	/bin/date "+ backup of test started at %c"
 backup_exec	/bin/date "+ backup of test ended at %c"
 EOFX
 
-    echo "Writing cron into ${cron_dir}rsnapshot..."
+    echo "Writing cron into ${cron_dir}/rsnapshot..."
 
-    cat >"${cron_dir}rsnapshot" <<'EOFX'
+    cat >"${cron_dir}/rsnapshot" <<'EOFX'
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Schedule backup every 6 hours
@@ -3166,7 +3175,7 @@ ffmpeg_install() {
     # Install Deb Multimedia keyring
     echo "Installing Deb Multimedia keyring..."
     apt update -oAcquire::AllowInsecureRepositories=true
-    apt install -y deb-multimedia-keyring
+    apt install -y deb-multimedia-keyring --allow-unauthenticated
 
     # Install ffmpeg non-free
     echo "Installing ffmpeg..."
@@ -3296,8 +3305,8 @@ version() {
 
 main() {
     if [[ $EUID -eq 0 ]]; then
-        if [[ ! -d "$cron_dir" ]]; then
-            mkdir -p "${cron_dir}"
+        if [[ ! -d "$cron_dir_user" ]]; then
+            mkdir -p "${cron_dir_user}"
         fi
     fi
 
@@ -3374,6 +3383,7 @@ main() {
 main "$@"
 ##########################################################################
 # APT
+# apt policy package # to show available versions and their repos
 # apt list --installed
 # dpkg -s package_name
 # apt list package_name
@@ -3442,3 +3452,8 @@ main "$@"
 # dpkg-reconfigure locale
 ##########################################################################
 # rsync -uavhzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "root@host":/etc/ssl/
+##########################################################################
+# NGINX
+# Install RTMP (first add sury's repo and add priorty)
+# apt install libnginx-mod-rtmp
+# gunzip -c /usr/share/doc/libnginx-mod-rtmp/examples/stat.xsl.gz > /var/www/html/rtmp/stat.xsl
