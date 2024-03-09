@@ -795,7 +795,7 @@ nginx_manage() {
     done
 }
 
-nginx_install_rtmp {
+nginx_install_rtmp() {
     apt-get install libnginx-mod-rtmp
 }
 
