@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.6"
+servo_version="0.5.7"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -772,6 +772,9 @@ nginx_manage() {
         echo "4. Add cloudflare IPs (nginx) SYNC script with cron job"
         echo "5. Install Cert"
         echo "6. Uninstall Cert"
+        echo "7. Backup nginx config (vhosts and ssl snippets)"
+        echo "8. Restore nginx config"
+        echo "9. Install RTMP module"
         echo "0. Quit"
 
         read -rp "Enter your choice: " choice
@@ -783,10 +786,17 @@ nginx_manage() {
         4) nginx_cloudflare_add ;;
         5) nginx_cert_install ;;
         6) nginx_cert_uninstall ;;
+        7) nginx_backup_config ;;
+        8) nginx_restore_config ;;
+        9) nginx_install_rtmp ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+nginx_install_rtmp {
+    apt-get install libnginx-mod-rtmp
 }
 
 # Function to install Nginx
@@ -797,31 +807,27 @@ nginx_install() {
     if [ -f "/etc/apt/sources.list.d/nginx.list" ]; then
         echo -e "\nnginx Repo Exists"
     else
-        # Adding sury's nginx repo
+        # Adding sury's nginx repo: https://packages.sury.org/nginx/dists/bookworm/main/binary-amd64/Packages
         echo -e "\nInstalling sury's nginx repo"
         curl -sSL https://packages.sury.org/nginx/README.txt | bash -x
         echo
         # Create the pinning configuration file
 
-        local PIN_FILE="/etc/apt/preferences.d/sury-repo-pin"
-        tee "$PIN_FILE" >/dev/null <<EOLX
-Package: *
-Pin: origin packages.sury.org
-Pin-Priority: 1000
-EOLX
+        #         local PIN_FILE="/etc/apt/preferences.d/sury-repo-pin"
+        #         tee "$PIN_FILE" >/dev/null <<EOLX
+        # Package: *
+        # Pin: origin packages.sury.org
+        # Pin-Priority: 1000
+        # EOLX
     fi
 
     local PACKAGE_NAME="nginx"
-    # Check if the package is installed
-    if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
-        echo "$PACKAGE_NAME is already installed."
-    else
-        echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update && apt install -y $PACKAGE_NAME || { echo "Failed to install $PACKAGE_NAME" && return 1; }
-        echo "$PACKAGE_NAME has been installed."
-    fi
+    # Check if the package is installed #nginx-extras
+    apt update && apt install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install $PACKAGE_NAME" && return 1; }
 
     systemctl enable nginx
+    # Create log folder for the main profile
+    rm -rf /var/www/html
 
     # Add log rotation for nginx
     # sed -i "s/^\/var\/log\/nginx\/\*\.log/\/var\/www\/*\/logs\/*\/*.log/" /etc/logrotate.d/nginx
@@ -846,9 +852,6 @@ EOLX
 	endscript
 }
 EOFX
-
-    # Create log folder for the main profile
-    rm -rf /var/www/html
 
     # Generate self-signed SSL certificate
     local nginx_key="/etc/ssl/private/nginx.key"
@@ -1039,12 +1042,32 @@ nginx_remove() {
     systemctl stop nginx
 
     # Purge Nginx and its configuration
-    apt purge nginx nginx-common && apt autoremove
+    apt-get remove --purge nginx nginx-common nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter && apt autoremove
 
     # Remove configuration files
     rm -rf /etc/nginx
 
     echo "Nginx and its configuration have been purged."
+}
+
+nginx_backup_config() {
+    tar -czf nginx_config_backup.tar.gz /etc/nginx/snippets/ssl-*.conf "/etc/nginx/sites-available" "/etc/nginx/sites-enabled" || echo "Success: nginx_config_backup.tar.gz" || echo "Backup Failed."
+}
+
+nginx_restore_config() {
+    local path="$1"
+    read -rp "Enter path to file/directory: " path
+    # Remove quotes if present in the input path
+    path=${path//\"/}
+    # Remove trailing slash if present in the input path
+    path=${path%/}
+
+    if ! path_exists "$path"; then
+        echo "Path doesn't exist"
+        return 1
+    fi
+
+    tar -xzvf "${path}" -C /
 }
 
 nginx_cloudflare_add() {
@@ -3456,4 +3479,4 @@ main "$@"
 # NGINX
 # Install RTMP (first add sury's repo and add priorty)
 # apt install libnginx-mod-rtmp
-# gunzip -c /usr/share/doc/libnginx-mod-rtmp/examples/stat.xsl.gz > /var/www/html/rtmp/stat.xsl
+# gunzip -c /usr/share/doc/libnginx-mod-rtmp/examples/stat.xsl.gz > /var/www/stat.xsl
