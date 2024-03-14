@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.7"
+servo_version="0.5.8"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2373,10 +2373,11 @@ net_manage() {
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
-        echo "1. Enable IP Forward"
+        echo "1. Enable IP Forward & MASQUERADE"
         echo "2. Tune Kernel"
         echo "3. tailscale_manage"
         echo "4. cloudflared_manage"
+        echo "5. Install SoftEther VPN"
 
         echo "0. Quit"
         echo -e "\033[0m"
@@ -2387,12 +2388,14 @@ net_manage() {
         2) net_tune_kernel ;;
         3) tailscale_manage ;;
         4) cloudflared_manage ;;
+        5) net_softether_install ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
 }
 
+# To be developed and tested (not working)
 softether_install() {
     ip tuntap add mode tap name soft
     ip link set dev soft up
@@ -2413,28 +2416,171 @@ EOFX
     systemctl restart networking
 }
 
+net_softether_install() {
+    local install_dir="/usr/local/softether"
+    local M1
+    local M2
+    local RTM
+    local IFS
+
+    case "$(uname -m)" in
+    aarch64)
+        M1="_ARM_64bit"
+        M2="arm64"
+        ;;
+    x86_64)
+        M1="_Intel_x64_or_AMD64"
+        M2="x64"
+        ;;
+    *) 
+        echo "Unsupported CPU"; exit 1;
+        ;;
+    esac
+
+    # Update system & Get build tools
+    apt-get update && apt-get -y install build-essential wget curl libreadline-dev libncurses-dev libssl-dev zlib1g-dev
+
+    # Define softether version
+    RTM=$(curl http://www.softether-download.com/files/softether/ | grep -o 'v[^"]*e' | grep rtm | tail -1)
+    IFS='-' read -ra RTMS <<<"${RTM}"
+
+    # Get softether source
+    wget "http://www.softether-download.com/files/softether/${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}/Linux/SoftEther_VPN_Server/64bit_-${M1}/softether-vpnserver-${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-linux-${M2}-64bit.tar.gz" -O /tmp/softether-vpnserver.tar.gz || exit 1
+
+    # Extract softether source & Remove unused file
+    tar -xzvf /tmp/softether-vpnserver.tar.gz -C /tmp/ && rm /tmp/softether-vpnserver.tar.gz
+
+    # Move to source directory
+    cd /tmp/vpnserver
+
+    # Workaround for 18.04+
+    #sed -i 's|OPTIONS=-O2|OPTIONS=-no-pie -O2|' Makefile
+
+    # Build softether (i_read_and_agree_the_license_agreement)
+    make || {
+        echo "Error: failed to compile."
+        exit 1
+    }
+
+    # Change file permission
+    chmod 600 * && chmod +x vpnserver && chmod +x vpncmd
+    echo "${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}" >version.txt
+
+    # Link binary files
+    #ln -sf /usr/local/vpnserver/vpnserver /usr/local/bin/vpnserver
+    #ln -sf /usr/local/vpnserver/vpncmd /usr/local/bin/vpncmd
+
+    # Add systemd service
+    cat <<EOF >/usr/lib/systemd/system/vpnserver.service
+[Unit]
+Description=SoftEther VPN Server
+After=network.target auditd.service
+
+[Service]
+Type=forking
+EnvironmentFile=-${install_dir}/vpnserver 
+ExecStart=${install_dir}/vpnserver start
+ExecStop=${install_dir}/vpnserver stop
+KillMode=process
+Restart=on-failure
+# Uncomment the below after creating tap_vpn bridge device
+ExecStartPost=/usr/bin/sleep 1
+ExecStartPost=/sbin/ip addr add 192.168.30.1/24 brd + dev tap_vpn
+
+# Hardening
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=full
+ReadOnlyDirectories=/
+ReadWriteDirectories=-${install_dir}
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_BROADCAST CAP_NET_RAW CAP_SYS_NICE CAP_SYS_ADMIN CAP_SETUID
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    mkdir -p ${install_dir} && mv hamcore.se2 vpnserver vpncmd version.txt ${install_dir} && rm -rf /tmp/vpnserver
+
+    # ip tuntap add mode tap name softether
+    # ip addr add 192.168.30.1/24 dev softether
+    # ip link set dev softether up
+
+    read -p "Place your 'vpn_server.config' in ${install_dir} and press Enter"
+
+    systemctl daemon-reload && systemctl enable vpnserver && systemctl restart vpnserver
+}
+
 net_enable_ip_forward() {
+    local NIC
+    # Get the "public" interface from the default route
+	NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
+
+    echo "------------- Adding -------------"
     echo "net.ipv4.ip_forward = 1" | tee /etc/sysctl.d/ip_forward.conf
     echo "net.ipv6.conf.all.forwarding = 1" | tee -a /etc/sysctl.d/ip_forward.conf
+    echo "------------- Reloading -------------"
     sysctl --system
+    echo "------------- Adding iptables rules -------------"
+
+    cat >'/etc/iptables/rules.v4' <<EOFX
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# XRDP
+-N XRDP
+-A INPUT -p tcp --dport 3389 -j DROP
+-I INPUT -p tcp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-I INPUT -p tcp --dport 3389 -j XRDP
+
+-I FORWARD -m state --state NEW,ESTABLISHED,RELATED -d 192.168.0.0/16 -o ${NIC} -j REJECT
+-I FORWARD -m state --state NEW,ESTABLISHED,RELATED -d 172.16.0.0/12 -o ${NIC} -j REJECT
+-I FORWARD -m state --state NEW,ESTABLISHED,RELATED -d 10.0.0.0/8 -o ${NIC} -j REJECT
+-I FORWARD -m state --state NEW,ESTABLISHED,RELATED -d 100.64.0.0/10 -o ${NIC} -j REJECT
+
+-I OUTPUT -d 192.168.0.0/16 -o ${NIC} -j DROP
+-I OUTPUT -d 172.16.0.0/12  -o ${NIC} -j DROP
+-I OUTPUT -d 10.0.0.0/8 -o ${NIC} -j DROP
+-I OUTPUT -d 100.64.0.0/10  -o ${NIC} -j DROP
+COMMIT
+
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+-A POSTROUTING -o ${NIC} -j MASQUERADE
+COMMIT
+
+# iptables -t nat -I POSTROUTING -o ${NIC} -j MASQUERADE
+# iptables -t nat -D POSTROUTING -s 192.168.30.0/24 -o ${NIC} -j MASQUERADE
+EOFX
+    echo
+    echo "- Restarting netfilter-persistent..."
+    systemctl restart netfilter-persistent
 }
 
 net_tune_kernel() {
     # Tune Kernel
+    echo "------------- Adding -------------"
     # echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.ip_local_port_range = 16384 60999" | tee /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.tcp_congestion_control = bbr" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.core.default_qdisc = fq_codel" | tee -a /etc/sysctl.d/tune_kernel.conf
 
+    echo "------------- Reloading -------------"
+    sysctl --system
+
+    echo "------------- Checking settings -------------"
     sysctl net.ipv4.tcp_max_syn_backlog
     sysctl net.core.rmem_max
     sysctl net.core.wmem_max
     sysctl net.ipv4.tcp_tw_reuse
-    sysctl net.ipv4.tcp_tw_recycle
+    # sysctl net.ipv4.tcp_tw_recycle
     sysctl net.ipv4.tcp_window_scaling
     sysctl net.ipv4.ip_local_port_range
-
-    sysctl --system
 }
 
 tailscale_manage() {
@@ -2874,7 +3020,7 @@ sys_std_pkg_install() {
     # Hetzner disables InstallRecommends using this:
     # /etc/apt/apt.conf.d/00InstallRecommends
     apt update && apt upgrade && apt install --no-install-recommends -y \
-        netfilter-persistent \
+        iptables-persistent \
         bash-completion \
         curl \
         wget \
