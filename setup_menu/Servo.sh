@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.8"
+servo_version="0.5.9"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -823,7 +823,7 @@ nginx_install() {
 
     local PACKAGE_NAME="nginx"
     # Check if the package is installed #nginx-extras
-    apt update && apt install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install $PACKAGE_NAME" && return 1; }
+    apt update && apt install -y nginx-full libnginx-mod-brotli || { echo "Failed to install $PACKAGE_NAME" && return 1; }
 
     systemctl enable nginx
     # Create log folder for the main profile
@@ -1042,7 +1042,7 @@ nginx_remove() {
     systemctl stop nginx
 
     # Purge Nginx and its configuration
-    apt-get remove --purge nginx nginx-common nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter && apt autoremove
+    apt-get remove --purge nginx* libnginx* && apt autoremove
 
     # Remove configuration files
     rm -rf /etc/nginx
@@ -2467,8 +2467,8 @@ net_softether_install() {
     echo "${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}" >version.txt
 
     # Link binary files
-    #ln -sf /usr/local/vpnserver/vpnserver /usr/local/bin/vpnserver
-    #ln -sf /usr/local/vpnserver/vpncmd /usr/local/bin/vpncmd
+    # ln -sf /usr/local/softether/vpnserver /usr/local/bin/vpnserver
+    # ln -sf /usr/local/softether/vpncmd /usr/local/bin/vpncmd
 
     # Add systemd service
     cat <<EOF >/usr/lib/systemd/system/vpnserver.service
@@ -3117,9 +3117,24 @@ sys_SSH_install() {
 
 }
 
+sys_set_grub_timeout() {
+    local TIMEOUT=3
+
+    [ ! -f "/etc/default/grub" ] && { echo "Grub configuration file not found."; return 1; }
+
+    sed -i "s/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=$TIMEOUT/" /etc/default/grub || { echo "Error: Failed to set Grub timeout."; return 1; }
+    update-grub || { echo "Error: Failed to update Grub."; return 1; }
+
+    echo "Grub timeout has been set to $TIMEOUT seconds."
+}
+
+
 sys_config_setup() {
     local restore_choice
     local bashrc="/etc/bash.bashrc"
+
+    echo "Updating Grub timeout.."
+    sys_set_grub_timeout
 
     echo "Setting server's timezone to Asia/Dubai"
     timedatectl set-timezone Asia/Dubai || echo "Failed to set timezone"
@@ -3626,3 +3641,6 @@ main "$@"
 # Install RTMP (first add sury's repo and add priorty)
 # apt install libnginx-mod-rtmp
 # gunzip -c /usr/share/doc/libnginx-mod-rtmp/examples/stat.xsl.gz > /var/www/stat.xsl
+##########################################################################
+# Install VMware tools
+# open-vm-tools
