@@ -822,7 +822,7 @@ nginx_install() {
     fi
 
     local PACKAGE_NAME="nginx"
-    # Check if the package is installed #nginx-extras
+    # Install nginx #nginx-extras #libnginx-mod-http-fancyindex
     apt update && apt install -y nginx-full libnginx-mod-brotli || { echo "Failed to install $PACKAGE_NAME" && return 1; }
 
     systemctl enable nginx
@@ -3622,8 +3622,11 @@ main "$@"
 # visudo
 # rootuser ALL=(ALL) NOPASSWD: ALL
 ##########################################################################
-# iptables
+# Networking
 # iptables-save > /etc/iptables/rules.v4
+# ip rule add from 10.5.4.0/24 table 100
+# ip route add default via 10.0.0.1 proto static table 100
+# ip .. del ..
 ##########################################################################
 # Change System local/keyboard
 # localectl # check locale
@@ -3644,3 +3647,24 @@ main "$@"
 ##########################################################################
 # Install VMware tools
 # open-vm-tools
+##########################################################################
+# string to hex
+# echo -n 123 | xxd -p | tr -d '\n'
+# echo -n 123 | od -An -t x1 | tr -d ' \n'
+# echo -n 123 | hexdump --no-squeezing --format '/1 "%02x"'
+
+# hex to string
+# echo -n 313233 | sed 's/\([0-9A-F]\{2\}\)/\\\\\\x\1/gI' | xargs printf
+# echo -n 313233 | xxd -r -p
+# echo -n 313233 | perl -pe 's/(..)/chr(hex($1))/ge'
+
+# string to base64
+# echo -n 123 | base64
+# echo -n 123 | openssl enc -base64 -A
+# echo -n 123 | openssl base64 -A
+
+# base64 to string
+# echo -n MTIz | base64 -d
+# echo -n MTIz | openssl base64 -d -A
+# echo -n MTIz | openssl enc -base64 -d -A
+##########################################################################
