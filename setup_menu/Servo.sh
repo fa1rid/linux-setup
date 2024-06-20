@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.5.9"
+servo_version="0.6.0"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -19,7 +19,7 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
         # return
         _init_completion -n = || return
 
-        opts="compress decompress db_backup db_restore perm_set gen_pass"
+        opts="compress decompress db_backup db_restore perm_set gen_pass rsync_push_letsencrypt"
         if ((cword == 1)); then
             COMPREPLY=($(compgen -W "$opts" -- "$cur"))
             return
@@ -1363,7 +1363,8 @@ server {
 }
 
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     ${server_name};
     root /var/www/${vuser}/${domain}/public;
     include ${ssl_nginx_snippet};
@@ -2022,7 +2023,12 @@ certbot_install() {
     # Check if Certbot is installed
     if ! command -v certbot &>/dev/null; then
         echo "Certbot is not installed. Installing Certbot..."
-        apt-get update && apt-get -y install certbot python3-certbot-dns-cloudflare
+        # apt-get update && apt-get -y install certbot python3-certbot-dns-cloudflare
+        apt-get update && apt-get -y install snapd
+        snap install --classic certbot
+        ln -s /snap/bin/certbot /usr/bin/certbot
+        snap set certbot trust-plugin-with-root=ok
+        snap install certbot-dns-cloudflare
     fi
 }
 
@@ -2169,17 +2175,25 @@ EOFX
 }
 
 rsync_push_letsencrypt() {
-    local path
-    path=$(select_from_dir "/etc/letsencrypt/live/")
+    local path="$1"
+    if [[ -z "$path" ]]; then
+        path=$(select_from_dir "/etc/letsencrypt/live/")
+    fi
     local domain="${path##*/}"
-    local host
-    local port
-    local user
-    read -rp "Enter host or IP: " host
-    read -rp "Enter port: " port
-    read -rp "Enter user (default root): " user
-    if [ -z "$user" ]; then
-        user=root
+    local host="$2"
+    local port="$3"
+    local user="$4"
+    if [[ -z "$host" ]]; then
+        read -rp "Enter host or IP: " host
+    fi
+    if [[ -z "$port" ]]; then
+        read -rp "Enter port: " port
+    fi
+    if [[ -z "$user" ]]; then
+        read -rp "Enter user (default root): " user
+        if [[ -z "$user" ]]; then
+            user=root
+        fi
     fi
     rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
     echo "Log written to '/var/log/rsync/letsencrypt.log'"
@@ -3544,6 +3558,7 @@ main() {
             echo "  compress [7z   bz2  gz   tar  xz   zip] [filename]"
             echo "  gen_pass [length] [min_numbers] [min_special_chars]"
             echo "  perm_set <target> <user> <group>"
+            echo "  rsync_push_letsencrypt <host> <port> <user>"
             echo -e "\033[93m===============================\033[0m"
 
             # Prompt the user for a choice
