@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.0"
+servo_version="0.6.1"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2769,6 +2769,7 @@ sys_manage() {
         echo "9. Read APT Config"
         echo "10. Install rsnapshot"
         echo "11. Reload Cron (root profile)"
+        echo "12. Install Auto Mount USB"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -2785,10 +2786,17 @@ sys_manage() {
         9) sys_read_apt_config ;;
         10) sys_rsnapshot_install ;;
         11) sys_cron_reload ;;
+        12) mount_usb_install ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+sys_init(){
+    sys_std_pkg_install
+    sys_SSH_install
+    sys_config_setup
 }
 
 sys_cron_reload() {
@@ -3453,6 +3461,58 @@ sys_more_pkg_install() {
     echo "More Packages installation complete."
 }
 
+mount_usb_install() {
+    # Update package lists and install necessary packages
+    apt update
+    apt install -y udiskie udisks2
+
+    # Create the udiskie configuration directory
+    mkdir -p /root/.config/udiskie
+
+# Create the udiskie configuration file
+cat <<EOL >/root/.config/udiskie/config.yml
+device_config:
+  - options:
+    - umask=000
+EOL
+
+cat <<EOL >/etc/polkit-1/localauthority/50-local.d/consolekit.pkla
+[udiskie]
+Identity=unix-group:root
+Action=org.freedesktop.udisks.*
+ResultAny=yes
+EOL
+
+cat <<EOL >/etc/udev/rules.d/99-udisks2.rules
+ENV{ID_FS_USAGE}=="filesystem|other|crypto", ENV{UDISKS_FILESYSTEM_SHARED}="1"
+EOL
+
+# Create a systemd service file for udiskie
+cat <<EOL >/etc/systemd/system/udiskie.service
+[Unit]
+Description=Udiskie Automounter
+After=local-fs.target
+Before=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/udiskie -F -N -T
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+    udevadm control --reload-rules
+    udevadm trigger
+
+    systemctl daemon-reload
+    systemctl enable udiskie
+    systemctl restart udiskie
+}
+
+
+
 # Function to check for updates
 update_check() {
     local github_repo="fa1rid/linux-setup"
@@ -3559,6 +3619,7 @@ main() {
             echo "  gen_pass [length] [min_numbers] [min_special_chars]"
             echo "  perm_set <target> <user> <group>"
             echo "  rsync_push_letsencrypt <host> <port> <user>"
+            echo "  sys_init"
             echo -e "\033[93m===============================\033[0m"
 
             # Prompt the user for a choice
@@ -3642,6 +3703,14 @@ main "$@"
 # ip rule add from 10.5.4.0/24 table 100
 # ip route add default via 10.0.0.1 proto static table 100
 # ip .. del ..
+### IP Forward ###
+# iface=eth0
+# PORT=
+# CLIENT_IP=
+# iptables -t nat -I PREROUTING -i ${iface} -p tcp --dport ${PORT} -j DNAT --to-destination ${CLIENT_IP}:${PORT}
+# iptables -t nat -I PREROUTING -i ${iface} -p udp --dport ${PORT} -j DNAT --to-destination ${CLIENT_IP}:${PORT}
+# iptables -I FORWARD -d ${CLIENT_IP} --dport ${PORT} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+######
 ##########################################################################
 # Change System local/keyboard
 # localectl # check locale
@@ -3659,6 +3728,19 @@ main "$@"
 # Install RTMP (first add sury's repo and add priorty)
 # apt install libnginx-mod-rtmp
 # gunzip -c /usr/share/doc/libnginx-mod-rtmp/examples/stat.xsl.gz > /var/www/stat.xsl
+
+# *** Combining Basic Authentication with Access Restriction by IP Address ***
+
+# apt install apache2-utils
+# htpasswd -c /etc/nginx/.htpasswd user1
+#     auth_basic           "Enter Password";
+#     auth_basic_user_file "/etc/nginx/.htpasswd";
+# satisfy all; # If you set the directive to to all, access is granted if a client satisfies both conditions
+# satisfy any;  # If you set the directive to any, access is granted if if a client satisfies at least one condition
+# deny  192.168.1.2;
+# allow 192.168.1.1/24;
+# allow 127.0.0.1;
+# deny  all;
 ##########################################################################
 # Install VMware tools
 # open-vm-tools
@@ -3683,3 +3765,8 @@ main "$@"
 # echo -n MTIz | openssl base64 -d -A
 # echo -n MTIz | openssl enc -base64 -d -A
 ##########################################################################
+# Work with USB Devices
+# List: 
+# blkid
+# lsblk
+# lsblk -o name,label,size,type,FSROOTS,FSTYPE,FSSIZE,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINT
