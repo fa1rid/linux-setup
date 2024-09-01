@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.1"
+servo_version="0.6.2"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -966,7 +966,7 @@ http {
     error_log /var/log/nginx/error.log;
 
     include /etc/nginx/conf.d/*.conf;
-    include /etc/nginx/sites-enabled/*;
+    include /etc/nginx/sites-enabled/*.conf;
 }
 EOTX'
     local compression_types='application/atom+xml
@@ -1652,11 +1652,11 @@ db_backup() {
     if [ -z "$db_name" ] || [ -z "$save_location" ]; then
         db_show_databases
         read -rp "Enter the database name: " db_name
-        read -rp "Enter the save location (e.g., /path/to/save): " save_location
+        read -rp "Enter the save Folder (e.g., /path/to/save/): " save_location
 
         # Check again if they are empty
         if [ -z "$db_name" ] || [ -z "$save_location" ]; then
-            echo "Both database name and save location are required."
+            echo "Both database name and save folder are required."
             return 1
         fi
     fi
@@ -3722,7 +3722,11 @@ main "$@"
 # dpkg-reconfigure keyboard-configuration
 # dpkg-reconfigure locale
 ##########################################################################
-# rsync -uavhzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "root@host":/etc/ssl/
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.ssh/id_ed25519.pub" -e "ssh -p 4444" "root@${ip):/root/.ssh/"
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/cloudflare/" -e "ssh -p 4444" "root@${ip):/etc/cloudflare/"
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.config/rsnapshot/" -e "ssh -p 4444" "root@${ip):/root/.config/rsnapshot/"
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/" -e "ssh -p 4444" "root@${ip):/etc/letsencrypt/"
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/var/www/solaris/solarissolutions.co/" -e "ssh -p 4444" "root@${ip):/var/www/solaris/solarissolutions.co/"
 ##########################################################################
 # NGINX
 # Install RTMP (first add sury's repo and add priorty)
@@ -3770,3 +3774,22 @@ main "$@"
 # blkid
 # lsblk
 # lsblk -o name,label,size,type,FSROOTS,FSTYPE,FSSIZE,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINT
+##########################################################################
+# MariaDB
+# DROP USER 'username'@'localhost';
+# DROP DATABASE database_name;
+##########################################################################
+# Certbot
+# certbot certificates # List Certificates
+# Output Example:
+# Saving debug log to /var/log/letsencrypt/letsencrypt.log
+# -------------------------------------------------------------------------------
+# Found the following certs:
+#   Certificate Name: example.com
+#     Domains: example.com www.example.com
+#     Expiry Date: 2024-09-15 15:01:49+00:00 (VALID: 47 days)
+#     Certificate Path: /etc/letsencrypt/live/example.com/fullchain.pem
+#     Private Key Path: /etc/letsencrypt/live/example.com/privkey.pem
+# -------------------------------------------------------------------------------
+
+# certbot renew --cert-name example.com # Rrenew cert
