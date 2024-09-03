@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.2"
+servo_version="0.6.3"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -453,7 +453,7 @@ php_install() {
     sleep 1
     # Calculate post_max_size
     post_max_size=$((upload_max_filesize + 1))
-    apt update
+    apt-get update
     for phpVer in "${PHP_Versions[@]}"; do
         echo -e "\nInstalling PHP ${phpVer}"
 
@@ -462,17 +462,17 @@ php_install() {
         # fi
 
         # Essential & Commonly Used Extensions Extensions
-        apt install -y bc php"${phpVer}"-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} || { echo "Failed to install" && return 1; }
+        apt-get install -y bc php"${phpVer}"-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} || { echo "Failed to install" && return 1; }
         # bz2
         # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
         # [Zend Modules]
         # Zend OPcache
 
         # Less Commonly Used Extensions
-        # apt install php"${phpVer}"-{soap,pspell,xmlrpc,memcached}
+        # apt-get install php"${phpVer}"-{soap,pspell,xmlrpc,memcached}
 
         # For dev
-        # apt install php${phpVer}-{dev}
+        # apt-get install php${phpVer}-{dev}
 
         # Modify default configs
         sed -i "s/memory_limit = .*/memory_limit = ${memory_limit}M/" "/etc/php/${phpVer}/cli/php.ini"
@@ -537,7 +537,7 @@ php_remove() {
     for phpVer in "${PHP_Versions[@]}"; do
 
         # Purge PHP packages
-        apt purge "php${phpVer}-"* && apt autoremove
+        apt purge -y "php${phpVer}-"* && apt-get autoremove -y
 
     done
 
@@ -823,7 +823,7 @@ nginx_install() {
 
     local PACKAGE_NAME="nginx"
     # Install nginx #nginx-extras #libnginx-mod-http-fancyindex
-    apt update && apt install -y nginx-full libnginx-mod-brotli || { echo "Failed to install $PACKAGE_NAME" && return 1; }
+    apt-get update && apt-get install -y nginx-full libnginx-mod-brotli || { echo "Failed to install $PACKAGE_NAME" && return 1; }
 
     systemctl enable nginx
     # Create log folder for the main profile
@@ -1042,7 +1042,7 @@ nginx_remove() {
     systemctl stop nginx
 
     # Purge Nginx and its configuration
-    apt-get remove --purge nginx* libnginx* && apt autoremove
+    apt-get remove --purge nginx* libnginx* && apt-get autoremove -y
 
     # Remove configuration files
     rm -rf /etc/nginx
@@ -1485,7 +1485,7 @@ mariadb_server_install() {
         return
     else
         echo "$PACKAGE_NAME is not installed. Installing..."
-        apt update && apt install -y $PACKAGE_NAME || { echo "Failed to install $PACKAGE_NAME" && return 1; }
+        apt-get update && apt-get install -y $PACKAGE_NAME || { echo "Failed to install $PACKAGE_NAME" && return 1; }
         echo "$PACKAGE_NAME has been installed."
     fi
     # Prompt for variable values
@@ -1546,7 +1546,7 @@ mariadb_client_install() {
 
     # Install the MariaDB client
     echo "Installing MariaDB client..."
-    apt update && apt install -y mariadb-client || { echo "Failed to install mariadb-client" && return 1; }
+    apt-get update && apt-get install -y mariadb-client || { echo "Failed to install mariadb-client" && return 1; }
 
     read -rp "Enter the MariaDB server hostname or IP (without port): " db_host
     read -rp "Enter the database username: " db_user
@@ -1582,15 +1582,15 @@ mariadb_remove() {
     fi
 
     # Uninstall MariaDB
-    apt remove --purge mariadb-server mariadb-client
-    # apt remove --purge mariadb* mysql*
+    apt remove -y --purge mariadb-server mariadb-client
+    # apt remove -y --purge mariadb* mysql*
     echo -e "\nRunning dpkg -l | grep -e mysql -e mariadb "
     dpkg -l | grep -e mysql -e mariadb
 
-    read -rp "Do you want to remove configurations by running apt autoremove? (y/n): " confirmation2
+    read -rp "Do you want to remove configurations by running apt-get autoremove? (y/n): " confirmation2
 
     if [[ $confirmation2 != "y" ]]; then
-        apt autoremove
+        apt-get autoremove -y
     fi
 
     # Delete configuration and database files
@@ -1778,7 +1778,7 @@ memcached_manage() {
 # Function to install Memcached
 memcached_install() {
     # Install Memcached and required dependencies
-    apt update && apt install -y memcached libmemcached-tools || { echo "Failed" && return 1; }
+    apt-get update && apt-get install -y memcached libmemcached-tools || { echo "Failed" && return 1; }
 
     # Configure Memcached
     # echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
@@ -1814,7 +1814,7 @@ memcached_remove() {
     rm -rf /var/lib/memcached/*
 
     # Remove Memcached configuration files
-    apt remove --purge memcached
+    apt remove -y --purge memcached
 
     # Also remove configuration files
     rm -rf /etc/memcached.conf
@@ -1837,16 +1837,16 @@ docker_install() {
 
     echo "deb [arch=$architecture signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $codename stable" |
         tee /etc/apt/sources.list.d/docker.list >/dev/null
-    apt update && apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 }
 
 docker_remove() {
     # Remove the official docker
-    apt purge docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     # for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do apt-get -y remove $pkg; done
     # Remove debian's docker
     # for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get -y remove $pkg; done
-    apt purge docker.io docker-doc docker-compose podman-docker containerd runc
+    apt purge -y docker.io docker-doc docker-compose podman-docker containerd runc
 
 }
 
@@ -2154,7 +2154,7 @@ rsync_install() {
     # Check if the 'rsync' command is available
     if ! command -v rsync >/dev/null 2>&1; then
         echo "The 'rsync' command is not installed. Installing..."
-        apt update && apt-get install -y rsync
+        apt-get update && apt-get install -y rsync
     fi
 
     echo -e "\nAdding log rotation.."
@@ -3021,10 +3021,10 @@ sys_list_groups() {
 }
 
 sys_cleanUp() {
-    apt autoremove
-    apt autoclean
-    apt update
-    apt clean
+    apt-get autoremove -y
+    apt-get autoclean
+    apt-get update
+    apt-get clean
 }
 
 sys_read_apt_config() {
@@ -3037,11 +3037,11 @@ sys_std_pkg_install() {
     # apt-config dump | grep -we Recommends -e Suggests | sed s/1/0/ | tee /etc/apt/apt.conf.d/99no-recommends
 
     # Install the "standard" task automatically
-    # apt install -y tasksel
+    # apt-get install -y tasksel
     # echo "standard" | tasksel install
     # Hetzner disables InstallRecommends using this:
     # /etc/apt/apt.conf.d/00InstallRecommends
-    apt update && apt upgrade && apt install --no-install-recommends -y \
+    apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         iptables-persistent \
         bash-completion \
         curl \
@@ -3074,12 +3074,12 @@ sys_std_pkg_install() {
     read -rp "Remove Exim4? (y/n) " confirmation
     if [[ "$confirmation" == "y" ]]; then
         echo -e "\nRunning apt purge exim4-*\n"
-        apt -y purge exim4-*
+        apt purge -y exim4-*
     fi
 
     # Clean up
-    apt autoremove -y
-    apt clean
+    apt-get autoremove -y
+    apt-get clean
 
     echo "Standard packages installation complete."
 }
@@ -3096,7 +3096,7 @@ sys_SSH_install() {
 
     if ! dpkg -l | grep -q "^ii\s*openssh-server\s"; then
         # Update package lists & Install SSH server
-        apt update && apt install openssh-server -y || return 1
+        apt-get update && apt-get install -y openssh-server || return 1
     fi
 
     # Backup the original configuration
@@ -3380,12 +3380,12 @@ ffmpeg_install() {
     fi
     # Install Deb Multimedia keyring
     echo "Installing Deb Multimedia keyring..."
-    apt update -oAcquire::AllowInsecureRepositories=true
-    apt install -y deb-multimedia-keyring --allow-unauthenticated
+    apt-get update -oAcquire::AllowInsecureRepositories=true
+    apt-get install -y deb-multimedia-keyring --allow-unauthenticated
 
     # Install ffmpeg non-free
     echo "Installing ffmpeg..."
-    apt install -y ffmpeg
+    apt-get install -y ffmpeg
 }
 
 nodejs_manage() {
@@ -3417,7 +3417,7 @@ nodejs_remove() {
         return 0
     fi
     # Purge PHP packages
-    apt purge nodejs && apt autoremove && echo "nodejs has been purged."
+    apt purge -y nodejs && apt-get autoremove -y && echo "nodejs has been purged."
 }
 
 nodejs_install() {
@@ -3452,19 +3452,19 @@ nodejs_install() {
         return 1
     }
     # Install Node.js and npm
-    apt install -y nodejs && echo "Node.js version $VERSION.x has been installed."
+    apt-get install -y nodejs && echo "Node.js version $VERSION.x has been installed."
 }
 
 sys_more_pkg_install() {
-    apt update && apt install -y build-essential software-properties-common python3 python3-pip
+    apt-get update && apt-get install -y build-essential software-properties-common python3 python3-pip
 
     echo "More Packages installation complete."
 }
 
 mount_usb_install() {
     # Update package lists and install necessary packages
-    apt update
-    apt install -y udiskie udisks2
+    apt-get update
+    apt-get install -y udiskie udisks2
 
     # Create the udiskie configuration directory
     mkdir -p /root/.config/udiskie
@@ -3525,7 +3525,7 @@ update_check() {
     local answer
 
     if ! command -v wget &>/dev/null; then
-        apt update && apt install wget
+        apt-get update && apt-get install -y wget
     fi
 
     echo "Checking for updates..."
@@ -3653,7 +3653,7 @@ main "$@"
 # zgrep 'install iptables' /var/log/dpkg.log*
 
 # dpkg-query -f '${binary:Package}\n' -W > packages_list.txt
-# xargs -a packages_list.txt apt install
+# xargs -a packages_list.txt apt-get install
 
 # dpkg --purge $(dpkg -l | awk '/^rc/ { print $2 }')
 # dpkg -l | grep '^rc' | awk '{print $2}' | xargs dpkg --purge
@@ -3730,12 +3730,12 @@ main "$@"
 ##########################################################################
 # NGINX
 # Install RTMP (first add sury's repo and add priorty)
-# apt install libnginx-mod-rtmp
+# apt-get install libnginx-mod-rtmp
 # gunzip -c /usr/share/doc/libnginx-mod-rtmp/examples/stat.xsl.gz > /var/www/stat.xsl
 
 # *** Combining Basic Authentication with Access Restriction by IP Address ***
 
-# apt install apache2-utils
+# apt-get install apache2-utils
 # htpasswd -c /etc/nginx/.htpasswd user1
 #     auth_basic           "Enter Password";
 #     auth_basic_user_file "/etc/nginx/.htpasswd";
