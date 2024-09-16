@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.3"
+servo_version="0.6.4"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2392,6 +2392,8 @@ net_manage() {
         echo "3. tailscale_manage"
         echo "4. cloudflared_manage"
         echo "5. Install SoftEther VPN"
+        echo "6. Install OpenConnect VPN Client"
+        echo "7. Add OpenConnect Client Configs"
 
         echo "0. Quit"
         echo -e "\033[0m"
@@ -2403,10 +2405,151 @@ net_manage() {
         3) tailscale_manage ;;
         4) cloudflared_manage ;;
         5) net_softether_install ;;
+        6) net_install_openconnect ;;
+        7) net_addConfig_openconnect ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+net_install_openconnect() {
+    # https://software.opensuse.org/download.html?project=home%3Abluca%3Aopenconnect%3Arelease&;package=openconnect
+    # Use local variables
+    local distro version repo_distro repo_url repo_key_url apt_list_path gpg_key_path temp_file
+
+    # Get the distribution name and version number
+    distro=$(lsb_release -is)
+    version=$(lsb_release -rs | cut -d'.' -f1)  # Get major version number
+
+    # Adjust the repository format based on the distribution
+    if [[ "$distro" == "Debian" ]]; then
+        repo_distro="Debian_${version}"
+    elif [[ "$distro" == "Ubuntu" ]]; then
+        repo_distro="Ubuntu_${version}.04"
+    else
+        echo "Unsupported distribution: $distro"
+        return 1
+    fi
+
+    # Set URLs for the repository and key
+    repo_url="http://download.opensuse.org/repositories/home:/bluca:/openconnect:/release/${repo_distro}/"
+    repo_key_url="https://download.opensuse.org/repositories/home:bluca:openconnect:release/${repo_distro}/Release.key"
+    apt_list_path="/etc/apt/sources.list.d/home:bluca:openconnect:release.list"
+    gpg_key_path="/etc/apt/trusted.gpg.d/home_bluca_openconnect_release.gpg"
+
+    # Check if the GPG key is valid
+    temp_file=$(mktemp)
+    if ! curl -fsSL "$repo_key_url" -o "$temp_file"; then
+        echo "Error: Failed to download GPG key from $repo_key_url."
+        rm -f "$temp_file"
+        return 1
+    fi
+    
+    if ! gpg --dearmor "$temp_file" > /dev/null; then
+        echo "Error: Failed to process GPG key."
+        rm -f "$temp_file"
+        return 1
+    fi
+    
+    rm -f "$temp_file"
+
+    # Add the OpenConnect repository
+    echo "deb $repo_url /" | tee "$apt_list_path" > /dev/null
+
+    # Add the repository key
+    if ! curl -fsSL "$repo_key_url" | gpg --dearmor | tee "$gpg_key_path" > /dev/null; then
+        echo "Error: Failed to add the GPG key."
+        return 1
+    fi
+
+    # Update package list and install OpenConnect
+    if ! apt-get update && apt-get install -y openconnect; then
+        echo "Error: Failed to update and install openconnect."
+        return 1
+    fi
+
+    echo "OpenConnect installed successfully."
+    return 0
+}
+
+net_addConfig_openconnect() {
+    # Local variables to avoid global scope issues
+    local VPN_SERVER CERT_PATH CERT_PASSWORD SERVICE_NAME SERVICE_FILE
+
+    echo "Please provide the following details for setting up the OpenConnect VPN:"
+
+    read -rp "Service name (e.g., my-vpn): " SERVICE_NAME
+    if [[ -z "$SERVICE_NAME" ]]; then
+        echo "Error: Service name is required." >&2
+        return 1
+    fi
+    
+    # Service file location
+    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+
+    if [[ -f "$SERVICE_FILE" ]]; then
+        echo "Error: The SERVICE file already exists." >&2
+        return 1
+    fi
+
+    # Use -rp for concise input with prompt, validate immediately after
+    read -rp "VPN Server URL (e.g., https://Server:port): " VPN_SERVER
+    if [[ -z "$VPN_SERVER" ]]; then
+        echo "Error: VPN server URL is required." >&2
+        return 1
+    fi
+
+    read -rp "Path to .p12 certificate file: " CERT_PATH
+    if [[ ! -f "$CERT_PATH" ]]; then
+        echo "Error: The .p12 certificate file does not exist at the specified path." >&2
+        return 1
+    fi
+
+    read -rsp "Password for the .p12 certificate: " CERT_PASSWORD
+    echo ""
+    if [[ -z "$CERT_PASSWORD" ]]; then
+        echo "Error: Certificate password is required." >&2
+        return 1
+    fi
+
+
+    echo "Creating systemd service for OpenConnect VPN..."
+
+    # Create systemd service file, handle error properly
+    cat > "${SERVICE_FILE}" <<EOL || { echo "Error: Failed to create service file." >&2; return 1; }
+[Unit]
+Description=OpenConnect VPN Service
+After=network.target
+
+[Service]
+ExecStart=/bin/echo "${CERT_PASSWORD}" | /usr/sbin/openconnect --passwd-on-stdin -c "${CERT_PATH}" ${VPN_SERVER}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+    # Validate that service file creation succeeded
+    if [[ ! -f "$SERVICE_FILE" ]]; then
+        echo "Error: Service file could not be created." >&2
+        return 1
+    fi
+
+    echo "Systemd service created at: ${SERVICE_FILE}"
+
+    # Reload systemd to recognize new service, error handling
+    systemctl daemon-reload || { echo "Error: Failed to reload systemd." >&2; return 1; }
+
+    # Enable the service to start on boot, with proper error handling
+    systemctl enable "${SERVICE_NAME}.service" || { echo "Error: Failed to enable VPN service." >&2; return 1; }
+
+    # Start the VPN service immediately, with proper error handling
+    systemctl start "${SERVICE_NAME}.service" || { echo "Error: Failed to start VPN service." >&2; return 1; }
+
+    echo "The service '${SERVICE_NAME}' will now automatically start at boot and reconnect on failure."
+
 }
 
 # To be developed and tested (not working)
@@ -3134,6 +3277,8 @@ sys_SSH_install() {
     # Allow only specific users or groups to log in via SSH (replace with your username)
     # echo "AllowUsers your_username" >> "$sshd_config"
 
+    mv "/etc/ssh/sshd_config.d/50-cloud-init.conf" "/etc/ssh/sshd_config.d/50-cloud-init.conf.disabled" > /dev/null
+
     # Restart SSH service (for changes to take effect immediately)
     systemctl restart sshd
 
@@ -3327,21 +3472,23 @@ media_manage() {
         echo "1. Install FFMPEG"
         echo "2. Install go-chromecast"
         echo "3. Install catt (Cast All The Things) using pipx for the current user"
+        echo "4. Install mkvtoolnix"
         echo "0. Quit"
 
         read -rp "Enter your choice: " choice
 
         case $choice in
-        1) ffmpeg_install ;;
-        2) go_chromecast_install ;;
+        1) media_ffmpeg_install ;;
+        2) media_go_chromecast_install ;;
         3) pipx install catt ;;
+        4) media_mkvtoolnix_install ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
 }
 
-go_chromecast_install() {
+media_go_chromecast_install() {
     local arch
     case "$(get_arch)" in
     amd64) arch="amd64" ;;
@@ -3362,7 +3509,7 @@ go_chromecast_install() {
 
 }
 
-ffmpeg_install() {
+media_ffmpeg_install() {
     local confirm
     if command -v ffmpeg >/dev/null 2>&1; then
         read -rp "FFMPEG is already installed, are you sure you want to continue? (y/n)" confirm
@@ -3386,6 +3533,12 @@ ffmpeg_install() {
     # Install ffmpeg non-free
     echo "Installing ffmpeg..."
     apt-get install -y ffmpeg
+}
+
+media_mkvtoolnix_install() {
+    wget -O /usr/share/keyrings/gpg-pub-moritzbunkus.gpg https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg || { echo "Failed to add GPG key" && return 1; }
+    echo "deb [signed-by=/usr/share/keyrings/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/debian/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/mkvtoolnix.list
+    apt-get install -y mkvtoolnix
 }
 
 nodejs_manage() {
@@ -3769,11 +3922,23 @@ main "$@"
 # echo -n MTIz | openssl base64 -d -A
 # echo -n MTIz | openssl enc -base64 -d -A
 ##########################################################################
-# Work with USB Devices
+# Work with Disks & USB Devices
 # List: 
 # blkid
 # lsblk
 # lsblk -o name,label,size,type,FSROOTS,FSTYPE,FSSIZE,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINT
+
+apt-get install -y acl
+mkdir -p /mnt/media
+chown root:media /mnt/media
+chmod 2775 /mnt/media
+setfacl -d -m g::rwx /mnt/media
+mkfs.ext4 -m 0 -i 325040 -T big -L 'media' /dev/sdb && mount -o discard,defaults /dev/sdb /mnt/media
+echo "LABEL=media /mnt/media ext4 discard,nofail,defaults 0 0" | tee -a /etc/fstab
+umount /mnt/media
+
+tune2fs -m 0 /dev/sdb # change reserved space (not needed if -m is used in mkfs.ext4)
+findmnt /mnt/media
 ##########################################################################
 # MariaDB
 # DROP USER 'username'@'localhost';
