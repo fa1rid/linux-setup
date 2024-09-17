@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.4"
+servo_version="0.6.5"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2520,10 +2520,12 @@ net_addConfig_openconnect() {
     cat > "${SERVICE_FILE}" <<EOL || { echo "Error: Failed to create service file." >&2; return 1; }
 [Unit]
 Description=OpenConnect VPN Service
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-ExecStart=/bin/echo "${CERT_PASSWORD}" | /usr/sbin/openconnect --passwd-on-stdin -c "${CERT_PATH}" ${VPN_SERVER}
+ExecStart=/bin/bash -c '/bin/echo -n "${CERT_PASSWORD}" | /usr/sbin/openconnect --passwd-on-stdin -c "${CERT_PATH}" ${VPN_SERVER}'
+KillSignal=SIGINT
 Restart=always
 RestartSec=10
 
@@ -2550,6 +2552,8 @@ EOL
 
     echo "The service '${SERVICE_NAME}' will now automatically start at boot and reconnect on failure."
 
+    # Bonus, monitor connection and restart service using cron
+    # * * * * * ping -c 10 10.10.10.1 > /dev/null || systemctl restart "${SERVICE_NAME}.service"
 }
 
 # To be developed and tested (not working)
