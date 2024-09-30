@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.5"
+servo_version="0.6.6"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2394,6 +2394,7 @@ net_manage() {
         echo "5. Install SoftEther VPN"
         echo "6. Install OpenConnect VPN Client"
         echo "7. Add OpenConnect Client Configs"
+        echo "7. Install and configure Squid as HTTP/S proxy"
 
         echo "0. Quit"
         echo -e "\033[0m"
@@ -2407,11 +2408,102 @@ net_manage() {
         5) net_softether_install ;;
         6) net_install_openconnect ;;
         7) net_addConfig_openconnect ;;
+        8) setup_squid_https_proxy ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
 }
+
+#!/bin/bash
+
+# Function to install and configure Squid as HTTP/S proxy
+setup_squid_https_proxy() {
+    # Local variables
+    local squid_conf="/etc/squid/squid.conf"
+    local squid_service="squid"
+    local http_port=3128
+    local https_port=3129
+
+    # Check if user is root
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "Error: This script must be run as root." >&2
+        return 1
+    fi
+
+    # Update package list
+    echo "Updating package list..."
+    if ! apt-get update -qq; then
+        echo "Error: Failed to update package list." >&2
+        return 1
+    fi
+
+    # Install Squid if not already installed
+    echo "Installing Squid..."
+    if ! apt-get install -y squid; then
+        echo "Error: Failed to install Squid." >&2
+        return 1
+    fi
+
+    # Backup the default squid configuration
+    if [ ! -f "${squid_conf}.bak" ]; then
+        echo "Backing up default Squid configuration..."
+        if ! cp "${squid_conf}" "${squid_conf}.bak"; then
+            echo "Error: Failed to backup Squid configuration." >&2
+            return 1
+        fi
+    fi
+
+    # Configure Squid
+    echo "Configuring Squid as HTTP/S proxy..."
+
+    # Allow HTTP and HTTPS ports
+    cat > "${squid_conf}" <<EOF
+# Squid proxy configuration
+http_port ${http_port}
+https_port ${https_port} cert=/etc/squid/ssl_cert/squid.pem key=/etc/squid/ssl_cert/squid.key
+
+# Allow access from all networks (for production, restrict to specific IP ranges)
+acl localnet src 0.0.0.0/0
+http_access allow localnet
+http_access deny all
+EOF
+
+    # Create SSL certificates if not present
+    if [ ! -d "/etc/squid/ssl_cert" ]; then
+        mkdir -p /etc/squid/ssl_cert
+    fi
+
+    if [ ! -f "/etc/squid/ssl_cert/squid.pem" ] || [ ! -f "/etc/squid/ssl_cert/squid.key" ]; then
+        echo "Generating SSL certificates for HTTPS support..."
+        openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/squid/ssl_cert/squid.key -out /etc/squid/ssl_cert/squid.pem -subj "/C=US/ST=State/L=City/O=Organization/OU=Department/CN=example.com"
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to generate SSL certificates." >&2
+            return 1
+        fi
+    fi
+
+    # Set proper permissions for the SSL certificates
+    chown -R proxy:proxy /etc/squid/ssl_cert
+    chmod -R 700 /etc/squid/ssl_cert
+
+    # Restart Squid to apply changes
+    echo "Restarting Squid service..."
+    if ! systemctl restart "${squid_service}"; then
+        echo "Error: Failed to restart Squid service." >&2
+        return 1
+    fi
+
+    # Enable Squid to start on boot
+    if ! systemctl enable "${squid_service}"; then
+        echo "Error: Failed to enable Squid service on boot." >&2
+        return 1
+    fi
+
+    echo "Squid HTTP/S proxy setup completed successfully."
+    return 0
+}
+
 
 net_install_openconnect() {
     # https://software.opensuse.org/download.html?project=home%3Abluca%3Aopenconnect%3Arelease&;package=openconnect
@@ -3477,6 +3569,8 @@ media_manage() {
         echo "2. Install go-chromecast"
         echo "3. Install catt (Cast All The Things) using pipx for the current user"
         echo "4. Install mkvtoolnix"
+        echo "5. Install GG Bot Upload Assistant in the current dir"
+        # echo "5. Install mediainfo"
         echo "0. Quit"
 
         read -rp "Enter your choice: " choice
@@ -3486,10 +3580,17 @@ media_manage() {
         2) media_go_chromecast_install ;;
         3) pipx install catt ;;
         4) media_mkvtoolnix_install ;;
+        5) gg_bot_upload_assistant_setup ;;
+        # 5) media_mediainfo_install ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+media_mediainfo_install(){
+    # Only for x86
+    wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-24_all.deb && dpkg -i repo-mediaarea_1.0-24_all.deb && apt-get update
 }
 
 media_go_chromecast_install() {
@@ -3544,6 +3645,92 @@ media_mkvtoolnix_install() {
     echo "deb [signed-by=/usr/share/keyrings/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/debian/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/mkvtoolnix.list
     apt-get install -y mkvtoolnix
 }
+
+gg_bot_upload_assistant_setup() {
+    local REPO_URL="https://gitlab.com/NoobMaster669/gg-bot-upload-assistant.git"
+    local PROJECT_DIR="gg-bot-upload-assistant"
+    local TAG="3.1.5"
+    local VENV_DIR="venv"
+    local REQUIREMENTS_FILE="requirements/requirements.txt"
+    local CONFIG_SAMPLE="samples/assistant/config.env"
+    local CONFIG_FILE="config.env"
+    local LOG_FILE="install_log.txt"
+    
+    # Log function
+    local log
+    log() {
+        echo "$(date +"%Y-%m-%d %T") - $1" | tee -a "$LOG_FILE"
+    }
+
+    # Error handling function
+    local handle_error
+    handle_error() {
+        log "ERROR: $1"
+        exit 1
+    }
+
+    # Update and upgrade system silently and unattended
+    log "Updating system packages..."
+    apt-get update -y && apt-get upgrade -y || handle_error "Failed to update system."
+
+    # Install necessary system packages for Python, Git, and dependencies
+    log "Installing required system packages..."
+    apt-get install -y python3 python3-pip python3-venv python3-dev build-essential git || handle_error "Failed to install required packages."
+
+    # Clone the repository if it doesn't exist
+    if [ -d "$PROJECT_DIR" ]; then
+        log "Project directory already exists. Skipping cloning."
+    else
+        log "Cloning repository..."
+        git clone "$REPO_URL" || handle_error "Failed to clone repository."
+    fi
+
+    cd "$PROJECT_DIR" || handle_error "Failed to enter project directory."
+
+    # Checkout the specific tag
+    log "Checking out tag $TAG..."
+    git checkout tags/"$TAG" || handle_error "Failed to checkout tag $TAG."
+
+    # Set up Python virtual environment
+    log "Setting up Python virtual environment..."
+    python3 -m venv "$VENV_DIR" || handle_error "Failed to create virtual environment."
+
+    # Activate virtual environment
+    log "Activating virtual environment..."
+    source "$VENV_DIR/bin/activate" || handle_error "Failed to activate virtual environment."
+
+    # Upgrade pip and install wheel for modern package installations
+    log "Upgrading pip and installing wheel..."
+    pip install --upgrade pip wheel || handle_error "Failed to upgrade pip or install wheel."
+
+    # Install Python dependencies
+    log "Installing Python dependencies from $REQUIREMENTS_FILE..."
+    pip install -r "$REQUIREMENTS_FILE" || handle_error "Failed to install dependencies."
+
+    # Make the main script executable
+    log "Making auto_upload.py executable..."
+    chmod u+x auto_upload.py || handle_error "Failed to make auto_upload.py executable."
+
+    # Set up the configuration file if it does not exist
+    if [ -f "$CONFIG_FILE" ]; then
+        log "Configuration file $CONFIG_FILE already exists. Skipping copying."
+    else
+        log "Copying configuration sample to project root..."
+        cp "$CONFIG_SAMPLE" "$CONFIG_FILE" || handle_error "Failed to copy configuration file."
+        log "Please edit $CONFIG_FILE to fill out required values."
+    fi
+
+    # Completion message
+    log "Setup completed successfully. You can now run the script using:"
+    log "python3 auto_upload.py -t <TRACKERS> -p \"<FILE_OR_FOLDER_TO_BE_UPLOADED>\" [OPTIONAL ARGUMENTS]"
+
+    # Deactivate the virtual environment
+    deactivate
+    log "Virtual environment deactivated."
+
+    log "Installation process completed."
+}
+
 
 nodejs_manage() {
     while true; do
@@ -3879,10 +4066,10 @@ main "$@"
 # dpkg-reconfigure keyboard-configuration
 # dpkg-reconfigure locale
 ##########################################################################
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.ssh/id_ed25519.pub" -e "ssh -p 4444" "root@${ip):/root/.ssh/"
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/cloudflare/" -e "ssh -p 4444" "root@${ip):/etc/cloudflare/"
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.config/rsnapshot/" -e "ssh -p 4444" "root@${ip):/root/.config/rsnapshot/"
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/" -e "ssh -p 4444" "root@${ip):/etc/letsencrypt/"
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.ssh/id_ed25519.pub" -e "ssh -p 4444" "root@${ip}:/root/.ssh/"
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/cloudflare/" -e "ssh -p 4444" "root@${ip}:/etc/cloudflare/"
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.config/rsnapshot/" -e "ssh -p 4444" "root@${ip}:/root/.config/rsnapshot/"
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/" -e "ssh -p 4444" "root@${ip}:/etc/letsencrypt/"
 # rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/var/www/solaris/solarissolutions.co/" -e "ssh -p 4444" "root@${ip):/var/www/solaris/solarissolutions.co/"
 ##########################################################################
 # NGINX
