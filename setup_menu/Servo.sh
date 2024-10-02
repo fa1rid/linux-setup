@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.6"
+servo_version="0.6.7"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -4119,18 +4119,32 @@ main "$@"
 # lsblk
 # lsblk -o name,label,size,type,FSROOTS,FSTYPE,FSSIZE,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINT
 
-apt-get install -y acl
-mkdir -p /mnt/media
-chown root:media /mnt/media
-chmod 2775 /mnt/media
-setfacl -d -m g::rwx /mnt/media
-mkfs.ext4 -m 0 -i 325040 -T big -L 'media' /dev/sdb && mount -o discard,defaults /dev/sdb /mnt/media
-echo "LABEL=media /mnt/media ext4 discard,nofail,defaults 0 0" | tee -a /etc/fstab
-umount /mnt/media
+# apt-get install -y acl
+# mkdir -p /mnt/media
+# chown root:media /mnt/media
+# chmod 2775 /mnt/media
+# setfacl -d -m g::rwx /mnt/media
+# mkfs.ext4 -m 0 -i 325040 -T big -L 'media' /dev/sdb && mount -o discard,defaults /dev/sdb /mnt/media
+# echo "LABEL=media /mnt/media ext4 discard,nofail,defaults 0 0" | tee -a /etc/fstab
+# umount /mnt/media
 
-tune2fs -m 0 /dev/sdb # change reserved space (not needed if -m is used in mkfs.ext4)
-findmnt /mnt/media
+# tune2fs -m 0 /dev/sdb # change reserved space (not needed if -m is used in mkfs.ext4)
+# findmnt /mnt/media
 ##########################################################################
+# RPI WiFi #
+# # Disable the specific connection:
+# nmcli connection down preconfigured
+
+# # Re-enable the specific connection:
+# nmcli connection up preconfigured
+
+# # Turn off WiFi entirely:
+# nmcli radio wifi off
+
+# # Turn on WiFi entirely:
+# nmcli radio wifi on
+##########################################################################
+
 # MariaDB
 # DROP USER 'username'@'localhost';
 # DROP DATABASE database_name;
