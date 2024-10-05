@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.7"
+servo_version="0.6.8"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2114,7 +2114,7 @@ certbot_certificate_get() {
     read -rp "Press Enter to start..."
 
     # Request the certificate (For debugging add: --dry-run -vvv)
-    if certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 60 --dns-cloudflare-credentials "${selected_config}" ${account}; then
+    if certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 20 --dns-cloudflare-credentials "${selected_config}" ${account}; then
         mkdir -p /etc/ssl
         ln -s "/etc/letsencrypt/live/${domain_name}" /etc/ssl/
     fi
@@ -3985,8 +3985,10 @@ main() {
 }
 
 main "$@"
-##########################################################################
+
+##########################
 # APT
+##########################
 # apt policy package # to show available versions and their repos
 # apt list --installed
 # dpkg -s package_name
@@ -4012,8 +4014,10 @@ main "$@"
 # else
 #     echo "$package_name is not installed."
 # fi
-##########################################################################
+
+##########################
 # Wordpress
+##########################
 # wp user update admin --user_pass=newpassword
 # wp plugin list
 # wp plugin deactivate --all
@@ -4026,23 +4030,29 @@ main "$@"
 # define('WP_DEBUG_LOG', true);
 # define('WP_DEBUG_DISPLAY', false);
 # @ini_set('display_errors',0);
-##########################################################################
-# Using grep
+
+##########################
+# grep
+##########################
 # grep -- (`--` tells grep that there are no more options following it)
 # -E,    PATTERNS are extended regular expressions
 # -F,    PATTERNS are strings
 # -w,    match only whole words
 # -x,    match only whole lines
 # -v,    select non-matching lines
-##########################################################################
-# Using sudo
+
+##########################
+# sudo
+##########################
 # useradd -m -s /bin/bash rootuser
 # passwd rootuser
 # usermod -aG sudo rootuser
 # visudo
 # rootuser ALL=(ALL) NOPASSWD: ALL
-##########################################################################
+
+##########################
 # Networking
+##########################
 # iptables-save > /etc/iptables/rules.v4
 # ip rule add from 10.5.4.0/24 table 100
 # ip route add default via 10.0.0.1 proto static table 100
@@ -4054,9 +4064,10 @@ main "$@"
 # iptables -t nat -I PREROUTING -i ${iface} -p tcp --dport ${PORT} -j DNAT --to-destination ${CLIENT_IP}:${PORT}
 # iptables -t nat -I PREROUTING -i ${iface} -p udp --dport ${PORT} -j DNAT --to-destination ${CLIENT_IP}:${PORT}
 # iptables -I FORWARD -d ${CLIENT_IP} --dport ${PORT} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
-######
-##########################################################################
+
+##########################
 # Change System local/keyboard
+##########################
 # localectl # check locale
 # nano /etc/default/keyboard
 # nano /etc/default/locale
@@ -4065,14 +4076,20 @@ main "$@"
 # ----------OR----------
 # dpkg-reconfigure keyboard-configuration
 # dpkg-reconfigure locale
-##########################################################################
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.ssh/id_ed25519.pub" -e "ssh -p 4444" "root@${ip}:/root/.ssh/"
+
+##########################
+# Rsync
+##########################
+## Commands to Migrate Solaris Server
+# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.ssh/id_ed25519.pub" "/root/.ssh/id_ed25519" -e "ssh -p 4444" "root@${ip}:/root/.ssh/"
 # rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/cloudflare/" -e "ssh -p 4444" "root@${ip}:/etc/cloudflare/"
 # rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.config/rsnapshot/" -e "ssh -p 4444" "root@${ip}:/root/.config/rsnapshot/"
 # rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/" -e "ssh -p 4444" "root@${ip}:/etc/letsencrypt/"
 # rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/var/www/solaris/solarissolutions.co/" -e "ssh -p 4444" "root@${ip):/var/www/solaris/solarissolutions.co/"
-##########################################################################
+
+##########################
 # NGINX
+##########################
 # Install RTMP (first add sury's repo and add priorty)
 # apt-get install libnginx-mod-rtmp
 # gunzip -c /usr/share/doc/libnginx-mod-rtmp/examples/stat.xsl.gz > /var/www/stat.xsl
@@ -4089,32 +4106,36 @@ main "$@"
 # allow 192.168.1.1/24;
 # allow 127.0.0.1;
 # deny  all;
-##########################################################################
-# Install VMware tools
-# open-vm-tools
-##########################################################################
-# string to hex
+
+##########################
+# Install VMware tools package: open-vm-tools
+##########################
+
+##########################
+# base64/hex
+##########################
 # echo -n 123 | xxd -p | tr -d '\n'
 # echo -n 123 | od -An -t x1 | tr -d ' \n'
 # echo -n 123 | hexdump --no-squeezing --format '/1 "%02x"'
 
-# hex to string
+## hex to string
 # echo -n 313233 | sed 's/\([0-9A-F]\{2\}\)/\\\\\\x\1/gI' | xargs printf
 # echo -n 313233 | xxd -r -p
 # echo -n 313233 | perl -pe 's/(..)/chr(hex($1))/ge'
 
-# string to base64
+## string to base64
 # echo -n 123 | base64
 # echo -n 123 | openssl enc -base64 -A
 # echo -n 123 | openssl base64 -A
 
-# base64 to string
+## base64 to string
 # echo -n MTIz | base64 -d
 # echo -n MTIz | openssl base64 -d -A
 # echo -n MTIz | openssl enc -base64 -d -A
-##########################################################################
-# Work with Disks & USB Devices
-# List: 
+
+##########################
+# Disks & USB Devices
+##########################
 # blkid
 # lsblk
 # lsblk -o name,label,size,type,FSROOTS,FSTYPE,FSSIZE,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINT
@@ -4130,36 +4151,39 @@ main "$@"
 
 # tune2fs -m 0 /dev/sdb # change reserved space (not needed if -m is used in mkfs.ext4)
 # findmnt /mnt/media
-##########################################################################
-# RPI WiFi #
-# # Disable the specific connection:
+
+##########################
+# RPI WiFi
+##########################
+## Disable the specific connection:
 # nmcli connection down preconfigured
 
-# # Re-enable the specific connection:
+## Re-enable the specific connection:
 # nmcli connection up preconfigured
 
-# # Turn off WiFi entirely:
+## Turn off WiFi entirely:
 # nmcli radio wifi off
 
-# # Turn on WiFi entirely:
+## Turn on WiFi entirely:
 # nmcli radio wifi on
-##########################################################################
 
+##########################
 # MariaDB
+##########################
 # DROP USER 'username'@'localhost';
 # DROP DATABASE database_name;
-##########################################################################
-# Certbot
-# certbot certificates # List Certificates
-# Output Example:
-# Saving debug log to /var/log/letsencrypt/letsencrypt.log
-# -------------------------------------------------------------------------------
-# Found the following certs:
-#   Certificate Name: example.com
-#     Domains: example.com www.example.com
-#     Expiry Date: 2024-09-15 15:01:49+00:00 (VALID: 47 days)
-#     Certificate Path: /etc/letsencrypt/live/example.com/fullchain.pem
-#     Private Key Path: /etc/letsencrypt/live/example.com/privkey.pem
-# -------------------------------------------------------------------------------
 
-# certbot renew --cert-name example.com # Rrenew cert
+##########################
+# Shares
+##########################
+## SMB
+# //192.168.20.15/M /mnt/M cifs credentials=/etc/smb_credentials,iocharset=utf8,nofail,noauto,x-systemd.automount,x-systemd.mount-timeout=30,_netdev,gid=media,file_mode=0660,dir_mode=0770 0 0
+
+# cat >"/etc/smb_credentials" <<EOF
+# username=user
+# password=pass
+# EOF
+
+##########################
+# 
+##########################
