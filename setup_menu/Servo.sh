@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.8"
+servo_version="0.6.9"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2739,6 +2739,7 @@ Restart=on-failure
 # Uncomment the below after creating tap_vpn bridge device
 ExecStartPost=/usr/bin/sleep 1
 ExecStartPost=/sbin/ip addr add 192.168.30.1/24 brd + dev tap_vpn
+ExecStartPost=/sbin/ip addr add 192.168.31.1/24 brd + dev tap_uae
 
 # Hardening
 PrivateTmp=yes
@@ -3778,13 +3779,13 @@ nodejs_install() {
     echo "Available Node.js versions:"
     echo "1. Node 18x"
     echo "2. Node 20x"
-    echo "3. Node 21x"
+    echo "3. Node 22x"
     # Prompt user for version choice
     read -rp "Enter the number corresponding to the Node.js version you want to install: " choice
     case $choice in
     1) VERSION="18" ;;
     2) VERSION="20" ;;
-    3) VERSION="21" ;;
+    3) VERSION="22" ;;
     *)
         echo "Invalid choice!"
         nodejs_install
@@ -4042,13 +4043,16 @@ main "$@"
 # -v,    select non-matching lines
 
 ##########################
-# sudo
+# Users & sudo
 ##########################
 # useradd -m -s /bin/bash rootuser
 # passwd rootuser
 # usermod -aG sudo rootuser
 # visudo
 # rootuser ALL=(ALL) NOPASSWD: ALL
+
+# useradd -N -m -s "/usr/sbin/nologin" username
+# usermod -s "/usr/bin/bash" username
 
 ##########################
 # Networking
