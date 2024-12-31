@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.6.9"
+servo_version="0.7.0"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3732,6 +3732,303 @@ gg_bot_upload_assistant_setup() {
     log "Installation process completed."
 }
 
+rr_manage() {
+    while true; do
+        echo "Choose an option:"
+        echo "1. Install Autobrr"
+        echo "2. Upgrade Autobrr"
+        echo "3. Manage qBittorrent"
+        echo "0. Quit"
+
+        read -rp "Enter your choice: " choice
+
+        case $choice in
+        1) autobrr_install ;;
+        2) autobrr_upgrade ;;
+        3) qBittorrent_manage ;;
+        0) return 0 ;;
+        *) echo "Invalid choice." ;;
+        esac
+    done
+}
+
+autobrr_install() {
+    mkdir -p /opt/autobrr/config
+    wget $(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4) && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
+    cat << EOF | tee /etc/systemd/system/autobrr.service > /dev/null
+[Unit]
+Description=autobrr service
+After=syslog.target network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/opt/autobrr/autobrr --config=/opt/autobrr/config/
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl enable --now autobrr.service && systemctl status autobrr.service
+}
+
+autobrr_upgrade() {
+    systemctl stop autobrr.service
+    wget $(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4) && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
+    systemctl start autobrr.service && systemctl status autobrr.service
+}
+
+qBittorrent_manage(){
+# Function to display error message and exit
+error_exit() {
+    echo "Error: $1" >&2
+    exit 1
+}
+
+# Create Systemd service for current user
+local service_dir="$HOME/.config/systemd/user"
+local service_file="/etc/systemd/system/qbittorrent.service"
+local install_dir="/opt/qBittorrent"
+local config_dir="/opt/qBittorrent/qBittorrent/config"
+
+# Function to hash the password using PBKDF2
+create_pass() {
+    local pass="$1"
+    local salt_b64=$(openssl rand -base64 16)
+    local salt_hex=$(echo -n "$salt_b64" | openssl base64 -d -A | od -An -t x1 | tr -d ' ')
+    local hash_b64=$(openssl kdf -binary -keylen 64 -kdfopt digest:SHA512 -kdfopt pass:"${pass}" -kdfopt hexsalt:${salt_hex} -kdfopt iter:100000 PBKDF2 | openssl base64 -A)
+    local passLine="\"@ByteArray($salt_b64:$hash_b64)\""
+    echo "$passLine"
+}
+upgrade_qbittorrent() {
+    local download_url
+    local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/4.6.7/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
+    local arch=$(uname -m)
+    case "$arch" in
+    x86_64)
+        download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
+        ;;
+    aarch64)
+        download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
+        ;;
+    *)
+        error_exit "Unsupported architecture: $arch"
+        ;;
+    esac
+
+    # Download qBittorrent
+    wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
+    chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
+    chown qbittorrent:media -R "$install_dir"
+    systemctl restart qbittorrent.service && systemctl status qbittorrent.service
+}
+# Function to install qBittorrent
+install_qbittorrent() {
+    local choice
+    local download_url
+    local arch
+    echo "1. Latest"
+    echo "2. v4 latest"
+    read -p "Which version you want to install? " choice
+    while true; do
+        case "$choice" in
+        1)
+            # Get latest version
+            local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/4.6.7/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
+            return 0
+            ;;
+        2)
+            local version="release-4.6.7_v1.2.19"
+            return 0
+            ;;
+        *)
+            echo "Invalid choice."
+            ;;
+        esac
+    done
+
+    # Download latest version that matches current system arch
+    arch=$(uname -m)
+    case "$arch" in
+    x86_64)
+        download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
+        ;;
+    aarch64)
+        download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
+        ;;
+    *)
+        error_exit "Unsupported architecture: $arch"
+        ;;
+    esac
+
+    if ! getent group "media" >/dev/null 2>&1; then
+        groupadd "media"
+    fi
+    if ! id "qbittorrent" &>/dev/null; then
+        useradd -Nm -g media -s /bin/bash qbittorrent
+    fi
+    mkdir -p "$config_dir"
+
+    # Download qBittorrent
+    wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
+    chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
+
+    # Ask for port and validate
+    read -p "Enter port for qBittorrent WebUI: " port
+    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
+        error_exit "Port must be a valid number."
+    fi
+
+    # Ask for username and password
+    read -p "Enter username for qBittorrent WebUI: " username
+    read -sp "Enter password for qBittorrent WebUI: " password
+    echo # Newline after password input
+
+    # Hash the password
+    password_hash=$(create_pass "$password")
+
+    # Create Config File
+    cat <<EOF >"$config_dir/qBittorrent.conf"
+[LegalNotice]
+Accepted=true
+
+[Preferences]
+WebUI\Port=$port
+WebUI\Username=$username
+WebUI\Password_PBKDF2=$password_hash
+EOF
+
+    # Create Systemd service for current user
+    # mkdir -p "$service_dir" || error_exit "Failed to create systemd user service directory."
+    cat <<EOF >"$service_file"
+[Unit]
+Description=qBittorrent-nox service
+Wants=network-online.target
+After=network-online.target nss-lookup.target
+
+[Service]
+Type=exec
+PrivateTmp=false
+ExecStart="$install_dir/qbittorrent-nox" --profile="$install_dir"
+Restart=on-failure
+SyslogIdentifier=qbittorrent-nox
+User=qbittorrent
+Group=media
+
+[Install]
+WantedBy=default.target
+EOF
+
+    chown qbittorrent:media -R "$install_dir"
+
+    # Reload systemctl daemon
+    systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
+
+    # Enable and start service
+    systemctl enable --now qbittorrent.service && systemctl status qbittorrent.service || error_exit "Failed to enable and start the service."
+
+    # Check service status
+    # systemctl --user status qbittorrent
+    
+
+    # Keep services running always
+    # loginctl enable-linger
+    # Check if linger is enabled:  loginctl show-user username | grep Linger
+
+    echo "qBittorrent installed and configured successfully!"
+
+    echo "Nginx proxy configuration:
+location /qbittorrent/ {
+    proxy_pass               http://127.0.0.1:$port/;
+    proxy_http_version       1.1;
+    proxy_set_header         X-Forwarded-Host        \$http_host;
+    http2_push_preload on; # Enable http2 push
+}"
+}
+
+uninstall_qbittorrent() {
+    read -rp "Are you sure you want to uninstall? (y/n)" confirm
+    if [[ $confirm != "y" ]]; then
+        echo "Aborting."
+        return 0
+    fi
+    systemctl stop qbittorrent.service
+    rm "$service_file"
+    systemctl daemon-reload
+    rm -rf "$install_dir"
+
+}
+
+config_set() {
+    local key="$1"
+    local val="$2"
+    local file="$3"
+    awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]*.*", key val); print}' "$file" | awk '{if (NF > 0) {if (!seen[$0]++) print} else {print}}' >"${file}.tmp" && mv "${file}.tmp" "$file"
+}
+
+# Function to reset username and password for the web UI
+reset_username_password() {
+    # Ask for new username and password
+    read -p "Enter new username for qBittorrent WebUI: " new_username
+    read -sp "Enter new password for qBittorrent WebUI: " new_password
+    echo # Newline after password input
+
+    # Hash the password
+    new_password_hash=$(create_pass "$new_password")
+    echo
+    echo "New Hash: $new_password_hash"
+    echo
+
+    # Update Config File with new username and password
+    if [[ -f "$config_dir/qBittorrent.conf" ]]; then
+
+        systemctl stop qbittorrent.service || error_exit "Failed to stop qbittorrent.service"
+
+        config_set 'WebUI\\\\Username=' "$new_username" "$config_dir/qBittorrent.conf" || error_exit "Failed to find Username line"
+        config_set 'WebUI\\\\Password_PBKDF2=' "$new_password_hash" "$config_dir/qBittorrent.conf" || error_exit "Failed to find Password line"
+        echo "Username and password updated successfully!"
+
+        echo "Value from config file:"
+        cat "$config_dir/qBittorrent.conf" | grep "Password_PBKDF2"
+
+        systemctl start qbittorrent.service || error_exit "Failed to start qbittorrent.service"
+
+    else
+        error_exit "qBittorrent configuration file not found. Please install qBittorrent first."
+    fi
+}
+
+# Menu
+echo "Welcome to qBittorrent Setup"
+echo "1. Install qBittorrent"
+echo "2. Upgrade qBittorrent"
+echo "3. Uninstall qBittorrent"
+echo "4. Reset username and password for the web UI"
+read -p "Enter your choice: " choice
+
+case "$choice" in
+1)
+    install_qbittorrent
+    ;;
+2)
+    upgrade_qbittorrent
+    ;;
+3)
+    uninstall_qbittorrent
+    ;;
+4)
+    reset_username_password
+    ;;
+*)
+    error_exit "Invalid choice. Exiting."
+    ;;
+esac
+}
+
+qBittorrent_upgrade(){
+    
+}
+
 
 nodejs_manage() {
     while true; do
@@ -3936,6 +4233,7 @@ main() {
             "nodejs_manage              | Node.js"
             "media_manage               | Media"
             "perm_set                   | Files/Folders Permissions"
+            "rr_manage                    | Manage *rr apps"
         )
         # Alternative way of spliting menu
         # awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//'
