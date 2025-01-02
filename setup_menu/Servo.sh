@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.1"
+servo_version="0.7.2"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -19,7 +19,7 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
         # return
         _init_completion -n = || return
 
-        opts="compress decompress db_backup db_restore perm_set gen_pass rsync_push_letsencrypt"
+        opts="compress decompress db_backup db_restore perm_set gen_pass rsync_push_letsencrypt rsync_push_ssl"
         if ((cword == 1)); then
             COMPREPLY=($(compgen -W "$opts" -- "$cur"))
             return
@@ -2157,6 +2157,7 @@ rsync_manage() {
         case $choice in
         1) rsync_install ;;
         2) rsync_push_letsencrypt ;;
+        3) rsync_push_ssl ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -2210,6 +2211,31 @@ rsync_push_letsencrypt() {
     fi
     rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
     echo "Log written to '/var/log/rsync/letsencrypt.log'"
+}
+
+rsync_push_ssl() {
+    local path="$1"
+    if [[ -z "$path" ]]; then
+        path=$(select_from_dir "/etc/ssl/")
+    fi
+    local domain="${path##*/}"
+    local host="$2"
+    local port="$3"
+    local user="$4"
+    if [[ -z "$host" ]]; then
+        read -rp "Enter host or IP: " host
+    fi
+    if [[ -z "$port" ]]; then
+        read -rp "Enter port: " port
+    fi
+    if [[ -z "$user" ]]; then
+        read -rp "Enter user (default root): " user
+        if [[ -z "$user" ]]; then
+            user=root
+        fi
+    fi
+    rsync --log-file="/var/log/rsync/push_ssl.log" --stats -uavhzPL "${path}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
+    echo "Log written to '/var/log/rsync/push_ssl.log'"
 }
 
 compress() {
@@ -4274,7 +4300,8 @@ main() {
             echo "  compress [7z   bz2  gz   tar  xz   zip] [filename]"
             echo "  gen_pass [length] [min_numbers] [min_special_chars]"
             echo "  perm_set <target> <user> <group>"
-            echo "  rsync_push_letsencrypt <host> <port> <user>"
+            echo "  rsync_push_letsencrypt <path> <host> <port> <user>"
+            echo "  rsync_push_ssl <path> <host> <port> <user>"
             echo "  sys_init"
             echo -e "\033[93m===============================\033[0m"
 
