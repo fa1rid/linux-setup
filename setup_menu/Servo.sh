@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.2"
+servo_version="0.7.3"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3867,13 +3867,13 @@ install_qbittorrent() {
     local download_url
     local arch
     echo "1. Latest"
-    echo "2. v4 latest"
+    echo "2. v4.6.7"
     read -p "Which version you want to install? " choice
     while true; do
         case "$choice" in
         1)
             # Get latest version
-            local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/4.6.7/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
+            local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
             return 0
             ;;
         2)
@@ -3977,11 +3977,14 @@ EOF
     echo "qBittorrent installed and configured successfully!"
 
     echo "Nginx proxy configuration:
-location /qbittorrent/ {
+location / {
     proxy_pass               http://127.0.0.1:$port/;
     proxy_http_version       1.1;
-    proxy_set_header         X-Forwarded-Host        \$http_host;
-    http2_push_preload on; # Enable http2 push
+    proxy_set_header   Host               \$proxy_host;
+    proxy_set_header   X-Forwarded-For    \$proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Host   \$http_host;
+    proxy_set_header   X-Forwarded-Proto  \$scheme;
+    proxy_cookie_path / "/; Secure";
 }"
 }
 
