@@ -2209,7 +2209,7 @@ rsync_push_letsencrypt() {
             user=root
         fi
     fi
-    rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
+    rsync --log-file="/var/log/rsync/letsencrypt.log" -uahzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
     echo "Log written to '/var/log/rsync/letsencrypt.log'"
 }
 
@@ -2234,7 +2234,7 @@ rsync_push_ssl() {
             user=root
         fi
     fi
-    rsync --log-file="/var/log/rsync/push_ssl.log" --stats -uavhzPL "${path}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
+    rsync --log-file="/var/log/rsync/push_ssl.log" -uahzPL "${path}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
     echo "Log written to '/var/log/rsync/push_ssl.log'"
 }
 
