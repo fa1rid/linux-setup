@@ -4064,10 +4064,6 @@ case "$choice" in
 esac
 }
 
-qBittorrent_upgrade(){
-    
-}
-
 
 nodejs_manage() {
     while true; do
