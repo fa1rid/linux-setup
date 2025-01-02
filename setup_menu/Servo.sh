@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.3"
+servo_version="0.7.4"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1179,9 +1179,13 @@ nginx_cert_install() {
     }
 
     echo -e "\n Domain: ${domain_name}\n"
+    sleep 2
 
     ssl_cert=$(select_from_dir "$ssl_dir")
     echo "Selected cert: $ssl_cert"
+
+    # Get Base Name
+    local ssl_cert_name="${ssl_cert##*/}"
 
     if ! [ -f "${ssl_cert}/fullchain.cer" ]; then
         echo "File does not exist: ${ssl_cert}/fullchain.cer"
@@ -1193,7 +1197,7 @@ nginx_cert_install() {
     fi
 
     mkdir -p "/etc/nginx/snippets/"
-    snippet_path="/etc/nginx/snippets/ssl-$domain_name.conf"
+    snippet_path="/etc/nginx/snippets/ssl-$ssl_cert_name.conf"
 
     cat >"$snippet_path" <<EOFX
 ssl_certificate "$ssl_cert/fullchain.cer";
@@ -3773,12 +3777,13 @@ gg_bot_upload_assistant_setup() {
 
 rr_manage() {
     while true; do
+        echo -e "\033[33m"
         echo "Choose an option:"
         echo "1. Install Autobrr"
         echo "2. Upgrade Autobrr"
         echo "3. Manage qBittorrent"
         echo "0. Quit"
-
+        echo -e "\033[0m"
         read -rp "Enter your choice: " choice
 
         case $choice in
@@ -3827,8 +3832,8 @@ error_exit() {
 # Create Systemd service for current user
 local service_dir="$HOME/.config/systemd/user"
 local service_file="/etc/systemd/system/qbittorrent.service"
-local install_dir="/opt/qBittorrent"
-local config_dir="/opt/qBittorrent/qBittorrent/config"
+local install_dir="/opt/qBit"
+local config_dir="/opt/qBit/qBittorrent/config"
 
 # Function to hash the password using PBKDF2
 create_pass() {
@@ -3868,17 +3873,17 @@ install_qbittorrent() {
     local arch
     echo "1. Latest"
     echo "2. v4.6.7"
-    read -p "Which version you want to install? " choice
     while true; do
+        read -p "Which version you want to install? " choice
         case "$choice" in
         1)
             # Get latest version
             local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
-            return 0
+            break
             ;;
         2)
             local version="release-4.6.7_v1.2.19"
-            return 0
+            break
             ;;
         *)
             echo "Invalid choice."
@@ -3931,6 +3936,13 @@ install_qbittorrent() {
 [LegalNotice]
 Accepted=true
 
+[BitTorrent]
+Session\MaxActiveDownloads=20
+Session\MaxActiveTorrents=20
+Session\MaxActiveUploads=20
+Session\MaxUploads=200
+Session\MaxUploadsPerTorrent=100
+
 [Preferences]
 WebUI\Port=$port
 WebUI\Username=$username
@@ -3976,7 +3988,8 @@ EOF
 
     echo "qBittorrent installed and configured successfully!"
 
-    echo "Nginx proxy configuration:
+    cat <<EOF
+Nginx proxy configuration:
 location / {
     proxy_pass               http://127.0.0.1:$port/;
     proxy_http_version       1.1;
@@ -3985,7 +3998,8 @@ location / {
     proxy_set_header   X-Forwarded-Host   \$http_host;
     proxy_set_header   X-Forwarded-Proto  \$scheme;
     proxy_cookie_path / "/; Secure";
-}"
+}
+EOF
 }
 
 uninstall_qbittorrent() {
@@ -4041,11 +4055,13 @@ reset_username_password() {
 }
 
 # Menu
+echo -e "\033[33m"
 echo "Welcome to qBittorrent Setup"
 echo "1. Install qBittorrent"
 echo "2. Upgrade qBittorrent"
 echo "3. Uninstall qBittorrent"
 echo "4. Reset username and password for the web UI"
+echo -e "\033[0m"
 read -p "Enter your choice: " choice
 
 case "$choice" in
