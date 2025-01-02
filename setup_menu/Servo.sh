@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.0"
+servo_version="0.7.1"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -62,9 +62,9 @@ fi
 cron_dir="/etc/cron.d"
 cron_dir_user="$HOME/.cron"
 cloudflare_config_dir="/etc/cloudflare"
-ssl_nginx_snippet="/etc/nginx/snippets/ssl-snippet.conf"
-common_nginx_snippet="/etc/nginx/snippets/common-snippet.conf"
-caching_nginx_snippet="/etc/nginx/snippets/caching-snippet.conf"
+ssl_nginx_snippet="/etc/nginx/snippets/ssl.conf"
+common_nginx_snippet="/etc/nginx/snippets/common.conf"
+caching_nginx_snippet="/etc/nginx/snippets/caching.conf"
 # default_domain="domain.local"
 # default_user="default"
 
@@ -966,7 +966,7 @@ http {
     error_log /var/log/nginx/error.log;
 
     include /etc/nginx/conf.d/*.conf;
-    include /etc/nginx/sites-enabled/*.conf;
+    include /etc/nginx/sites-available/*.conf;
 }
 EOTX'
     local compression_types='application/atom+xml
@@ -1165,6 +1165,7 @@ EOFX
 nginx_cert_install() {
     local nginx_conf_dir="/etc/nginx/sites-available"
     local ssl_dir="/etc/ssl"
+    local ssl_cert
 
     nginx_config=$(select_from_dir "$nginx_conf_dir")
     echo "Selected config: $nginx_config"
@@ -1179,12 +1180,24 @@ nginx_cert_install() {
 
     echo -e "\n Domain: ${domain_name}\n"
 
+    ssl_cert=$(select_from_dir "$ssl_dir")
+    echo "Selected cert: $ssl_cert"
+
+    if ! [ -f "${ssl_cert}/fullchain.cer" ]; then
+        echo "File does not exist: ${ssl_cert}/fullchain.cer"
+        return 1
+    fi
+    if ! [ -f "${ssl_cert}/privkey.pem" ]; then
+        echo "File does not exist: ${ssl_cert}/fullchain.cer"
+        return 1
+    fi
+
     mkdir -p "/etc/nginx/snippets/"
-    snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+    snippet_path="/etc/nginx/snippets/ssl-$domain_name.conf"
 
     cat >"$snippet_path" <<EOFX
-ssl_certificate $ssl_dir/$domain_name/fullchain.pem;
-ssl_certificate_key $ssl_dir/$domain_name/privkey.pem;
+ssl_certificate "$ssl_cert/fullchain.cer";
+ssl_certificate_key "$ssl_cert/privkey.pem";
 EOFX
 
     # Add or update the include line in the nginx configuration
@@ -1216,7 +1229,7 @@ nginx_cert_uninstall() {
     # nginx_config="/etc/nginx/sites-available/$domain_name"
 
     if [ -f "$nginx_config" ]; then
-        local snippet_path="/etc/nginx/snippets/ssl-$domain_name-snippet.conf"
+        local snippet_path="/etc/nginx/snippets/ssl-$domain_name.conf"
 
         # echo "Commenting: include $snippet_path;"
         comment_uncomment "include $snippet_path;" "$nginx_config" comment
