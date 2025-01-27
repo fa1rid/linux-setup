@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.4"
+servo_version="0.7.5"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1495,7 +1495,7 @@ mariadb_server_install() {
         fi
     fi
 
-    PACKAGE_NAME="mariadb-server"
+    PACKAGE_NAME="mariadb-server mariadb-backup"
     # Check if the package is installed
     if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
         echo "$PACKAGE_NAME is already installed."
@@ -2437,7 +2437,8 @@ net_manage() {
         echo "5. Install SoftEther VPN"
         echo "6. Install OpenConnect VPN Client"
         echo "7. Add OpenConnect Client Configs"
-        echo "7. Install and configure Squid as HTTP/S proxy"
+        echo "8. Install and configure Squid as HTTP/S proxy"
+        echo "9. Install UDP-GRO Service"
 
         echo "0. Quit"
         echo -e "\033[0m"
@@ -2452,13 +2453,82 @@ net_manage() {
         6) net_install_openconnect ;;
         7) net_addConfig_openconnect ;;
         8) setup_squid_https_proxy ;;
+        9) setup_gro_service ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
 }
 
-#!/bin/bash
+# Function to install and configure GRO settings as a systemd service
+setup_gro_service() {
+    local service_name="udp-gro"
+    local service_file="/etc/systemd/system/${service_name}.service"
+
+    # Check if ethtool is installed
+    if ! command -v ethtool &> /dev/null; then
+        echo "ethtool is not installed. Installing..."
+        if command -v apt &> /dev/null; then
+            apt update && apt install -y ethtool
+        else
+            echo "Error: Package manager not supported. Install ethtool manually."
+            exit 1
+        fi
+    else
+        echo "ethtool is already installed."
+    fi
+
+    if ! command -v ethtool &> /dev/null; then
+        echo "ethtool was not installed."
+        exit 1
+    fi
+
+    # Create the systemd service file
+    echo "Creating systemd service file..."
+    cat > "${service_file}" <<EOL
+[Unit]
+Description=Enable rx-udp-gro-forwarding and disable rx-gro-list for primary network interface
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/bash -c 'until ping -c1 google.com &>/dev/null; do sleep 1; done'
+ExecStart=/bin/bash -c "\
+    NETDEV=\$(ip -o route get 8.8.8.8 | cut -f 5 -d ' '); \
+    if [ -n \"\$NETDEV\" ]; then \
+        /usr/sbin/ethtool -K \"\$NETDEV\" rx-udp-gro-forwarding on rx-gro-list off; \
+        logger -t ${service_name} \"Applied GRO settings for interface \$NETDEV\"; \
+    else \
+        logger -t ${service_name} \"Failed to determine primary network interface\"; \
+        exit 1; \
+    fi"
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+    echo "Systemd service file created at ${service_file}."
+
+    # Reload systemd, enable, and start the service
+    echo "Reloading systemd and enabling the service..."
+    systemctl daemon-reload
+    systemctl enable "${service_name}"
+    systemctl start "${service_name}"
+    echo "Service enabled and started."
+
+    # Verify the settings
+    echo "Verifying GRO settings..."
+    local netdev=$(ip -o route get 8.8.8.8 | cut -f 5 -d " ")
+    if [ -n "${netdev}" ]; then
+        ethtool -k "${netdev}" | grep -E "rx-udp-gro-forwarding|rx-gro-list"
+    else
+        echo "Warning: Unable to determine the primary network interface for verification."
+    fi
+
+    echo "Setup complete. The GRO settings will be applied automatically on boot."
+}
 
 # Function to install and configure Squid as HTTP/S proxy
 setup_squid_https_proxy() {
@@ -2501,7 +2571,7 @@ setup_squid_https_proxy() {
     echo "Configuring Squid as HTTP/S proxy..."
 
     # Allow HTTP and HTTPS ports
-    cat > "${squid_conf}" <<EOF
+    cat >"${squid_conf}" <<EOF
 # Squid proxy configuration
 http_port ${http_port}
 https_port ${https_port} cert=/etc/squid/ssl_cert/squid.pem key=/etc/squid/ssl_cert/squid.key
@@ -2547,7 +2617,6 @@ EOF
     return 0
 }
 
-
 net_install_openconnect() {
     # https://software.opensuse.org/download.html?project=home%3Abluca%3Aopenconnect%3Arelease&;package=openconnect
     # Use local variables
@@ -2555,7 +2624,7 @@ net_install_openconnect() {
 
     # Get the distribution name and version number
     distro=$(lsb_release -is)
-    version=$(lsb_release -rs | cut -d'.' -f1)  # Get major version number
+    version=$(lsb_release -rs | cut -d'.' -f1) # Get major version number
 
     # Adjust the repository format based on the distribution
     if [[ "$distro" == "Debian" ]]; then
@@ -2580,20 +2649,20 @@ net_install_openconnect() {
         rm -f "$temp_file"
         return 1
     fi
-    
-    if ! gpg --dearmor "$temp_file" > /dev/null; then
+
+    if ! gpg --dearmor "$temp_file" >/dev/null; then
         echo "Error: Failed to process GPG key."
         rm -f "$temp_file"
         return 1
     fi
-    
+
     rm -f "$temp_file"
 
     # Add the OpenConnect repository
-    echo "deb $repo_url /" | tee "$apt_list_path" > /dev/null
+    echo "deb $repo_url /" | tee "$apt_list_path" >/dev/null
 
     # Add the repository key
-    if ! curl -fsSL "$repo_key_url" | gpg --dearmor | tee "$gpg_key_path" > /dev/null; then
+    if ! curl -fsSL "$repo_key_url" | gpg --dearmor | tee "$gpg_key_path" >/dev/null; then
         echo "Error: Failed to add the GPG key."
         return 1
     fi
@@ -2619,7 +2688,7 @@ net_addConfig_openconnect() {
         echo "Error: Service name is required." >&2
         return 1
     fi
-    
+
     # Service file location
     SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
@@ -2648,11 +2717,10 @@ net_addConfig_openconnect() {
         return 1
     fi
 
-
     echo "Creating systemd service for OpenConnect VPN..."
 
     # Create systemd service file, handle error properly
-    cat > "${SERVICE_FILE}" <<EOL || { echo "Error: Failed to create service file." >&2; return 1; }
+    cat >"${SERVICE_FILE}" <<EOL || {
 [Unit]
 Description=OpenConnect VPN Service
 After=network-online.target
@@ -2667,6 +2735,9 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOL
+        echo "Error: Failed to create service file." >&2
+        return 1
+    }
 
     # Validate that service file creation succeeded
     if [[ ! -f "$SERVICE_FILE" ]]; then
@@ -2677,13 +2748,22 @@ EOL
     echo "Systemd service created at: ${SERVICE_FILE}"
 
     # Reload systemd to recognize new service, error handling
-    systemctl daemon-reload || { echo "Error: Failed to reload systemd." >&2; return 1; }
+    systemctl daemon-reload || {
+        echo "Error: Failed to reload systemd." >&2
+        return 1
+    }
 
     # Enable the service to start on boot, with proper error handling
-    systemctl enable "${SERVICE_NAME}.service" || { echo "Error: Failed to enable VPN service." >&2; return 1; }
+    systemctl enable "${SERVICE_NAME}.service" || {
+        echo "Error: Failed to enable VPN service." >&2
+        return 1
+    }
 
     # Start the VPN service immediately, with proper error handling
-    systemctl start "${SERVICE_NAME}.service" || { echo "Error: Failed to start VPN service." >&2; return 1; }
+    systemctl start "${SERVICE_NAME}.service" || {
+        echo "Error: Failed to start VPN service." >&2
+        return 1
+    }
 
     echo "The service '${SERVICE_NAME}' will now automatically start at boot and reconnect on failure."
 
@@ -2728,8 +2808,9 @@ net_softether_install() {
         M1="_Intel_x64_or_AMD64"
         M2="x64"
         ;;
-    *) 
-        echo "Unsupported CPU"; exit 1;
+    *)
+        echo "Unsupported CPU"
+        exit 1
         ;;
     esac
 
@@ -2810,7 +2891,7 @@ EOF
 net_enable_ip_forward() {
     local NIC
     # Get the "public" interface from the default route
-	NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
+    NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 
     echo "------------- Adding -------------"
     echo "net.ipv4.ip_forward = 1" | tee /etc/sysctl.d/ip_forward.conf
@@ -3058,7 +3139,7 @@ sys_manage() {
         read -rp "Enter your choice: " choice
 
         case $choice in
-        1) sys_list_users ;;
+        1) sys_list_users_new; read -rp "Press Enter to go back " choice ;;
         2) sys_list_groups ;;
         3) sys_cleanUp ;;
         4) sys_std_pkg_install ;;
@@ -3076,14 +3157,18 @@ sys_manage() {
     done
 }
 
-sys_init(){
+sys_init() {
     sys_std_pkg_install
     sys_SSH_install
     sys_config_setup
 }
 
 sys_cron_reload() {
-    cat "${cron_dir_user}"/* | crontab -
+    if [ ! -d "$cron_dir_user" ]; then
+        echo "Error: Directory $cron_dir_user does not exist."
+        return
+    fi
+    cat "${cron_dir_user}"/* 2>/dev/null | crontab - || { echo "Error loading cron jobs"; return; }
     echo -e "Loaded cron jobs:\n"
     crontab -l
 }
@@ -3249,6 +3334,122 @@ sys_swap_add() {
         echo "Failed to create swap file. Please check if you have necessary permissions and free disk space."
     fi
 
+}
+
+sys_list_users_new() {
+    default_users=("root" "daemon" "bin" "sys" "sync" "games" "man" "lp" "mail" "news" "uucp" "proxy" "www-data" "backup" "list" "irc" "gnats" "nobody" "_apt" "systemd-network" "systemd-timesync" "systemd-resolve" "messagebus" "sshd")
+    local row_count=0
+    # Define colors
+    local BG_GRAY='\033[48;5;236m'
+    local RED='\033[1;31m'
+    local GREEN='\033[1;32m'
+    local YELLOW='\033[1;33m'
+    local BLUE='\033[1;34m'
+    local PURPLE='\033[1;35m'
+    local CYAN='\033[1;36m'
+    local RESET='\033[0m'
+
+    # Define column widths
+    local COL1=30 # Username (UID)
+    local COL2=6  # Locked
+    local COL3=6  # HasPass
+    local COL4=6  # System
+    local COL5=30 # Groups
+    local COL6=35 # Home
+
+    # Print header
+    printf "${CYAN}%-${COL1}s${RESET}" "Username (UID)"
+    printf "${CYAN}%-${COL2}s${RESET}" "Lock"
+    printf "${CYAN}%-${COL3}s${RESET}" "Pass"
+    printf "${CYAN}%-${COL4}s${RESET}" "Sys"
+    printf "${CYAN}%-${COL5}s${RESET}" "Groups"
+    printf "${CYAN}%-${COL6}s${RESET}\n" "Home"
+
+    # Print separator line
+    printf "%.0s-" {1..105}
+    printf "\n"
+
+    # Process each user
+    while IFS=: read -r username password uid gid info home shell; do
+        # Skip if username is empty
+        [ -z "$username" ] && continue
+        if [[ " ${default_users[@]} " =~ " ${username} " ]]; then continue; fi
+
+        # Check if system user (UID < 1000)
+        local is_system="NO"
+        if [ "$uid" -lt 1000 ]; then
+            is_system="YES"
+        fi
+
+        # Check password status
+        local has_pass="NO"
+        local is_locked="NO"
+        if [ -f "/etc/shadow" ]; then
+            local shadow_line
+            shadow_line=$(sudo grep "^${username}:" /etc/shadow)
+            if [ -n "$shadow_line" ]; then
+                local pass_field
+                pass_field=$(echo "$shadow_line" | cut -d: -f2)
+                if [ "$pass_field" != "*" ] && [ "$pass_field" != "!" ]; then
+                    has_pass="YES"
+                fi
+                if [[ "$pass_field" == *'!'* ]]; then
+                    is_locked="YES"
+                fi
+            fi
+        fi
+
+        # Get groups
+        local groups
+        groups=$(groups "$username" 2>/dev/null | cut -d: -f2 | sed 's/^ //')
+        if [ -z "$groups" ]; then
+            groups=$(id -Gn "$username" 2>/dev/null)
+        fi
+        groups="${groups// /, }"
+
+        # Format username with UID
+        local username_uid="${username} (${uid})"
+
+        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+
+        # Print user information with colors
+        printf "${YELLOW}%-${COL1}s${RESET}" "${username_uid}"
+
+        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+
+        if [ "$is_locked" = "YES" ]; then
+            printf "${RED}%-${COL4}s${RESET}" "Y"
+        else
+            printf "${GREEN}%-${COL4}s${RESET}" "N"
+        fi
+
+        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+
+        # Fixed color output for status fields
+        if [ "$has_pass" = "YES" ]; then
+            printf "${GREEN}%-${COL2}s${RESET}" "Y"
+        else
+            printf "${RED}%-${COL2}s${RESET}" "N"
+        fi
+
+        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+
+        if [ "$is_system" = "YES" ]; then
+            printf "${BLUE}%-${COL3}s${RESET}" "Y"
+        else
+            printf "${PURPLE}%-${COL3}s${RESET}" "N"
+        fi
+
+        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+
+        printf "${PURPLE}%-${COL5}s${RESET}" "${groups}"
+
+        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+
+        printf "${CYAN}%-${COL6}s${RESET}\n" "${home}"
+
+        row_count=$((row_count + 1))
+    done </etc/passwd
 }
 
 sys_list_users() {
@@ -3417,7 +3618,7 @@ sys_SSH_install() {
     # Allow only specific users or groups to log in via SSH (replace with your username)
     # echo "AllowUsers your_username" >> "$sshd_config"
 
-    mv "/etc/ssh/sshd_config.d/50-cloud-init.conf" "/etc/ssh/sshd_config.d/50-cloud-init.conf.disabled" > /dev/null
+    mv "/etc/ssh/sshd_config.d/50-cloud-init.conf" "/etc/ssh/sshd_config.d/50-cloud-init.conf.disabled" >/dev/null
 
     # Restart SSH service (for changes to take effect immediately)
     systemctl restart sshd
@@ -3427,14 +3628,22 @@ sys_SSH_install() {
 sys_set_grub_timeout() {
     local TIMEOUT=3
 
-    [ ! -f "/etc/default/grub" ] && { echo "Grub configuration file not found."; return 1; }
+    [ ! -f "/etc/default/grub" ] && {
+        echo "Grub configuration file not found."
+        return 1
+    }
 
-    sed -i "s/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=$TIMEOUT/" /etc/default/grub || { echo "Error: Failed to set Grub timeout."; return 1; }
-    update-grub || { echo "Error: Failed to update Grub."; return 1; }
+    sed -i "s/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=$TIMEOUT/" /etc/default/grub || {
+        echo "Error: Failed to set Grub timeout."
+        return 1
+    }
+    update-grub || {
+        echo "Error: Failed to update Grub."
+        return 1
+    }
 
     echo "Grub timeout has been set to $TIMEOUT seconds."
 }
-
 
 sys_config_setup() {
     local restore_choice
@@ -3632,7 +3841,7 @@ media_manage() {
     done
 }
 
-media_mediainfo_install(){
+media_mediainfo_install() {
     # Only for x86
     wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-24_all.deb && dpkg -i repo-mediaarea_1.0-24_all.deb && apt-get update
 }
@@ -3699,7 +3908,7 @@ gg_bot_upload_assistant_setup() {
     local CONFIG_SAMPLE="samples/assistant/config.env"
     local CONFIG_FILE="config.env"
     local LOG_FILE="install_log.txt"
-    
+
     # Log function
     local log
     log() {
@@ -3799,7 +4008,7 @@ rr_manage() {
 autobrr_install() {
     mkdir -p /opt/autobrr/config
     wget $(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4) && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
-    cat << EOF | tee /etc/systemd/system/autobrr.service > /dev/null
+    cat <<EOF | tee /etc/systemd/system/autobrr.service >/dev/null
 [Unit]
 Description=autobrr service
 After=syslog.target network-online.target
@@ -3822,117 +4031,117 @@ autobrr_upgrade() {
     systemctl start autobrr.service && systemctl status autobrr.service
 }
 
-qBittorrent_manage(){
-# Function to display error message and exit
-error_exit() {
-    echo "Error: $1" >&2
-    exit 1
-}
+qBittorrent_manage() {
+    # Function to display error message and exit
+    error_exit() {
+        echo "Error: $1" >&2
+        exit 1
+    }
 
-# Create Systemd service for current user
-local service_dir="$HOME/.config/systemd/user"
-local service_file="/etc/systemd/system/qbittorrent.service"
-local install_dir="/opt/qBit"
-local config_dir="/opt/qBit/qBittorrent/config"
+    # Create Systemd service for current user
+    local service_dir="$HOME/.config/systemd/user"
+    local service_file="/etc/systemd/system/qbittorrent.service"
+    local install_dir="/opt/qBit"
+    local config_dir="/opt/qBit/qBittorrent/config"
 
-# Function to hash the password using PBKDF2
-create_pass() {
-    local pass="$1"
-    local salt_b64=$(openssl rand -base64 16)
-    local salt_hex=$(echo -n "$salt_b64" | openssl base64 -d -A | od -An -t x1 | tr -d ' ')
-    local hash_b64=$(openssl kdf -binary -keylen 64 -kdfopt digest:SHA512 -kdfopt pass:"${pass}" -kdfopt hexsalt:${salt_hex} -kdfopt iter:100000 PBKDF2 | openssl base64 -A)
-    local passLine="\"@ByteArray($salt_b64:$hash_b64)\""
-    echo "$passLine"
-}
-upgrade_qbittorrent() {
-    local download_url
-    local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/4.6.7/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
-    local arch=$(uname -m)
-    case "$arch" in
-    x86_64)
-        download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
-        ;;
-    aarch64)
-        download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
-        ;;
-    *)
-        error_exit "Unsupported architecture: $arch"
-        ;;
-    esac
-
-    # Download qBittorrent
-    wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
-    chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
-    chown qbittorrent:media -R "$install_dir"
-    systemctl restart qbittorrent.service && systemctl status qbittorrent.service
-}
-# Function to install qBittorrent
-install_qbittorrent() {
-    local choice
-    local download_url
-    local arch
-    echo "1. Latest"
-    echo "2. v4.6.7"
-    while true; do
-        read -p "Which version you want to install? " choice
-        case "$choice" in
-        1)
-            # Get latest version
-            local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
-            break
+    # Function to hash the password using PBKDF2
+    create_pass() {
+        local pass="$1"
+        local salt_b64=$(openssl rand -base64 16)
+        local salt_hex=$(echo -n "$salt_b64" | openssl base64 -d -A | od -An -t x1 | tr -d ' ')
+        local hash_b64=$(openssl kdf -binary -keylen 64 -kdfopt digest:SHA512 -kdfopt pass:"${pass}" -kdfopt hexsalt:${salt_hex} -kdfopt iter:100000 PBKDF2 | openssl base64 -A)
+        local passLine="\"@ByteArray($salt_b64:$hash_b64)\""
+        echo "$passLine"
+    }
+    upgrade_qbittorrent() {
+        local download_url
+        local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
+        local arch=$(uname -m)
+        case "$arch" in
+        x86_64)
+            download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
             ;;
-        2)
-            local version="release-4.6.7_v1.2.19"
-            break
+        aarch64)
+            download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
             ;;
         *)
-            echo "Invalid choice."
+            error_exit "Unsupported architecture: $arch"
             ;;
         esac
-    done
 
-    # Download latest version that matches current system arch
-    arch=$(uname -m)
-    case "$arch" in
-    x86_64)
-        download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
-        ;;
-    aarch64)
-        download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
-        ;;
-    *)
-        error_exit "Unsupported architecture: $arch"
-        ;;
-    esac
+        # Download qBittorrent
+        wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
+        chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
+        chown qbittorrent:media -R "$install_dir"
+        systemctl restart qbittorrent.service && systemctl status qbittorrent.service
+    }
+    # Function to install qBittorrent
+    install_qbittorrent() {
+        local choice
+        local download_url
+        local arch
+        echo "1. Latest"
+        echo "2. v4.6.7"
+        while true; do
+            read -p "Which version you want to install? " choice
+            case "$choice" in
+            1)
+                # Get latest version
+                local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
+                break
+                ;;
+            2)
+                local version="release-4.6.7_v1.2.19"
+                break
+                ;;
+            *)
+                echo "Invalid choice."
+                ;;
+            esac
+        done
 
-    if ! getent group "media" >/dev/null 2>&1; then
-        groupadd "media"
-    fi
-    if ! id "qbittorrent" &>/dev/null; then
-        useradd -Nm -g media -s /bin/bash qbittorrent
-    fi
-    mkdir -p "$config_dir"
+        # Download latest version that matches current system arch
+        arch=$(uname -m)
+        case "$arch" in
+        x86_64)
+            download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
+            ;;
+        aarch64)
+            download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
+            ;;
+        *)
+            error_exit "Unsupported architecture: $arch"
+            ;;
+        esac
 
-    # Download qBittorrent
-    wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
-    chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
+        if ! getent group "media" >/dev/null 2>&1; then
+            groupadd "media"
+        fi
+        if ! id "qbittorrent" &>/dev/null; then
+            useradd -Nm -g media -s /bin/bash qbittorrent
+        fi
+        mkdir -p "$config_dir"
 
-    # Ask for port and validate
-    read -p "Enter port for qBittorrent WebUI: " port
-    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
-        error_exit "Port must be a valid number."
-    fi
+        # Download qBittorrent
+        wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
+        chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
 
-    # Ask for username and password
-    read -p "Enter username for qBittorrent WebUI: " username
-    read -sp "Enter password for qBittorrent WebUI: " password
-    echo # Newline after password input
+        # Ask for port and validate
+        read -p "Enter port for qBittorrent WebUI: " port
+        if ! [[ "$port" =~ ^[0-9]+$ ]]; then
+            error_exit "Port must be a valid number."
+        fi
 
-    # Hash the password
-    password_hash=$(create_pass "$password")
+        # Ask for username and password
+        read -p "Enter username for qBittorrent WebUI: " username
+        read -sp "Enter password for qBittorrent WebUI: " password
+        echo # Newline after password input
 
-    # Create Config File
-    cat <<EOF >"$config_dir/qBittorrent.conf"
+        # Hash the password
+        password_hash=$(create_pass "$password")
+
+        # Create Config File
+        cat <<EOF >"$config_dir/qBittorrent.conf"
 [LegalNotice]
 Accepted=true
 
@@ -3949,9 +4158,9 @@ WebUI\Username=$username
 WebUI\Password_PBKDF2=$password_hash
 EOF
 
-    # Create Systemd service for current user
-    # mkdir -p "$service_dir" || error_exit "Failed to create systemd user service directory."
-    cat <<EOF >"$service_file"
+        # Create Systemd service for current user
+        # mkdir -p "$service_dir" || error_exit "Failed to create systemd user service directory."
+        cat <<EOF >"$service_file"
 [Unit]
 Description=qBittorrent-nox service
 Wants=network-online.target
@@ -3970,25 +4179,24 @@ Group=media
 WantedBy=default.target
 EOF
 
-    chown qbittorrent:media -R "$install_dir"
+        chown qbittorrent:media -R "$install_dir"
 
-    # Reload systemctl daemon
-    systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
+        # Reload systemctl daemon
+        systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
 
-    # Enable and start service
-    systemctl enable --now qbittorrent.service && systemctl status qbittorrent.service || error_exit "Failed to enable and start the service."
+        # Enable and start service
+        systemctl enable --now qbittorrent.service && systemctl status qbittorrent.service || error_exit "Failed to enable and start the service."
 
-    # Check service status
-    # systemctl --user status qbittorrent
-    
+        # Check service status
+        # systemctl --user status qbittorrent
 
-    # Keep services running always
-    # loginctl enable-linger
-    # Check if linger is enabled:  loginctl show-user username | grep Linger
+        # Keep services running always
+        # loginctl enable-linger
+        # Check if linger is enabled:  loginctl show-user username | grep Linger
 
-    echo "qBittorrent installed and configured successfully!"
+        echo "qBittorrent installed and configured successfully!"
 
-    cat <<EOF
+        cat <<EOF
 Nginx proxy configuration:
 location / {
     proxy_pass               http://127.0.0.1:$port/;
@@ -4000,89 +4208,88 @@ location / {
     proxy_cookie_path / "/; Secure";
 }
 EOF
+    }
+
+    uninstall_qbittorrent() {
+        read -rp "Are you sure you want to uninstall? (y/n)" confirm
+        if [[ $confirm != "y" ]]; then
+            echo "Aborting."
+            return 0
+        fi
+        systemctl stop qbittorrent.service
+        rm "$service_file"
+        systemctl daemon-reload
+        rm -rf "$install_dir"
+
+    }
+
+    config_set() {
+        local key="$1"
+        local val="$2"
+        local file="$3"
+        awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]*.*", key val); print}' "$file" | awk '{if (NF > 0) {if (!seen[$0]++) print} else {print}}' >"${file}.tmp" && mv "${file}.tmp" "$file"
+    }
+
+    # Function to reset username and password for the web UI
+    reset_username_password() {
+        # Ask for new username and password
+        read -p "Enter new username for qBittorrent WebUI: " new_username
+        read -sp "Enter new password for qBittorrent WebUI: " new_password
+        echo # Newline after password input
+
+        # Hash the password
+        new_password_hash=$(create_pass "$new_password")
+        echo
+        echo "New Hash: $new_password_hash"
+        echo
+
+        # Update Config File with new username and password
+        if [[ -f "$config_dir/qBittorrent.conf" ]]; then
+
+            systemctl stop qbittorrent.service || error_exit "Failed to stop qbittorrent.service"
+
+            config_set 'WebUI\\\\Username=' "$new_username" "$config_dir/qBittorrent.conf" || error_exit "Failed to find Username line"
+            config_set 'WebUI\\\\Password_PBKDF2=' "$new_password_hash" "$config_dir/qBittorrent.conf" || error_exit "Failed to find Password line"
+            echo "Username and password updated successfully!"
+
+            echo "Value from config file:"
+            cat "$config_dir/qBittorrent.conf" | grep "Password_PBKDF2"
+
+            systemctl start qbittorrent.service || error_exit "Failed to start qbittorrent.service"
+
+        else
+            error_exit "qBittorrent configuration file not found. Please install qBittorrent first."
+        fi
+    }
+
+    # Menu
+    echo -e "\033[33m"
+    echo "Welcome to qBittorrent Setup"
+    echo "1. Install qBittorrent"
+    echo "2. Upgrade qBittorrent"
+    echo "3. Uninstall qBittorrent"
+    echo "4. Reset username and password for the web UI"
+    echo -e "\033[0m"
+    read -p "Enter your choice: " choice
+
+    case "$choice" in
+    1)
+        install_qbittorrent
+        ;;
+    2)
+        upgrade_qbittorrent
+        ;;
+    3)
+        uninstall_qbittorrent
+        ;;
+    4)
+        reset_username_password
+        ;;
+    *)
+        error_exit "Invalid choice. Exiting."
+        ;;
+    esac
 }
-
-uninstall_qbittorrent() {
-    read -rp "Are you sure you want to uninstall? (y/n)" confirm
-    if [[ $confirm != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
-    systemctl stop qbittorrent.service
-    rm "$service_file"
-    systemctl daemon-reload
-    rm -rf "$install_dir"
-
-}
-
-config_set() {
-    local key="$1"
-    local val="$2"
-    local file="$3"
-    awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]*.*", key val); print}' "$file" | awk '{if (NF > 0) {if (!seen[$0]++) print} else {print}}' >"${file}.tmp" && mv "${file}.tmp" "$file"
-}
-
-# Function to reset username and password for the web UI
-reset_username_password() {
-    # Ask for new username and password
-    read -p "Enter new username for qBittorrent WebUI: " new_username
-    read -sp "Enter new password for qBittorrent WebUI: " new_password
-    echo # Newline after password input
-
-    # Hash the password
-    new_password_hash=$(create_pass "$new_password")
-    echo
-    echo "New Hash: $new_password_hash"
-    echo
-
-    # Update Config File with new username and password
-    if [[ -f "$config_dir/qBittorrent.conf" ]]; then
-
-        systemctl stop qbittorrent.service || error_exit "Failed to stop qbittorrent.service"
-
-        config_set 'WebUI\\\\Username=' "$new_username" "$config_dir/qBittorrent.conf" || error_exit "Failed to find Username line"
-        config_set 'WebUI\\\\Password_PBKDF2=' "$new_password_hash" "$config_dir/qBittorrent.conf" || error_exit "Failed to find Password line"
-        echo "Username and password updated successfully!"
-
-        echo "Value from config file:"
-        cat "$config_dir/qBittorrent.conf" | grep "Password_PBKDF2"
-
-        systemctl start qbittorrent.service || error_exit "Failed to start qbittorrent.service"
-
-    else
-        error_exit "qBittorrent configuration file not found. Please install qBittorrent first."
-    fi
-}
-
-# Menu
-echo -e "\033[33m"
-echo "Welcome to qBittorrent Setup"
-echo "1. Install qBittorrent"
-echo "2. Upgrade qBittorrent"
-echo "3. Uninstall qBittorrent"
-echo "4. Reset username and password for the web UI"
-echo -e "\033[0m"
-read -p "Enter your choice: " choice
-
-case "$choice" in
-1)
-    install_qbittorrent
-    ;;
-2)
-    upgrade_qbittorrent
-    ;;
-3)
-    uninstall_qbittorrent
-    ;;
-4)
-    reset_username_password
-    ;;
-*)
-    error_exit "Invalid choice. Exiting."
-    ;;
-esac
-}
-
 
 nodejs_manage() {
     while true; do
@@ -4165,26 +4372,26 @@ mount_usb_install() {
     # Create the udiskie configuration directory
     mkdir -p /root/.config/udiskie
 
-# Create the udiskie configuration file
-cat <<EOL >/root/.config/udiskie/config.yml
+    # Create the udiskie configuration file
+    cat <<EOL >/root/.config/udiskie/config.yml
 device_config:
   - options:
     - umask=000
 EOL
 
-cat <<EOL >/etc/polkit-1/localauthority/50-local.d/consolekit.pkla
+    cat <<EOL >/etc/polkit-1/localauthority/50-local.d/consolekit.pkla
 [udiskie]
 Identity=unix-group:root
 Action=org.freedesktop.udisks.*
 ResultAny=yes
 EOL
 
-cat <<EOL >/etc/udev/rules.d/99-udisks2.rules
+    cat <<EOL >/etc/udev/rules.d/99-udisks2.rules
 ENV{ID_FS_USAGE}=="filesystem|other|crypto", ENV{UDISKS_FILESYSTEM_SHARED}="1"
 EOL
 
-# Create a systemd service file for udiskie
-cat <<EOL >/etc/systemd/system/udiskie.service
+    # Create a systemd service file for udiskie
+    cat <<EOL >/etc/systemd/system/udiskie.service
 [Unit]
 Description=Udiskie Automounter
 After=local-fs.target
@@ -4206,8 +4413,6 @@ EOL
     systemctl enable udiskie
     systemctl restart udiskie
 }
-
-
 
 # Function to check for updates
 update_check() {
@@ -4407,6 +4612,8 @@ main "$@"
 # useradd -N -m -s "/usr/sbin/nologin" username
 # usermod -s "/usr/bin/bash" username
 
+# Lock a User Account: passwd -l username
+# Unlock a User Account: passwd -u username
 ##########################
 # Networking
 ##########################
@@ -4443,7 +4650,22 @@ main "$@"
 # rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.config/rsnapshot/" -e "ssh -p 4444" "root@${ip}:/root/.config/rsnapshot/"
 # rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/" -e "ssh -p 4444" "root@${ip}:/etc/letsencrypt/"
 # rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/var/www/solaris/solarissolutions.co/" -e "ssh -p 4444" "root@${ip):/var/www/solaris/solarissolutions.co/"
-
+# rsync -ahPL -e "ssh -p 4444" "root@10.0.0.3:/root/Downloads/" "."
+# rsync -ahPL "/usr/local/softether/vpn_server.config" -e "ssh -p 4444" "root@10.0.0.4:/usr/local/softether/vpn_server.config"
+# -u         skip files that are newer on the receiver
+# -a         archive mode is -rlptgoD (no -A,-X,-U,-N,-H)
+# -r           recurse into directories
+# -l           copy symlinks as symlinks
+# -t           preserve modification times
+# -g           preserve group
+# -o           preserve owner (super-user only)
+# -D           same as --devices --specials
+# -v         increase verbosity
+# -h         output numbers in a human-readable format
+# -z         compress file data during the transfer
+# -p         preserve permissions
+# -P         same as --partial --progress (show progress during transfer)
+# -L         transform symlink into referent file/dir
 ##########################
 # NGINX
 ##########################
@@ -4542,5 +4764,39 @@ main "$@"
 # EOF
 
 ##########################
-# 
+# journald
+##########################
+# journalctl --disk-usage
+
+# one-time operation, delete older logs
+# journalctl --vacuum-time=2weeks
+# journalctl --vacuum-size=100M
+
+# Configure persistent and volatile limits
+# echo "SystemMaxUse=500M" | tee -a /etc/systemd/journald.conf
+# echo "RuntimeMaxUse=200M" | tee -a /etc/systemd/journald.conf
+# systemctl restart systemd-journald
+##########################
+# makemkv
+##########################
+# wget https://apt.benthetechguy.net/benthetechguy-archive-keyring.gpg -O /usr/share/keyrings/benthetechguy-archive-keyring.gpg
+# echo "deb [signed-by=/usr/share/keyrings/benthetechguy-archive-keyring.gpg] https://apt.benthetechguy.net/debian bookworm non-free" > /etc/apt/sources.list.d/benthetechguy.list
+# apt update
+# apt install makemkv
+##########################
+# RAM
+##########################
+# Check how many memory slots are installed and how much RAM is in each slot on a Debian
+# apt install dmidecode
+# dmidecode --type memory
+# dmidecode --type memory | grep -E 'Memory Device|Size'
+##########################
+# curl
+##########################
+# Bind to an Interface
+# curl --interface enp7s0 ipinfo.io/ip
+# Bind to a Source IP
+# curl --interface 192.168.1.100 http://example.com
+##########################
+#
 ##########################
