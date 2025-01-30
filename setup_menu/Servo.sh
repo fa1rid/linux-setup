@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.5"
+servo_version="0.7.6"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2465,10 +2465,21 @@ setup_gro_service() {
     local service_name="udp-gro"
     local service_file="/etc/systemd/system/${service_name}.service"
 
+    KERNEL_VERSION=$(uname -r | cut -d '-' -f1)
+    REQUIRED_VERSION="6.2"
+    # Compare versions using sort -V
+    if printf "%s\n%s" "$REQUIRED_VERSION" "$KERNEL_VERSION" | sort -V | tail -n1 | grep -q "$KERNEL_VERSION"; then
+        echo "Kernel version is $KERNEL_VERSION ."
+    else
+        echo "Kernel version $KERNEL_VERSION is lower than $REQUIRED_VERSION."
+        echo "Abort!"
+        return 1
+    fi
+
     # Check if ethtool is installed
-    if ! command -v ethtool &> /dev/null; then
+    if ! command -v ethtool &>/dev/null; then
         echo "ethtool is not installed. Installing..."
-        if command -v apt &> /dev/null; then
+        if command -v apt &>/dev/null; then
             apt update && apt install -y ethtool
         else
             echo "Error: Package manager not supported. Install ethtool manually."
@@ -2478,14 +2489,14 @@ setup_gro_service() {
         echo "ethtool is already installed."
     fi
 
-    if ! command -v ethtool &> /dev/null; then
+    if ! command -v ethtool &>/dev/null; then
         echo "ethtool was not installed."
         exit 1
     fi
 
     # Create the systemd service file
     echo "Creating systemd service file..."
-    cat > "${service_file}" <<EOL
+    cat >"${service_file}" <<EOL
 [Unit]
 Description=Enable rx-udp-gro-forwarding and disable rx-gro-list for primary network interface
 Wants=network-online.target
@@ -3139,7 +3150,10 @@ sys_manage() {
         read -rp "Enter your choice: " choice
 
         case $choice in
-        1) sys_list_users_new; read -rp "Press Enter to go back " choice ;;
+        1)
+            sys_list_users_new
+            read -rp "Press Enter to go back " choice
+            ;;
         2) sys_list_groups ;;
         3) sys_cleanUp ;;
         4) sys_std_pkg_install ;;
@@ -3168,7 +3182,10 @@ sys_cron_reload() {
         echo "Error: Directory $cron_dir_user does not exist."
         return
     fi
-    cat "${cron_dir_user}"/* 2>/dev/null | crontab - || { echo "Error loading cron jobs"; return; }
+    cat "${cron_dir_user}"/* 2>/dev/null | crontab - || {
+        echo "Error loading cron jobs"
+        return
+    }
     echo -e "Loaded cron jobs:\n"
     crontab -l
 }
@@ -3554,13 +3571,13 @@ sys_std_pkg_install() {
         xz-utils \
         ca-certificates \
         lynx
-
-    read -rp "Remove Exim4? (y/n) " confirmation
-    if [[ "$confirmation" == "y" ]]; then
-        echo -e "\nRunning apt purge exim4-*\n"
-        apt purge -y exim4-*
+    if dpkg -l | grep -q "exim4"; then
+        read -rp "Remove Exim4? (y/n) " confirmation
+        if [[ "$confirmation" == "y" ]]; then
+            echo -e "\nRunning apt purge exim4-*\n"
+            apt purge -y exim4-*
+        fi
     fi
-
     # Clean up
     apt-get autoremove -y
     apt-get clean
@@ -3618,7 +3635,9 @@ sys_SSH_install() {
     # Allow only specific users or groups to log in via SSH (replace with your username)
     # echo "AllowUsers your_username" >> "$sshd_config"
 
-    mv "/etc/ssh/sshd_config.d/50-cloud-init.conf" "/etc/ssh/sshd_config.d/50-cloud-init.conf.disabled" >/dev/null
+    if [ -f "/etc/ssh/sshd_config.d/50-cloud-init.conf" ]; then
+        mv "/etc/ssh/sshd_config.d/50-cloud-init.conf" "/etc/ssh/sshd_config.d/50-cloud-init.conf.disabled" >/dev/null
+    fi
 
     # Restart SSH service (for changes to take effect immediately)
     systemctl restart sshd
@@ -4617,10 +4636,15 @@ main "$@"
 ##########################
 # Networking
 ##########################
+# To find out which process is using port 8888, run:
+# lsof -i :8888
+
 # iptables-save > /etc/iptables/rules.v4
 # ip rule add from 10.5.4.0/24 table 100
 # ip route add default via 10.0.0.1 proto static table 100
 # ip .. del ..
+# Identify the Custom Tables
+# ip route show table all | grep 'table' | grep -vE 'table (local|main|default)'
 ### IP Forward ###
 # iface=eth0
 # PORT=
@@ -4629,6 +4653,20 @@ main "$@"
 # iptables -t nat -I PREROUTING -i ${iface} -p udp --dport ${PORT} -j DNAT --to-destination ${CLIENT_IP}:${PORT}
 # iptables -I FORWARD -d ${CLIENT_IP} --dport ${PORT} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
 
+# List tables, -n numeric output of addresses and ports
+# iptables --line-numbers -nvL
+# iptables --line-numbers -nvLt nat
+# iptables --line-numbers -nvLt mangle
+
+# Delete iptables Rules
+# iptables -D OUTPUT 1 # Delete first rule from OUTPUT chain in filter table
+# iptables -t nat -D POSTROUTING 4 # Delete 4th rule from POSTROUTING chain in nat table
+
+# occtl -s /var/run/occtl5 show users
+# occtl -s /var/run/occtl4 show users
+# occtl -s /var/run/occtl3 show users
+# occtl -s /var/run/occtl2 show users
+# occtl -s /var/run/occtl show users
 ##########################
 # Change System local/keyboard
 ##########################
@@ -4797,6 +4835,25 @@ main "$@"
 # curl --interface enp7s0 ipinfo.io/ip
 # Bind to a Source IP
 # curl --interface 192.168.1.100 http://example.com
+
+# test and view your HTTP headers
+# curl  https://httpbin.org/headers
+##########################
+# wget
+##########################
+# HTTP/HTTPS Proxy with wget
+# wget -e use_proxy=yes -e http_proxy=http://<proxy-ip>:<proxy-port> http://example.com
+# wget -e use_proxy=yes -e http_proxy=http://<username>:<password>@<proxy-ip>:<proxy-port> http://example.com
+# wget -e use_proxy=yes -e https_proxy=http://<username>:<password>@<proxy-ip>:<proxy-port> https://example.com
+
+# If you want to use the proxy for all wget commands in the current session:
+# export http_proxy=http://<username>:<password>@<proxy-ip>:<proxy-port>
+# export https_proxy=http://<username>:<password>@<proxy-ip>:<proxy-port>
+# To make the proxy settings permanent, add these export lines to your ~/.bashrc or ~/.bash_profile file.
+##########################
+#
+##########################
+
 ##########################
 #
 ##########################
