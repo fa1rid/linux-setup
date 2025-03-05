@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.6"
+servo_version="0.7.7"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -952,14 +952,25 @@ http {
     include /etc/nginx/mime.types;
     # default_type application/octet-stream;
     # ssl_dhparam ${nginx_dhparams2048};
+    # With only ECDHE ciphers in use, you don’t need a custom DH parameter file.
+    # If you were to use DHE cipher suites, you would generate one (e.g. using openssl dhparam)
+
     ssl_protocols TLSv1.2 TLSv1.3;
     proxy_ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers off;
-    ssl_ciphers "TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-CHACHA20-POLY1305";
+
+    # For TLSv1.3, remove AES_256 support
+    ssl_conf_command Ciphersuites TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256;
+
+    # For TLSv1.2 the server’s preference isn’t critical when only strong ciphers are used.
+    # (Note: TLSv1.3 cipher suites are chosen by OpenSSL and are not affected by this.)
+    ssl_prefer_server_ciphers on;
+
+    ssl_ciphers 'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
+
 
     # Enable session resumption to improve performance
     ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 1h;
+    ssl_session_timeout 1d;
     ssl_session_tickets on;
 
     access_log /var/log/nginx/access.log;
@@ -2439,6 +2450,7 @@ net_manage() {
         echo "7. Add OpenConnect Client Configs"
         echo "8. Install and configure Squid as HTTP/S proxy"
         echo "9. Install UDP-GRO Service"
+        echo "10. Install TinyProxy"
 
         echo "0. Quit"
         echo -e "\033[0m"
@@ -2454,12 +2466,24 @@ net_manage() {
         7) net_addConfig_openconnect ;;
         8) setup_squid_https_proxy ;;
         9) setup_gro_service ;;
+        10) setup_tinyproxy ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
 }
 
+setup_tinyproxy(){
+    local configFile="/etc/tinyproxy/tinyproxy.conf"
+    apt update && apt install tinyproxy
+
+    if [ ! -f "${configFile}" ]; then
+        echo "Error: Config File was not found"
+        return 1
+    fi
+
+    config_set 
+}
 # Function to install and configure GRO settings as a systemd service
 setup_gro_service() {
     local service_name="udp-gro"
@@ -3296,9 +3320,7 @@ EOFX
 }
 
 sys_swap_add() {
-
-    #!/bin/bash
-
+# Turn off swap: swapoff -a && rm /swapfile
     # Ask user for swap size in MB (default: 2048MB)
     read -rp "Enter swap size in MB [2048]: " swap_size
     swap_size=${swap_size:-2048}
@@ -3313,6 +3335,7 @@ sys_swap_add() {
     # Create swap file
     echo "Creating ${swap_size}MB swap file at ${swap_location}..."
     dd if=/dev/zero of=$swap_location bs=10M count=$buffer_size
+    # fallocate -l 1G "$swap_location"
 
     if [ -e "$swap_location" ]; then
         # Set permissions
@@ -3853,17 +3876,71 @@ media_manage() {
         3) pipx install catt ;;
         4) media_mkvtoolnix_install ;;
         5) gg_bot_upload_assistant_setup ;;
-        # 5) media_mediainfo_install ;;
+        6) media_mediainfo_install ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
 }
 
-media_mediainfo_install() {
-    # Only for x86
-    wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-24_all.deb && dpkg -i repo-mediaarea_1.0-24_all.deb && apt-get update
+install_mediainfo() {
+    # Determine the system architecture
+    arch=$(dpkg --print-architecture)
+    echo "Detected architecture: $arch"
+
+    if [ "$arch" = "amd64" ] || [ "$arch" = "i386" ]; then
+        echo "Setting up MediaArea repository for x86..."
+
+        # Download the repository package for x86 systems
+        wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-25_all.deb || {
+            echo "Error: Failed to download repository package for x86."
+            return 1
+        }
+
+        # Install the downloaded package
+        dpkg -i repo-mediaarea_1.0-25_all.deb || {
+            echo "Error: Failed to install the repository package."
+            rm -f repo-mediaarea_1.0-25_all.deb
+            return 1
+        }
+        # Clean up the downloaded file
+        rm -f repo-mediaarea_1.0-25_all.deb
+
+    elif [ "$arch" = "arm64" ] || [ "$arch" = "armhf" ]; then
+        echo "Setting up MediaArea repository for ARM (arm64/armhf)..."
+
+        # Download and install the repository key
+        wget "https://mediaarea.net/repo/deb/debian/keyring.gpg" -O /etc/apt/trusted.gpg.d/mediaarea.gpg || {
+            echo "Error: Failed to download the repository key."
+            return 1
+        }
+
+        # Write the repository entry for ARM architectures
+        echo "deb https://mediaarea.net/repo/deb/raspbian bookworm main" > /etc/apt/sources.list.d/mediaarea.list || {
+            echo "Error: Failed to write repository list."
+            return 1
+        }
+
+    else
+        echo "Error: Unsupported architecture: $arch"
+        return 1
+    fi
+
+    # Update package lists
+    apt-get update || {
+        echo "Error: apt-get update failed."
+        return 1
+    }
+
+    # Install mediainfo
+    apt-get install -y mediainfo || {
+        echo "Error: Installation of mediainfo failed."
+        return 1
+    }
+
+    echo "Mediainfo installation completed successfully."
 }
+
 
 media_go_chromecast_install() {
     local arch
@@ -4378,15 +4455,14 @@ nodejs_install() {
 }
 
 sys_more_pkg_install() {
-    apt-get update && apt-get install -y build-essential software-properties-common python3 python3-pip
+    apt-get update && apt-get install -y build-essential software-properties-common python3-full python3 python3-pip python3-venv
 
     echo "More Packages installation complete."
 }
 
 mount_usb_install() {
     # Update package lists and install necessary packages
-    apt-get update
-    apt-get install -y udiskie udisks2
+    apt-get update && apt-get install -y udiskie udisks2
 
     # Create the udiskie configuration directory
     mkdir -p /root/.config/udiskie
@@ -4769,6 +4845,24 @@ main "$@"
 # tune2fs -m 0 /dev/sdb # change reserved space (not needed if -m is used in mkfs.ext4)
 # findmnt /mnt/media
 
+# Explaination:
+# By default, ext4 allocates 1 inode per 16 KiB of space (or 1 inode per 16384 bytes).
+# The default inode ratio is -i 16384, meaning one inode is created for every 16 KB of storage.
+# The default inode size (individual inode metadata) is usually 256 bytes, but this can be 128 bytes on older systems.
+
+# -i 325040 means one inode per 325040 bytes (~317 KB).
+# Higher values = fewer inodes = more available storage but worse handling of many small files.
+
+# By default, ext4 reserves 5% of the total disk space for privileged (root) use. This helps prevent system failures when the disk is nearly full, ensuring root/system processes can continue operating.
+
+#  How to Check Current Reserved Space?
+# tune2fs -l /dev/sda1 | grep 'Reserved block count'
+
+# To check how much space is reserved in megabytes (MB):
+# tune2fs -l /dev/sda1 | awk '/Block size|Reserved block count/ {print $NF}' | paste - - | awk '{printf "%.2f MB\n", ($1 * $2) / 1024 / 1024}'
+
+# To reduce reserved space to 1% (safer option for system stability):
+# tune2fs -m 1 /dev/sda1
 ##########################
 # RPI WiFi
 ##########################
