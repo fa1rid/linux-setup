@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.7"
+servo_version="0.7.8"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3865,7 +3865,7 @@ media_manage() {
         echo "3. Install catt (Cast All The Things) using pipx for the current user"
         echo "4. Install mkvtoolnix"
         echo "5. Install GG Bot Upload Assistant in the current dir"
-        # echo "5. Install mediainfo"
+        echo "6. Install mediainfo"
         echo "0. Quit"
 
         read -rp "Enter your choice: " choice
@@ -3964,35 +3964,58 @@ media_go_chromecast_install() {
 }
 
 media_ffmpeg_install() {
-    local confirm
-    if command -v ffmpeg >/dev/null 2>&1; then
-        read -rp "FFMPEG is already installed, are you sure you want to continue? (y/n)" confirm
-        if [[ $confirm != "y" ]]; then
-            echo "Aborting."
-            return 0
-        fi
+    # local confirm
+    # if command -v ffmpeg >/dev/null 2>&1; then
+    #     read -rp "FFMPEG is already installed, are you sure you want to continue? (y/n)" confirm
+    #     if [[ $confirm != "y" ]]; then
+    #         echo "Aborting."
+    #         return 0
+    #     fi
+    # fi
+
+    # if [ ! -f "/etc/apt/sources.list.d/deb-multimedia.list" ]; then
+    #     # Add Deb Multimedia repository
+    #     echo "Adding Deb Multimedia repository..."
+    #     echo "deb http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee /etc/apt/sources.list.d/deb-multimedia.list >/dev/null
+    #     # echo "deb-src http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee -a /etc/apt/sources.list.d/deb-multimedia.list > /dev/null
+    # fi
+    # # Install Deb Multimedia keyring
+    # echo "Installing Deb Multimedia keyring..."
+    # apt-get update -oAcquire::AllowInsecureRepositories=true
+    # apt-get install -y deb-multimedia-keyring --allow-unauthenticated
+
+    # # Install ffmpeg non-free
+    # echo "Installing ffmpeg..."
+    # apt-get install -y ffmpeg
+    local repo_url="https://github.com/fa1rid/FFmpeg-Builds/releases/download/latest"
+    local arch=$(uname -m)
+    local file=""
+
+    if [[ "$arch" == "x86_64" ]]; then
+        file="ffmpeg-master-latest-linux64-nonfree.tar.xz"
+    elif [[ "$arch" == "aarch64" ]]; then
+        file="ffmpeg-master-latest-linuxarm64-nonfree.tar.xz"
+    else
+        echo "Unsupported architecture: $arch"
+        return 1
     fi
 
-    if [ ! -f "/etc/apt/sources.list.d/deb-multimedia.list" ]; then
-        # Add Deb Multimedia repository
-        echo "Adding Deb Multimedia repository..."
-        echo "deb http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee /etc/apt/sources.list.d/deb-multimedia.list >/dev/null
-        # echo "deb-src http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee -a /etc/apt/sources.list.d/deb-multimedia.list > /dev/null
-    fi
-    # Install Deb Multimedia keyring
-    echo "Installing Deb Multimedia keyring..."
-    apt-get update -oAcquire::AllowInsecureRepositories=true
-    apt-get install -y deb-multimedia-keyring --allow-unauthenticated
+    echo "Downloading $file..."
+    wget -q --show-progress "$repo_url/$file" -O "$file"
 
-    # Install ffmpeg non-free
-    echo "Installing ffmpeg..."
-    apt-get install -y ffmpeg
+    if [[ ! -f "$file" ]]; then
+        echo "Download failed!"
+        return 1
+    fi
+
+    echo "Extracting $file..."
+    tar -xJf "$file" --strip-components=2 -C /usr/local/bin ${file%.tar.xz}/bin || echo "Failed to extract!" && ffmpeg -version | grep "ffmpeg version"
 }
 
 media_mkvtoolnix_install() {
     wget -O /usr/share/keyrings/gpg-pub-moritzbunkus.gpg https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg || { echo "Failed to add GPG key" && return 1; }
     echo "deb [signed-by=/usr/share/keyrings/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/debian/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/mkvtoolnix.list
-    apt-get install -y mkvtoolnix
+    apt-get update && apt-get install -y mkvtoolnix
 }
 
 gg_bot_upload_assistant_setup() {
