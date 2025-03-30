@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.8"
+servo_version="0.7.9"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2164,6 +2164,8 @@ rsync_manage() {
         echo "Choose an option:"
         echo "1. Install rsync & add log rotation"
         echo "2. Rsync push letsencrypt"
+        echo "3. rsync_push_ssl (guided)"
+        echo "4. Install rsync daemon"
         echo "0. Quit"
         echo -e "\033[0m"
 
@@ -2173,6 +2175,7 @@ rsync_manage() {
         1) rsync_install ;;
         2) rsync_push_letsencrypt ;;
         3) rsync_push_ssl ;;
+        4) install_rsync_daemon ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -2185,6 +2188,8 @@ rsync_install() {
         echo "The 'rsync' command is not installed. Installing..."
         apt-get update && apt-get install -y rsync
     fi
+
+    mkdir -p /var/log/rsync
 
     echo -e "\nAdding log rotation.."
     cat >/etc/logrotate.d/rsync <<EOFX
@@ -2201,6 +2206,96 @@ EOFX
     mkdir /var/log/rsync
     chown root:root /var/log/rsync
     chmod 640 /var/log/rsync
+}
+
+install_rsync_daemon() {
+    # Check if running as root
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "This script must be run as root"
+        return 1
+    fi
+
+    # Install rsync if not already installed
+    if ! command -v rsync &> /dev/null; then
+        echo "Installing rsync..."
+        rsync_install
+    fi
+
+    # Prompt for module details
+    read -p "Enter the module name (e.g., downloads): " module_name
+    read -p "Enter the full path for the module (e.g., /root/Downloads): " module_path
+
+    # Check if module path exists
+    if [ ! -d "$module_path" ]; then
+        echo "Directory $module_path does not exist. Creating it..."
+        mkdir -p "$module_path" || {
+            echo "Failed to create directory $module_path"
+            return 1
+        }
+        echo "Directory created successfully"
+        chmod 777 "$module_path" && echo "Permissions set to 777 for $module_path" || echo "Failed to set permissions for $module_path"
+    else
+        echo "Directory $module_path already exists"
+    fi
+
+    # Create rsync config file
+    cat > /etc/rsyncd.conf <<EOF
+# Global Settings
+uid = nobody
+gid = nogroup
+use chroot = yes
+max connections = 10
+timeout = 300
+pid file = /var/run/rsyncd.pid
+lock file = /var/run/rsync.lock
+log file = /var/log/rsync/rsyncd.log
+reverse lookup = no
+
+# Module Configuration
+[$module_name]
+    path = $module_path
+    comment = Public files
+    read only = yes
+    list = yes
+    hosts allow = *
+    # Or specific IPs/networks 192.168.1.0/24 1.2.3.4
+    # hosts deny = *
+    transfer logging = no
+    # Disables per file transfer logging for speed.
+    ignore errors = yes
+    # Continue even if there are errors.
+    numeric ids = yes
+    # Avoids name resolution overhead.
+    dont compress = *
+    #.zip *.gz *.tgz *.bz2 *.xz *.7z *.rar *.mp3 *.mp4 *.avi *.mkv *.jpg *.jpeg *.png *.gif # Files that are already compressed.
+EOF
+
+    # Create systemd service file if systemd is available
+    # cat > /etc/systemd/system/rsync.service <<EOF
+# [Unit]
+# Description=fast remote file copy program daemon
+# ConditionPathExists=/etc/rsyncd.conf
+# After=network.target
+# Documentation=man:rsync(1) man:rsyncd.conf(5)
+
+# [Service]
+# ExecStart=/usr/bin/rsync --daemon --no-detach
+# RestartSec=1
+# Restart=on-failure
+# ProtectSystem=full
+# #ProtectHome=on|off|read-only
+# PrivateDevices=on
+# NoNewPrivileges=on
+
+# [Install]
+# WantedBy=multi-user.target
+# EOF
+
+    # systemctl daemon-reload
+    systemctl enable rsync
+    systemctl start rsync
+    echo "Rsync daemon enabled and started as a systemd service."
+    echo "You can edit the configuration at /etc/rsyncd.conf"
 }
 
 rsync_push_letsencrypt() {
@@ -4803,6 +4898,12 @@ main "$@"
 # -p         preserve permissions
 # -P         same as --partial --progress (show progress during transfer)
 # -L         transform symlink into referent file/dir
+#-----------------------------------
+# Rsync daemon "/etc/rsyncd.conf"
+# Example Usage: 
+# rsync rsync://server.net/
+# rsync -ahPL "rsync://server.net/downloads/video.mkv" ./folder/
+# (uses port 873)
 ##########################
 # NGINX
 ##########################
