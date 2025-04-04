@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.7.9"
+servo_version="0.8.0"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -775,6 +775,7 @@ nginx_manage() {
         echo "7. Backup nginx config (vhosts and ssl snippets)"
         echo "8. Restore nginx config"
         echo "9. Install RTMP module"
+        echo "10. Install Caddy"
         echo "0. Quit"
 
         read -rp "Enter your choice: " choice
@@ -789,10 +790,18 @@ nginx_manage() {
         7) nginx_backup_config ;;
         8) nginx_restore_config ;;
         9) nginx_install_rtmp ;;
+        10) nginx_install_caddy ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+nginx_install_caddy() {
+    apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+    apt update && apt install caddy
 }
 
 nginx_install_rtmp() {
