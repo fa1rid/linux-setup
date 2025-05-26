@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.0"
+servo_version="0.8.1"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3080,24 +3080,76 @@ EOFX
 }
 
 net_tune_kernel() {
+    apt-get install irqbalance && systemctl enable --now irqbalance
+
     # Tune Kernel
     echo "------------- Adding -------------"
     # echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.ip_local_port_range = 16384 60999" | tee /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.tcp_congestion_control = bbr" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.core.default_qdisc = fq_codel" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_fastopen = 3" | tee -a /etc/sysctl.d/tune_kernel.conf
+
+    echo "net.core.rmem_default = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.core.rmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.core.wmem_default = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.core.wmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.core.optmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+
+    echo "net.ipv4.tcp_rmem = 4096 1048576 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_wmem = 4096 1048576 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+
+    echo "net.ipv4.tcp_mtu_probing = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_no_metrics_save = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_mem = 3145728 4194304 6291456" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_rfc1337 = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.core.somaxconn = 16384" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.core.netdev_max_backlog = 16384" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.core.netdev_budget = 1000" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_slow_start_after_idle = 0" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_max_syn_backlog = 4096" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_max_tw_buckets = 1440000" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.netfilter.nf_conntrack_max = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
+
+    echo "vm.dirty_ratio = 10   " | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "vm.dirty_background_ratio = 5" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "vm.vfs_cache_pressure = 50" | tee -a /etc/sysctl.d/tune_kernel.conf
+
+    # echo "net.ipv4.tcp_tw_reuse = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+    # echo "net.ipv4.tcp_adv_win_scale = 2" | tee -a /etc/sysctl.d/tune_kernel.conf
+    # echo "net.ipv4.tcp_timestamps = 0" | tee -a /etc/sysctl.d/tune_kernel.conf
 
     echo "------------- Reloading -------------"
     sysctl --system
 
     echo "------------- Checking settings -------------"
-    sysctl net.ipv4.tcp_max_syn_backlog
-    sysctl net.core.rmem_max
-    sysctl net.core.wmem_max
-    sysctl net.ipv4.tcp_tw_reuse
-    # sysctl net.ipv4.tcp_tw_recycle
-    sysctl net.ipv4.tcp_window_scaling
-    sysctl net.ipv4.ip_local_port_range
+    # sysctl net.core.default_qdisc
+    # sysctl net.ipv4.tcp_max_syn_backlog
+    # sysctl net.core.rmem_default
+    # sysctl net.core.rmem_max
+    # sysctl net.core.wmem_default
+    # sysctl net.core.wmem_max
+    # sysctl net.core.optmem_max
+    # sysctl net.ipv4.tcp_tw_reuse
+    # sysctl net.ipv4.tcp_rmem
+    # sysctl net.ipv4.tcp_wmem
+    # sysctl net.ipv4.tcp_timestamps
+    # sysctl net.ipv4.tcp_mtu_probing
+    # sysctl net.ipv4.tcp_mem
+    # sysctl net.ipv4.tcp_rfc1337
+    # sysctl net.ipv4.tcp_adv_win_scale
+    # sysctl vm.swappiness
+    # sysctl net.core.somaxconn
+    # sysctl net.core.netdev_max_backlog
+    # sysctl net.core.netdev_budget
+    # sysctl net.ipv4.tcp_slow_start_after_idle
+    # sysctl net.netfilter.nf_conntrack_max
+    # sysctl vm.dirty_ratio
+    # sysctl vm.dirty_background_ratio
+    # sysctl vm.vfs_cache_pressure
+    # # sysctl net.ipv4.tcp_tw_recycle
+    # sysctl net.ipv4.tcp_window_scaling
+    # sysctl net.ipv4.ip_local_port_range
 }
 
 tailscale_manage() {
@@ -3455,11 +3507,11 @@ sys_swap_add() {
         if grep -q "$swap_location" /proc/swaps; then
             echo "Swap file has been created and activated."
 
-            echo "Setting vm.swappiness=20 ..."
-            # Set swappiness to 20
-            sysctl vm.swappiness=20
+            echo "Setting vm.swappiness=10 ..."
+            # Set swappiness to 10
+            sysctl vm.swappiness=10
             # Make the swappiness setting persistent across reboots
-            echo "vm.swappiness = 20" | tee -a /etc/sysctl.conf
+            echo "vm.swappiness = 10" | tee -a  /etc/sysctl.d/tune_kernel.conf
 
             # Ask user if they want to add entry to /etc/fstab for persistence
             read -rp "Add entry to /etc/fstab for persistence? (Y/n): " add_to_fstab
@@ -4229,6 +4281,8 @@ rr_manage() {
 }
 
 autobrr_install() {
+    local subdomain
+
     mkdir -p /opt/autobrr/config
     wget $(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4) && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
     cat <<EOF | tee /etc/systemd/system/autobrr.service >/dev/null
@@ -4245,7 +4299,43 @@ ExecStart=/opt/autobrr/autobrr --config=/opt/autobrr/config/
 [Install]
 WantedBy=multi-user.target
 EOF
+
+    echo "Creating nginx vHost"
+    mkdir -p "/etc/nginx/sites-available/"
+    
+    read -rp "Enter subdomain for nginx: " subdomain
+
+    cat >"/etc/nginx/sites-available/autobrr.conf" <<EOF
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name $subdomain;
+    include /etc/nginx/snippets/ssl.conf;
+    include /etc/nginx/snippets/common.conf;
+    access_log off;
+    log_not_found off;
+
+    # error_page 404 /404.html;
+
+    client_max_body_size 10M;
+
+    add_header X-Robots-Tag "noindex, nofollow";
+
+    location / {
+        proxy_pass http://127.0.0.1:7474/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$proxy_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$http_connection;
+    }
+
+}
+EOF
+    nginx_cert_install
     systemctl enable --now autobrr.service && systemctl status autobrr.service
+    nginx -t && systemctl reload nginx
 }
 
 autobrr_upgrade() {
@@ -4255,6 +4345,7 @@ autobrr_upgrade() {
 }
 
 qBittorrent_manage() {
+    # https://github.com/userdocs/qbittorrent-nox-static/releases?q=4.6.7&expanded=true
     # Function to display error message and exit
     error_exit() {
         echo "Error: $1" >&2
@@ -4369,13 +4460,34 @@ qBittorrent_manage() {
 Accepted=true
 
 [BitTorrent]
+Session\DHTEnabled=false
 Session\MaxActiveDownloads=20
-Session\MaxActiveTorrents=20
-Session\MaxActiveUploads=20
-Session\MaxUploads=200
-Session\MaxUploadsPerTorrent=100
+Session\MaxActiveTorrents=500
+Session\MaxActiveUploads=500
+Session\MaxUploads=400
+Session\MaxUploadsPerTorrent=200
+Session\BTProtocol=TCP
+; Session\CoalesceReadWrite=true
+; Session\ConnectionSpeed=150
+; Session\IDNSupportEnabled=true
+; Session\MultiConnectionsPerIp=true
+; Session\PeerToS=128
+; Session\PeerTurnover=10
+; Session\PieceExtentAffinity=true
+; Session\Preallocation=true
+; Session\SendBufferLowWatermark=1048
+; Session\SendBufferWatermark=5120
+; Session\SendBufferWatermarkFactor=200
+; Session\SocketBacklogSize=300
+; Session\StopTrackerTimeout=5
+; Session\SuggestMode=true
+
+[Network]
+PortForwardingEnabled=false
+Proxy\HostnameLookupEnabled=false
 
 [Preferences]
+General\DeleteTorrentsFilesAsDefault=true
 WebUI\Port=$port
 WebUI\Username=$username
 WebUI\Password_PBKDF2=$password_hash
@@ -4870,6 +4982,16 @@ main "$@"
 # occtl -s /var/run/occtl3 show users
 # occtl -s /var/run/occtl2 show users
 # occtl -s /var/run/occtl show users
+
+# Enable offloading
+# ethtool -K eth0 tx-checksum-ip-generic on
+# ethtool -K eth0 sg on
+# ethtool -K eth0 gro on
+# ethtool -K eth0 tso on
+# ethtool -K eth0 gso on
+# ethtool -G eth0 rx 4096 tx 4096
+
+# traceroute -nm 2 1.1.1.1
 ##########################
 # Change System local/keyboard
 ##########################
@@ -4975,6 +5097,10 @@ main "$@"
 # echo "LABEL=media /mnt/media ext4 discard,nofail,defaults 0 0" | tee -a /etc/fstab
 # umount /mnt/media
 
+# Mount after adding fstab without reboot
+# systemctl daemon-reload
+# mount -a 
+
 # tune2fs -m 0 /dev/sdb # change reserved space (not needed if -m is used in mkfs.ext4)
 # findmnt /mnt/media
 
@@ -4996,6 +5122,9 @@ main "$@"
 
 # To reduce reserved space to 1% (safer option for system stability):
 # tune2fs -m 1 /dev/sda1
+
+# Optimize Storage for seeding:
+# UUID=xxxxxxxx / ext4 defaults,noatime,commit=60,errors=remount-ro 0 1
 ##########################
 # RPI WiFi
 ##########################
