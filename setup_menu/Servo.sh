@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.1"
+servo_version="0.8.2"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -801,7 +801,7 @@ nginx_install_caddy() {
     apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-    apt update && apt install caddy
+    apt update && apt install caddy && caddy list-modules
 }
 
 nginx_install_rtmp() {
@@ -1062,10 +1062,13 @@ nginx_remove() {
     systemctl stop nginx
 
     # Purge Nginx and its configuration
-    apt-get remove --purge nginx* libnginx* && apt-get autoremove -y
+    apt-get remove --purge nginx* libnginx* -y && apt-get autoremove -y
 
     # Remove configuration files
     rm -rf /etc/nginx
+
+    dpkg --audit
+    dpkg --configure --pending
 
     echo "Nginx and its configuration have been purged."
 }
@@ -3150,6 +3153,7 @@ net_tune_kernel() {
     # # sysctl net.ipv4.tcp_tw_recycle
     # sysctl net.ipv4.tcp_window_scaling
     # sysctl net.ipv4.ip_local_port_range
+    # sysctl net.ipv4.tcp_fin_timeout
 }
 
 tailscale_manage() {
@@ -4266,6 +4270,7 @@ rr_manage() {
         echo "1. Install Autobrr"
         echo "2. Upgrade Autobrr"
         echo "3. Manage qBittorrent"
+        echo "4. Install cross-seed"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -4274,10 +4279,60 @@ rr_manage() {
         1) autobrr_install ;;
         2) autobrr_upgrade ;;
         3) qBittorrent_manage ;;
+        4) cross_seed_install ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+cross_seed_install() {
+    # Check if node is installed
+    if ! command -v node &> /dev/null; then
+        echo "Error: Node.js is not installed. Please install Node.js first."
+        return 1
+    fi
+
+    # Check if npm is installed
+    if ! command -v npm &> /dev/null; then
+        echo "Error: npm is not installed. Please install npm (it usually comes with Node.js)."
+        return 1
+    fi
+
+    echo "Installing cross-seed..."
+    npm install -g cross-seed
+    
+    # Verify installation was successful
+    if command -v cross-seed &> /dev/null; then
+        cross-seed --version
+    else
+        echo "Error: cross-seed installation failed."
+        return 1
+    fi
+
+    echo -e "\nPut config in /root/.cross-seed/ [config.js] [cross-seed.db] [torrent_cache] and press Enter..."
+    read
+
+    cat <<EOF | tee /etc/systemd/system/cross-seed.service >/dev/null
+[Unit]
+Description=cross-seed daemon
+After=syslog.target network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=cross-seed daemon
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Reload systemctl daemon
+    systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
+
+    systemctl enable --now cross-seed.service && systemctl status cross-seed.service || error_exit "Failed to enable and start the service."
+
 }
 
 autobrr_install() {
@@ -4334,7 +4389,8 @@ server {
 }
 EOF
     nginx_cert_install
-    systemctl enable --now autobrr.service && systemctl status autobrr.service
+    systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
+    systemctl enable --now autobrr.service && systemctl status autobrr.service || error_exit "Failed to enable and start the service."
     nginx -t && systemctl reload nginx
 }
 
