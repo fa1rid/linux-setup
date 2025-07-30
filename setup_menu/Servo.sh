@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.2"
+servo_version="0.8.3"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3113,6 +3113,9 @@ net_tune_kernel() {
     echo "net.ipv4.tcp_max_syn_backlog = 4096" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.tcp_max_tw_buckets = 1440000" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.netfilter.nf_conntrack_max = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.netfilter.nf_conntrack_buckets = 262144" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_fin_timeout = 30" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30" | tee -a /etc/sysctl.d/tune_kernel.conf
 
     echo "vm.dirty_ratio = 10   " | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "vm.dirty_background_ratio = 5" | tee -a /etc/sysctl.d/tune_kernel.conf
@@ -4267,10 +4270,12 @@ rr_manage() {
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
-        echo "1. Install Autobrr"
+        echo "1. Install Autobrr (root)"
         echo "2. Upgrade Autobrr"
         echo "3. Manage qBittorrent"
         echo "4. Install cross-seed"
+        echo "5. Install Prowlarr (prowlarr)"
+        echo "6. Upgrade Prowlarr"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -4280,6 +4285,8 @@ rr_manage() {
         2) autobrr_upgrade ;;
         3) qBittorrent_manage ;;
         4) cross_seed_install ;;
+        5) prowlarr_install ;;
+        6) prowlarr_upgrade ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -4398,6 +4405,41 @@ autobrr_upgrade() {
     systemctl stop autobrr.service
     wget $(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4) && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
     systemctl start autobrr.service && systemctl status autobrr.service
+}
+
+prowlarr_install() {
+    mkdir -p /opt/Prowlarr/data
+    useradd -Nm -g media -s /bin/bash prowlarr
+
+    wget $(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4) && tar -C /opt/Prowlarr/app -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/Prowlarr && rm Prowlarr*.tar.gz
+
+    cat << EOF | tee /etc/systemd/system/prowlarr.service > /dev/null
+[Unit]
+Description=Prowlarr Daemon
+After=syslog.target network.target
+[Service]
+User=prowlarr
+Group=media
+Type=simple
+
+ExecStart=/opt/Prowlarr/app/Prowlarr -nobrowser -data=/opt/Prowlarr/data/
+TimeoutStopSec=20
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
+    systemctl enable --now prowlarr.service && systemctl status prowlarr.service || error_exit "Failed to enable and start the service."
+}
+
+prowlarr_upgrade() {
+    systemctl stop prowlarr.service
+    wget $(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4) && tar -C /opt/Prowlarr/app -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/Prowlarr && rm Prowlarr*.tar.gz
+
+    systemctl start prowlarr.service && systemctl status prowlarr.service
 }
 
 qBittorrent_manage() {
