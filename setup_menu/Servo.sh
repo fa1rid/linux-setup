@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.3"
+servo_version="0.8.4"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -810,29 +810,52 @@ nginx_install_rtmp() {
 
 # Function to install Nginx
 nginx_install() {
-
     local COMMON_NAME="localhost"
 
-    if [ -f "/etc/apt/sources.list.d/nginx.list" ]; then
-        echo -e "\nnginx Repo Exists"
+    # First, detect the OS
+    local OS=$(lsb_release -is)
+
+    if [ "$OS" = "Ubuntu" ]; then
+        # This is Ubuntu, use the PPA
+        if [ -f "/etc/apt/sources.list.d/ondrej-ubuntu-nginx-$(lsb_release -cs).list" ]; then
+            echo -e "\nOndrej Sury's Nginx PPA already exists."
+        else
+            echo -e "\nAdding Ondrej Sury's Nginx PPA for Ubuntu."
+            # software-properties-common is needed for add-apt-repository
+            apt-get update && apt-get install -y software-properties-common
+            add-apt-repository ppa:ondrej/nginx -y
+        fi
+        
+        # Install Nginx and modules for Ubuntu
+        echo "Installing Nginx for Ubuntu..."
+        apt-get update && apt-get install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install nginx on Ubuntu" && return 1; }
+
+    elif [ "$OS" = "Debian" ]; then
+        # This is Debian, use the packages.sury.org repository
+        if grep -qR "packages.sury.org/nginx" /etc/apt/sources.list.d/; then
+            echo -e "\nSury's nginx Repo Exists"
+        else
+            # Adding sury's nginx repo for Debian
+            echo -e "\nInstalling sury's nginx repo for Debian"
+            curl -sSL https://packages.sury.org/nginx/README.txt | bash -x
+            echo
+            # Create the pinning configuration file
+            #         local PIN_FILE="/etc/apt/preferences.d/sury-repo-pin"
+            #         tee "$PIN_FILE" >/dev/null <<EOLX
+            # Package: *
+            # Pin: origin packages.sury.org
+            # Pin-Priority: 1000
+            # EOLX
+        fi
+
+        # Install Nginx and modules for Debian
+        echo "Installing Nginx for Debian..."
+        apt-get update && apt-get install -y nginx-full libnginx-mod-brotli || { echo "Failed to install nginx on Debian" && return 1; }
+
     else
-        # Adding sury's nginx repo: https://packages.sury.org/nginx/dists/bookworm/main/binary-amd64/Packages
-        echo -e "\nInstalling sury's nginx repo"
-        curl -sSL https://packages.sury.org/nginx/README.txt | bash -x
-        echo
-        # Create the pinning configuration file
-
-        #         local PIN_FILE="/etc/apt/preferences.d/sury-repo-pin"
-        #         tee "$PIN_FILE" >/dev/null <<EOLX
-        # Package: *
-        # Pin: origin packages.sury.org
-        # Pin-Priority: 1000
-        # EOLX
+        echo "Unsupported operating system: $OS"
+        return 1
     fi
-
-    local PACKAGE_NAME="nginx"
-    # Install nginx #nginx-extras #libnginx-mod-http-fancyindex
-    apt-get update && apt-get install -y nginx-full libnginx-mod-brotli || { echo "Failed to install $PACKAGE_NAME" && return 1; }
 
     systemctl enable nginx
     # Create log folder for the main profile
@@ -3747,7 +3770,7 @@ sys_std_pkg_install() {
         cron \
         logrotate \
         ncurses-term \
-        mime-support \
+        mailcap \
         iproute2 \
         pciutils \
         bc \
@@ -3757,6 +3780,7 @@ sys_std_pkg_install() {
         xz-utils \
         ca-certificates \
         lynx
+
     if dpkg -l | grep -q "exim4"; then
         read -rp "Remove Exim4? (y/n) " confirmation
         if [[ "$confirmation" == "y" ]]; then
@@ -3780,6 +3804,7 @@ config_set() {
 
 sys_SSH_install() {
     local sshd_config="/etc/ssh/sshd_config"
+    local sshd_config_dir="/etc/ssh/sshd_config.d"
 
     if ! dpkg -l | grep -q "^ii\s*openssh-server\s"; then
         # Update package lists & Install SSH server
@@ -3825,8 +3850,40 @@ sys_SSH_install() {
         mv "/etc/ssh/sshd_config.d/50-cloud-init.conf" "/etc/ssh/sshd_config.d/50-cloud-init.conf.disabled" >/dev/null
     fi
 
+    # Check if directory exists and is readable
+    if [ -d "$sshd_config_dir" ] && [ -r "$sshd_config_dir" ]; then
+        # Check if sshd_config_dir contains any files (excluding . and ..)
+        if find "$sshd_config_dir" -maxdepth 1 -type f | read -r; then
+            # Warning message in yellow color
+            echo -e "\033[1;33mWARNING: Files detected in $sshd_config_dir"
+            echo -e "These may override SSH configuration. Please review them.\033[0m"
+        fi
+    fi
+
     # Restart SSH service (for changes to take effect immediately)
-    systemctl restart sshd
+
+    # Check if the ssh.socket unit is active and enabled.
+    if systemctl is-active --quiet ssh.socket || systemctl is-enabled --quiet ssh.socket; then
+        echo "SSH is running as a socket. Reloading and restarting."
+        systemctl daemon-reload && systemctl restart ssh.socket
+    elif systemctl is-active --quiet ssh || systemctl is-enabled --quiet ssh; then
+        echo "SSH is running as a service (ssh). Restarting."
+        systemctl restart ssh
+    else
+        echo "Attempting to restart sshd service as a fallback."
+        systemctl restart sshd
+    fi
+
+    # Verify the status after attempting a restart.
+    if systemctl is-active --quiet ssh.socket; then
+        echo "ssh.socket is active."
+    elif systemctl is-active --quiet ssh; then
+        echo "ssh service is active."
+    elif systemctl is-active --quiet sshd; then
+        echo "sshd service is active."
+    else
+        echo "Warning: SSH server does not appear to be active after restart attempt."
+    fi
 
 }
 
@@ -5223,6 +5280,16 @@ main "$@"
 
 # Optimize Storage for seeding:
 # UUID=xxxxxxxx / ext4 defaults,noatime,commit=60,errors=remount-ro 0 1
+# ___________________________
+# setfacl: The command to set a File Access Control List.
+# -d: This is the most important flag here. It means default. This command doesn't change the permissions on the directory itself, but sets a default ACL for any new files or directories created inside it.
+# -m: This means modify the ACL.
+# g::rwx: This is the permission being set.
+# g stands for group.
+# The empty space between the colons (::) means the owning group of the file.
+# rwx means read, write, and execute.
+# In plain English, the command means: "For this directory, set a default rule that any new item created inside it will automatically grant read, write, and execute permissions to the item's primary group."
+# In your case, you are already achieving this with the file_mode=0660 and dir_mode=0770 options in your fstab, so you don't need to run this command.
 ##########################
 # RPI WiFi
 ##########################
@@ -5248,7 +5315,7 @@ main "$@"
 # Shares
 ##########################
 ## SMB
-# //192.168.20.15/M /mnt/M cifs credentials=/etc/smb_credentials,iocharset=utf8,nofail,noauto,x-systemd.automount,x-systemd.mount-timeout=30,_netdev,gid=media,file_mode=0660,dir_mode=0770 0 0
+# //192.168.20.15/M /mnt/M cifs credentials=/etc/smb_credentials,iocharset=utf8,nofail,noauto,x-systemd.automount,x-systemd.mount-timeout=30,_netdev,gid=media,file_mode=0660,dir_mode=0770,noperm 0 0
 
 # cat >"/etc/smb_credentials" <<EOF
 # username=user
