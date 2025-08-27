@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.4"
+servo_version="0.8.5"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -814,6 +814,7 @@ nginx_install() {
 
     # First, detect the OS
     local OS=$(lsb_release -is)
+    local OS_Codename=$(lsb_release -cs)
 
     if [ "$OS" = "Ubuntu" ]; then
         # This is Ubuntu, use the PPA
@@ -828,7 +829,16 @@ nginx_install() {
         
         # Install Nginx and modules for Ubuntu
         echo "Installing Nginx for Ubuntu..."
-        apt-get update && apt-get install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install nginx on Ubuntu" && return 1; }
+        case "$OS_Codename" in
+            "noble")
+                echo "Installing brotli for Ubuntu 24 (Noble)..."
+                sudo apt-get install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install nginx on Ubuntu" && return 1; }
+                ;;
+            *)
+                echo "Unsupported Ubuntu version: $OS_Codename"
+                return 1
+                ;;
+        esac
 
     elif [ "$OS" = "Debian" ]; then
         # This is Debian, use the packages.sury.org repository
@@ -850,7 +860,20 @@ nginx_install() {
 
         # Install Nginx and modules for Debian
         echo "Installing Nginx for Debian..."
-        apt-get update && apt-get install -y nginx-full libnginx-mod-brotli || { echo "Failed to install nginx on Debian" && return 1; }
+        case "$OS_Codename" in
+            "bookworm")
+                echo "Installing brotli for Debian 12 (Bookworm)..."
+                sudo apt-get install -y nginx-full libnginx-mod-brotli || { echo "Failed to install nginx on Debian" && return 1; }
+                ;;
+            "trixie")
+                echo "Installing brotli for Debian 13 (Trixie)..."
+                sudo apt-get install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install nginx on Debian" && return 1; }
+                ;;
+            *)
+                echo "Unsupported Debian version: $OS_Codename"
+                return 1
+                ;;
+        esac
 
     else
         echo "Unsupported operating system: $OS"
@@ -4551,6 +4574,7 @@ qBittorrent_manage() {
         local arch
         echo "1. Latest"
         echo "2. v4.6.7"
+        echo "3. v5.1.2"
         while true; do
             read -p "Which version you want to install? " choice
             case "$choice" in
@@ -4561,6 +4585,10 @@ qBittorrent_manage() {
                 ;;
             2)
                 local version="release-4.6.7_v1.2.19"
+                break
+                ;;
+            3)
+                local version="release-5.1.2_v1.2.20"
                 break
                 ;;
             *)
