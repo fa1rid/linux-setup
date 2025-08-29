@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC2016,SC2119,SC2155,SC2206,SC2207,SC2254,SC2086
+# shellcheck disable=SC2016,SC2119,SC2155,SC2206,SC2207,SC2254,SC2086,SC1091
 # Shellcheck ignore list:
 #  - SC2016: Expressions don't expand in single quotes, use double quotes for that.
 #  - SC2119: Use foo "$@" if function's $1 should mean script's $1.
@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.6"
+servo_version="0.8.7"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -982,7 +982,7 @@ location = /xmlrpc.php {
     return 444;
 }
 EOFX
-    bash -c 'cat <<EOTX >/etc/nginx/nginx.conf
+    cat >/etc/nginx/nginx.conf <<'EOTX'
 user www-data;
 worker_processes auto;
 worker_rlimit_nofile 20960;
@@ -1007,7 +1007,7 @@ http {
     include /etc/nginx/mime.types;
     # default_type application/octet-stream;
     # ssl_dhparam ${nginx_dhparams2048};
-    # With only ECDHE ciphers in use, you don’t need a custom DH parameter file.
+    # With only ECDHE ciphers in use, you don't need a custom DH parameter file.
     # If you were to use DHE cipher suites, you would generate one (e.g. using openssl dhparam)
 
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -1016,7 +1016,7 @@ http {
     # For TLSv1.3, remove AES_256 support
     ssl_conf_command Ciphersuites TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256;
 
-    # For TLSv1.2 the server’s preference isn’t critical when only strong ciphers are used.
+    # For TLSv1.2 the server's preference isn't critical when only strong ciphers are used.
     # (Note: TLSv1.3 cipher suites are chosen by OpenSSL and are not affected by this.)
     ssl_prefer_server_ciphers on;
 
@@ -1034,7 +1034,8 @@ http {
     include /etc/nginx/conf.d/*.conf;
     include /etc/nginx/sites-available/*.conf;
 }
-EOTX'
+EOTX
+
     local compression_types='application/atom+xml
 application/javascript
 application/json
@@ -2280,8 +2281,8 @@ install_rsync_daemon() {
     fi
 
     # Prompt for module details
-    read -p "Enter the module name (e.g., downloads): " module_name
-    read -p "Enter the full path for the module (e.g., /root/Downloads): " module_path
+    read -rp "Enter the module name (e.g., downloads): " module_name
+    read -rp "Enter the full path for the module (e.g., /root/Downloads): " module_path
 
     # Check if module path exists
     if [ ! -d "$module_path" ]; then
@@ -2777,8 +2778,8 @@ EOF
 
     if [ ! -f "/etc/squid/ssl_cert/squid.pem" ] || [ ! -f "/etc/squid/ssl_cert/squid.key" ]; then
         echo "Generating SSL certificates for HTTPS support..."
-        openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/squid/ssl_cert/squid.key -out /etc/squid/ssl_cert/squid.pem -subj "/C=US/ST=State/L=City/O=Organization/OU=Department/CN=example.com"
-        if [ $? -ne 0 ]; then
+        if ! openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/squid/ssl_cert/squid.key -out /etc/squid/ssl_cert/squid.pem -subj "/C=US/ST=State/L=City/O=Organization/OU=Department/CN=example.com"
+        then
             echo "Error: Failed to generate SSL certificates." >&2
             return 1
         fi
@@ -2986,6 +2987,8 @@ net_softether_install() {
     local M2
     local RTM
     local IFS
+    local tmpDIR="/tmp/vpnserver"
+    local tmp="/tmp"
 
     case "$(uname -m)" in
     aarch64)
@@ -3010,26 +3013,23 @@ net_softether_install() {
     IFS='-' read -ra RTMS <<<"${RTM}"
 
     # Get softether source
-    wget "http://www.softether-download.com/files/softether/${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}/Linux/SoftEther_VPN_Server/64bit_-${M1}/softether-vpnserver-${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-linux-${M2}-64bit.tar.gz" -O /tmp/softether-vpnserver.tar.gz || exit 1
+    wget "http://www.softether-download.com/files/softether/${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}/Linux/SoftEther_VPN_Server/64bit_-${M1}/softether-vpnserver-${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-linux-${M2}-64bit.tar.gz" -O ${tmp}/softether-vpnserver.tar.gz || exit 1
 
     # Extract softether source & Remove unused file
-    tar -xzvf /tmp/softether-vpnserver.tar.gz -C /tmp/ && rm /tmp/softether-vpnserver.tar.gz
-
-    # Move to source directory
-    cd /tmp/vpnserver
+    tar -xzvf ${tmp}/softether-vpnserver.tar.gz -C ${tmp} && rm ${tmp}/softether-vpnserver.tar.gz
 
     # Workaround for 18.04+
     #sed -i 's|OPTIONS=-O2|OPTIONS=-no-pie -O2|' Makefile
 
     # Build softether (i_read_and_agree_the_license_agreement)
-    make || {
+    make -C ${tmpDIR} || {
         echo "Error: failed to compile."
         exit 1
     }
 
     # Change file permission
-    chmod 600 * && chmod +x vpnserver && chmod +x vpncmd
-    echo "${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}" >version.txt
+    chmod 600 ${tmpDIR}/* && chmod +x ${tmpDIR}/vpnserver && chmod +x ${tmpDIR}/vpncmd
+    echo "${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}" >${tmpDIR}/version.txt
 
     # Link binary files
     # ln -sf /usr/local/softether/vpnserver /usr/local/bin/vpnserver
@@ -3065,13 +3065,13 @@ CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_BROADCAST CAP_N
 WantedBy=multi-user.target
 EOF
 
-    mkdir -p ${install_dir} && mv hamcore.se2 vpnserver vpncmd version.txt ${install_dir} && rm -rf /tmp/vpnserver
+    mkdir -p ${install_dir} && mv ${tmpDIR}/hamcore.se2 ${tmpDIR}/vpnserver ${tmpDIR}/vpncmd ${tmpDIR}/version.txt ${install_dir} && rm -rf ${tmpDIR:?}/
 
     # ip tuntap add mode tap name softether
     # ip addr add 192.168.30.1/24 dev softether
     # ip link set dev softether up
 
-    read -p "Place your 'vpn_server.config' in ${install_dir} and press Enter"
+    read -rp "Place your 'vpn_server.config' in ${install_dir} and press Enter"
 
     systemctl daemon-reload && systemctl enable vpnserver && systemctl restart vpnserver
 }
@@ -3619,10 +3619,11 @@ sys_list_users_new() {
     printf "\n"
 
     # Process each user
-    while IFS=: read -r username password uid gid info home shell; do
+    # while IFS=: read -r username password uid gid info home shell; do
+    while IFS=: read -r username password uid gid _ home _; do
         # Skip if username is empty
         [ -z "$username" ] && continue
-        if [[ " ${default_users[@]} " =~ " ${username} " ]]; then continue; fi
+        if [[ " ${default_users[*]} " =~  ${username}  ]]; then continue; fi
 
         # Check if system user (UID < 1000)
         local is_system="NO"
@@ -3659,12 +3660,12 @@ sys_list_users_new() {
         # Format username with UID
         local username_uid="${username} (${uid})"
 
-        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
 
         # Print user information with colors
         printf "${YELLOW}%-${COL1}s${RESET}" "${username_uid}"
 
-        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
 
         if [ "$is_locked" = "YES" ]; then
             printf "${RED}%-${COL4}s${RESET}" "Y"
@@ -3672,7 +3673,7 @@ sys_list_users_new() {
             printf "${GREEN}%-${COL4}s${RESET}" "N"
         fi
 
-        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
 
         # Fixed color output for status fields
         if [ "$has_pass" = "YES" ]; then
@@ -3681,7 +3682,7 @@ sys_list_users_new() {
             printf "${RED}%-${COL2}s${RESET}" "N"
         fi
 
-        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
 
         if [ "$is_system" = "YES" ]; then
             printf "${BLUE}%-${COL3}s${RESET}" "Y"
@@ -3689,11 +3690,11 @@ sys_list_users_new() {
             printf "${PURPLE}%-${COL3}s${RESET}" "N"
         fi
 
-        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
 
         printf "${PURPLE}%-${COL5}s${RESET}" "${groups}"
 
-        if ((row_count % 2 == 1)); then printf "${BG_GRAY}"; fi
+        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
 
         printf "${CYAN}%-${COL6}s${RESET}\n" "${home}"
 
@@ -3882,8 +3883,6 @@ sys_SSH_install() {
             echo -e "These may override SSH configuration. Please review them.\033[0m"
         fi
     fi
-
-    if 
 
     local AUTH_KEYS="/root/.ssh/authorized_keys"
     local SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBZHBIqC2RMXrqf94kDvAzqLB0ymgPn4eU/VTSMgtTy"
@@ -4304,13 +4303,11 @@ gg_bot_upload_assistant_setup() {
     local LOG_FILE="install_log.txt"
 
     # Log function
-    local log
     log() {
         echo "$(date +"%Y-%m-%d %T") - $1" | tee -a "$LOG_FILE"
     }
 
     # Error handling function
-    local handle_error
     handle_error() {
         log "ERROR: $1"
         exit 1
@@ -4344,6 +4341,7 @@ gg_bot_upload_assistant_setup() {
 
     # Activate virtual environment
     log "Activating virtual environment..."
+
     source "$VENV_DIR/bin/activate" || handle_error "Failed to activate virtual environment."
 
     # Upgrade pip and install wheel for modern package installations
@@ -4430,7 +4428,7 @@ cross_seed_install() {
     fi
 
     echo -e "\nPut config in /root/.cross-seed/ [config.js] [cross-seed.db] [torrent_cache] and press Enter..."
-    read
+    read -r
 
     cat <<EOF | tee /etc/systemd/system/cross-seed.service >/dev/null
 [Unit]
@@ -4458,7 +4456,7 @@ autobrr_install() {
     local subdomain
 
     mkdir -p /opt/autobrr/config
-    wget $(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4) && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
+    wget "$(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
     cat <<EOF | tee /etc/systemd/system/autobrr.service >/dev/null
 [Unit]
 Description=autobrr service
@@ -4515,7 +4513,7 @@ EOF
 
 autobrr_upgrade() {
     systemctl stop autobrr.service
-    wget $(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4) && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
+    wget "$(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
     systemctl start autobrr.service && systemctl status autobrr.service
 }
 
@@ -4523,7 +4521,7 @@ prowlarr_install() {
     mkdir -p /opt/Prowlarr/data
     useradd -Nm -g media -s /bin/bash prowlarr
 
-    wget $(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4) && tar -C /opt/Prowlarr/app -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/Prowlarr && rm Prowlarr*.tar.gz
+    wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/Prowlarr/app -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/Prowlarr && rm Prowlarr*.tar.gz
 
     cat << EOF | tee /etc/systemd/system/prowlarr.service > /dev/null
 [Unit]
@@ -4549,7 +4547,7 @@ EOF
 
 prowlarr_upgrade() {
     systemctl stop prowlarr.service
-    wget $(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4) && tar -C /opt/Prowlarr/app -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/Prowlarr && rm Prowlarr*.tar.gz
+    wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/Prowlarr/app -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/Prowlarr && rm Prowlarr*.tar.gz
 
     systemctl start prowlarr.service && systemctl status prowlarr.service
 }
@@ -4563,7 +4561,7 @@ qBittorrent_manage() {
     }
 
     # Create Systemd service for current user
-    local service_dir="$HOME/.config/systemd/user"
+    # local service_dir="$HOME/.config/systemd/user"
     local service_file="/etc/systemd/system/qbittorrent.service"
     local install_dir="/opt/qBit"
     local config_dir="/opt/qBit/qBittorrent/config"
@@ -4608,7 +4606,7 @@ qBittorrent_manage() {
         echo "2. v4.6.7"
         echo "3. v5.1.2"
         while true; do
-            read -p "Which version you want to install? " choice
+            read -rp "Which version you want to install? " choice
             case "$choice" in
             1)
                 # Get latest version
@@ -4656,14 +4654,14 @@ qBittorrent_manage() {
         chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
 
         # Ask for port and validate
-        read -p "Enter port for qBittorrent WebUI: " port
+        read -rp "Enter port for qBittorrent WebUI: " port
         if ! [[ "$port" =~ ^[0-9]+$ ]]; then
             error_exit "Port must be a valid number."
         fi
 
         # Ask for username and password
-        read -p "Enter username for qBittorrent WebUI: " username
-        read -sp "Enter password for qBittorrent WebUI: " password
+        read -rp "Enter username for qBittorrent WebUI: " username
+        read -rsp "Enter password for qBittorrent WebUI: " password
         echo # Newline after password input
 
         # Hash the password
@@ -4783,8 +4781,8 @@ EOF
     # Function to reset username and password for the web UI
     reset_username_password() {
         # Ask for new username and password
-        read -p "Enter new username for qBittorrent WebUI: " new_username
-        read -sp "Enter new password for qBittorrent WebUI: " new_password
+        read -rp "Enter new username for qBittorrent WebUI: " new_username
+        read -rsp "Enter new password for qBittorrent WebUI: " new_password
         echo # Newline after password input
 
         # Hash the password
@@ -4820,7 +4818,7 @@ EOF
     echo "3. Uninstall qBittorrent"
     echo "4. Reset username and password for the web UI"
     echo -e "\033[0m"
-    read -p "Enter your choice: " choice
+    read -rp "Enter your choice: " choice
 
     case "$choice" in
     1)
