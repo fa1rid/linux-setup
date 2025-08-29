@@ -3891,7 +3891,7 @@ sys_SSH_install() {
     # Check if authorized_keys exists
     if [ -f "$AUTH_KEYS" ]; then
         # Create a temporary file
-        TEMP_FILE=$(mktemp)
+        local TEMP_FILE=$(mktemp)
         
         # Remove lines containing "Please login as the user" and store other lines
         grep -v "Please login as the user" "$AUTH_KEYS" > "$TEMP_FILE"
