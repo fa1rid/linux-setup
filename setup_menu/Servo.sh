@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.7"
+servo_version="0.8.8"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2387,6 +2387,7 @@ rsync_push_ssl() {
     if [[ -z "$path" ]]; then
         path=$(select_from_dir "/etc/ssl/")
     fi
+    path="${path%%+(/)}"
     local domain="${path##*/}"
     local host="$2"
     local port="$3"
@@ -3660,12 +3661,12 @@ sys_list_users_new() {
         # Format username with UID
         local username_uid="${username} (${uid})"
 
-        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
+        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
         # Print user information with colors
         printf "${YELLOW}%-${COL1}s${RESET}" "${username_uid}"
 
-        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
+        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
         if [ "$is_locked" = "YES" ]; then
             printf "${RED}%-${COL4}s${RESET}" "Y"
@@ -3673,7 +3674,7 @@ sys_list_users_new() {
             printf "${GREEN}%-${COL4}s${RESET}" "N"
         fi
 
-        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
+        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
         # Fixed color output for status fields
         if [ "$has_pass" = "YES" ]; then
@@ -3682,7 +3683,7 @@ sys_list_users_new() {
             printf "${RED}%-${COL2}s${RESET}" "N"
         fi
 
-        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
+        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
         if [ "$is_system" = "YES" ]; then
             printf "${BLUE}%-${COL3}s${RESET}" "Y"
@@ -3690,11 +3691,11 @@ sys_list_users_new() {
             printf "${PURPLE}%-${COL3}s${RESET}" "N"
         fi
 
-        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
+        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
         printf "${PURPLE}%-${COL5}s${RESET}" "${groups}"
 
-        if ((row_count % 2 == 1)); then printf "%s" "$BG_GRAY"; fi
+        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
         printf "${CYAN}%-${COL6}s${RESET}\n" "${home}"
 
@@ -3886,6 +3887,8 @@ sys_SSH_install() {
 
     local AUTH_KEYS="/root/.ssh/authorized_keys"
     local SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBZHBIqC2RMXrqf94kDvAzqLB0ymgPn4eU/VTSMgtTy"
+    local SSH_KEY2="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJA3sRPDekFDYji0tObnDQgteucMQbPr7EhtGvIYnGbG solaris"
+
 
     # Check if authorized_keys exists
     if [ -f "$AUTH_KEYS" ]; then
@@ -3897,6 +3900,7 @@ sys_SSH_install() {
         
         # Add the new SSH key at the top of the file
         echo "$SSH_KEY" > "$AUTH_KEYS"
+        echo "$SSH_KEY2" >> "$AUTH_KEYS"
         cat "$TEMP_FILE" >> "$AUTH_KEYS"
         
         # Remove temporary file
@@ -3905,11 +3909,12 @@ sys_SSH_install() {
         # Set proper permissions
         chmod 600 "$AUTH_KEYS"
         
-        echo "SSH key has been updated in $AUTH_KEYS"
+        echo -e "\033[32mSSH key has been updated in $AUTH_KEYS\033[0m"
     else
         # If file doesn't exist, create it with proper permissions
         mkdir -p "$(dirname "$AUTH_KEYS")"
         echo "$SSH_KEY" > "$AUTH_KEYS"
+        echo "$SSH_KEY2" >> "$AUTH_KEYS"
         chmod 600 "$AUTH_KEYS"
         echo "Created new $AUTH_KEYS file with SSH key"
     fi
@@ -5434,9 +5439,10 @@ main "$@"
 # export https_proxy=http://<username>:<password>@<proxy-ip>:<proxy-port>
 # To make the proxy settings permanent, add these export lines to your ~/.bashrc or ~/.bash_profile file.
 ##########################
-#
+# Cron / crontab 
 ##########################
-
+# For a specific user, the cron entries from crontab -l are stored in a file called
+# /var/spool/cron/crontabs/<username>
 ##########################
 #
 ##########################
