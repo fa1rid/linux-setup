@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.8"
+servo_version="0.8.9"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -4162,7 +4162,7 @@ media_manage() {
     done
 }
 
-install_mediainfo() {
+media_mediainfo_install() {
     # Determine the system architecture
     arch=$(dpkg --print-architecture)
     echo "Detected architecture: $arch"
@@ -4171,15 +4171,15 @@ install_mediainfo() {
         echo "Setting up MediaArea repository for x86..."
 
         # Download the repository package for x86 systems
-        wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-25_all.deb || {
+        wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-26_all.deb || {
             echo "Error: Failed to download repository package for x86."
             return 1
         }
 
         # Install the downloaded package
-        dpkg -i repo-mediaarea_1.0-25_all.deb || {
+        dpkg -i repo-mediaarea_1.0-26_all.deb || {
             echo "Error: Failed to install the repository package."
-            rm -f repo-mediaarea_1.0-25_all.deb
+            rm -f repo-mediaarea_1.0-26_all.deb
             return 1
         }
         # Clean up the downloaded file
@@ -5443,6 +5443,11 @@ main "$@"
 ##########################
 # For a specific user, the cron entries from crontab -l are stored in a file called
 # /var/spool/cron/crontabs/<username>
+##########################
+# Query Time server
+##########################
+# apt install ntpsec-ntpdate
+# ntpdate -q time.android.com
 ##########################
 #
 ##########################
