@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.8.9"
+servo_version="0.9.0"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -435,14 +435,6 @@ php_install() {
     fi
     echo "time_zone is: ${time_zone}"
 
-    if [ -f "/etc/apt/sources.list.d/php.list" ]; then
-        echo "PHP Repo Exists"
-    else
-        # Adding sury's PHP repo
-        echo "Installing sury's PHP repo"
-        curl -sSL https://packages.sury.org/php/README.txt | bash -x
-        echo
-    fi
     # upload_max_filesize
     read -rp "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
     # Use the user input if provided, or the default value if the input is upload_max_filesize
@@ -453,58 +445,110 @@ php_install() {
     sleep 1
     # Calculate post_max_size
     post_max_size=$((upload_max_filesize + 1))
-    apt-get update
-    for phpVer in "${PHP_Versions[@]}"; do
-        echo -e "\nInstalling PHP ${phpVer}"
 
-        # if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.disabled" ]; then
-        #     mv "/etc/php/${phpVer}/fpm/pool.d/www.disabled" "/etc/php/${phpVer}/fpm/pool.d/www.conf"
-        # fi
-
-        # Essential & Commonly Used Extensions Extensions
-        apt-get install -y bc php"${phpVer}"-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} || { echo "Failed to install" && return 1; }
-        # bz2
-        # [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
-        # [Zend Modules]
-        # Zend OPcache
-
-        # Less Commonly Used Extensions
-        # apt-get install php"${phpVer}"-{soap,pspell,xmlrpc,memcached}
-
-        # For dev
-        # apt-get install php${phpVer}-{dev}
-
-        # Modify default configs
-        sed -i "s/memory_limit = .*/memory_limit = ${memory_limit}M/" "/etc/php/${phpVer}/cli/php.ini"
-
-        # Enable JIT
-        # ; tracing: An alias to the granular configuration 1254.
-        # ; function: An alias to the granular configuration 1205.
-        enableJIT=$(echo "${phpVer} > 8" | bc)
-        if [ "$enableJIT" -eq 1 ]; then
-            # sed -i "s/opcache.jit.*/opcache.jit=function/" "/etc/php/${phpVer}/mods-available/opcache.ini"
-            # echo "opcache.jit_buffer_size = 256M" >>"/etc/php/${phpVer}/mods-available/opcache.ini"
-            echo "Skipping enabling JIT.."
+#################################
+	# First, detect the OS
+    local OS=$(lsb_release -is)
+    local OS_Codename=$(lsb_release -cs)
+    if [ "$OS" = "Ubuntu" ]; then
+        # This is Ubuntu, use the PPA
+        if [ -f "/etc/apt/sources.list.d/ondrej-ubuntu-php-$(lsb_release -cs).sources" ]; then
+            echo -e "\nOndrej Sury's PHP PPA already exists."
+        else
+            echo -e "\nAdding Ondrej Sury's PHP PPA for Ubuntu."
+            # software-properties-common is needed for add-apt-repository
+            apt-get update && apt-get install -y software-properties-common ca-certificates lsb-release
+            add-apt-repository ppa:ondrej/php -y
         fi
+    elif [ "$OS" = "Debian" ]; then
+        if [ -f "/etc/apt/sources.list.d/php.list" ]; then
+        echo "PHP Repo Exists"
+		else
+			# Adding sury's PHP repo
+			echo "Installing sury's PHP repo"
+			curl -sSL https://packages.sury.org/php/README.txt | bash -x
+			echo
+		fi
+    else
+        echo "Unsupported operating system: $OS"
+        return 1
+    fi
+#################################
 
-        # Set default time zone
-        time_zone_escaped=$(printf '%s\n' "${time_zone}" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
-        sed -i "s/;date\.timezone =.*/date.timezone = ${time_zone_escaped}/" "/etc/php/${phpVer}/cli/php.ini"
+	# Display available versions
+	echo "Available PHP versions:"
+	for i in "${!PHP_Versions[@]}"; do
+		echo "$((i+1)). PHP ${PHP_Versions[$i]}"
+	done
 
-        # Set upload_max_filesize and post_max_size
-        sed -i "s/upload_max_filesize = .*/upload_max_filesize = ${upload_max_filesize}M/" "/etc/php/${phpVer}/cli/php.ini"
-        sed -i "s/post_max_size = .*/post_max_size = ${post_max_size}M/" "/etc/php/${phpVer}/cli/php.ini"
+	# Get user choices
+	echo -n "Select PHP versions to install (comma-separated, e.g., 1,3,5): "
+	read -r choices
 
-        if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.conf" ]; then
-            mv "/etc/php/${phpVer}/fpm/pool.d/www.conf" "/etc/php/${phpVer}/fpm/pool.d/www.disabled"
-        fi
+	# Convert comma-separated choices to array
+	IFS=',' read -ra selected_indices <<< "$choices"
 
-        # echo "Stopping service as there are no configs.."
-        # systemctl stop php${phpVer}-fpm
+	# Process selected versions
+	for choice in "${selected_indices[@]}"; do
+		# Remove any whitespace
+		choice=$(echo $choice | tr -d ' ')
+		
+		if [[ $choice -ge 1 && $choice -le ${#PHP_Versions[@]} ]]; then
+			selected_index=$((choice-1))
+			phpVer="${PHP_Versions[$selected_index]}"
 
-        echo "Done Installing PHP ${phpVer}"
-        echo "----------------------------------"
-    done
+			echo -e "\nInstalling PHP ${phpVer}"
+			
+			# if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.disabled" ]; then
+			#     mv "/etc/php/${phpVer}/fpm/pool.d/www.disabled" "/etc/php/${phpVer}/fpm/pool.d/www.conf"
+			# fi
+
+			# Essential & Commonly Used Extensions Extensions
+			apt-get install -y bc php"${phpVer}"-{fpm,mysqli,mbstring,curl,xml,intl,gd,zip,bcmath,apcu,sqlite3,imagick,tidy,gmp,bz2,ldap,memcached} || { echo "Failed to install" && return 1; }
+			# [PHP Modules] bcmath calendar Core ctype curl date dom exif FFI fileinfo filter ftp gd gettext hash iconv intl json libxml mbstring mysqli mysqlnd openssl pcntl pcre PDO pdo_mysql Phar posix readline Reflection session shmop SimpleXML sockets sodium SPL standard sysvmsg sysvsem sysvshm tokenizer xml xmlreader xmlwriter xsl Zend OPcache zip zlib apcu sqlite3 imagick tidy
+			# [Zend Modules]
+			# Zend OPcache
+
+			# Less Commonly Used Extensions
+			# apt-get install php"${phpVer}"-{soap,pspell,xmlrpc}
+
+			# For dev
+			# apt-get install php${phpVer}-{dev}
+
+			# Modify default configs
+			sed -i "s/memory_limit = .*/memory_limit = ${memory_limit}M/" "/etc/php/${phpVer}/cli/php.ini"
+
+			# Enable JIT
+			# ; tracing: An alias to the granular configuration 1254.
+			# ; function: An alias to the granular configuration 1205.
+			enableJIT=$(echo "${phpVer} > 8" | bc)
+			if [ "$enableJIT" -eq 1 ]; then
+				# sed -i "s/opcache.jit.*/opcache.jit=function/" "/etc/php/${phpVer}/mods-available/opcache.ini"
+				# echo "opcache.jit_buffer_size = 256M" >>"/etc/php/${phpVer}/mods-available/opcache.ini"
+				echo "Skipping enabling JIT.."
+			fi
+
+			# Set default time zone
+			time_zone_escaped=$(printf '%s\n' "${time_zone}" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
+			sed -i "s/;date\.timezone =.*/date.timezone = ${time_zone_escaped}/" "/etc/php/${phpVer}/cli/php.ini"
+
+			# Set upload_max_filesize and post_max_size
+			sed -i "s/upload_max_filesize = .*/upload_max_filesize = ${upload_max_filesize}M/" "/etc/php/${phpVer}/cli/php.ini"
+			sed -i "s/post_max_size = .*/post_max_size = ${post_max_size}M/" "/etc/php/${phpVer}/cli/php.ini"
+
+			if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.conf" ]; then
+				mv "/etc/php/${phpVer}/fpm/pool.d/www.conf" "/etc/php/${phpVer}/fpm/pool.d/www.disabled"
+			fi
+
+			# echo "Stopping service as there are no configs.."
+			# systemctl stop php${phpVer}-fpm
+
+			echo "Done Installing PHP ${phpVer}"
+			echo "----------------------------------"
+		else
+			echo "Invalid selection: $choice"
+		fi
+	done
 
     # Install Composer
     if [ -f "/usr/local/bin/composer" ]; then
@@ -818,7 +862,7 @@ nginx_install() {
 
     if [ "$OS" = "Ubuntu" ]; then
         # This is Ubuntu, use the PPA
-        if [ -f "/etc/apt/sources.list.d/ondrej-ubuntu-nginx-$(lsb_release -cs).list" ]; then
+        if [ -f "/etc/apt/sources.list.d/ondrej-ubuntu-nginx-$(lsb_release -cs).sources" ]; then
             echo -e "\nOndrej Sury's Nginx PPA already exists."
         else
             echo -e "\nAdding Ondrej Sury's Nginx PPA for Ubuntu."
@@ -1637,7 +1681,7 @@ mariadb_client_install() {
 
     read -rp "Enter the MariaDB server hostname or IP (without port): " db_host
     read -rp "Enter the database username: " db_user
-    read -rps "Enter the password for the database user: " db_pass
+    read -rsp "Enter the password for the database user: " db_pass
     echo
 
     # Create a configuration file for the MariaDB client
@@ -1652,8 +1696,8 @@ EOF
     echo
     cat ~/.my.cnf
     echo
-    echo "MariaDB client has been installed and configured."
-
+    echo "MariaDB client has been installed and configured in ~/.my.cnf."
+	mysql -e "\s"
 }
 
 # Function to remove MariaDB
@@ -2262,7 +2306,7 @@ rsync_install() {
     create 640 root root
 }
 EOFX
-    mkdir /var/log/rsync
+    mkdir -p /var/log/rsync
     chown root:root /var/log/rsync
     chmod 640 /var/log/rsync
 }
@@ -3379,6 +3423,7 @@ sys_manage() {
         echo "10. Install rsnapshot"
         echo "11. Reload Cron (root profile)"
         echo "12. Install Auto Mount USB"
+        echo "13. Cleanup ubuntu bloat"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -3399,6 +3444,7 @@ sys_manage() {
         10) sys_rsnapshot_install ;;
         11) sys_cron_reload ;;
         12) mount_usb_install ;;
+        13) sys_cleanup-ubuntu;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -3789,7 +3835,6 @@ sys_std_pkg_install() {
         bzip2 \
         gzip \
         htop \
-        net-tools \
         nftables \
         bind9-dnsutils \
         cron \
@@ -3804,7 +3849,11 @@ sys_std_pkg_install() {
         members \
         xz-utils \
         ca-certificates \
-        lynx
+        lynx \
+		whiptail \
+		iputils-ping \
+		apt-utils
+        # net-tools \
 
     if dpkg -l | grep -q "exim4"; then
         read -rp "Remove Exim4? (y/n) " confirmation
@@ -3966,6 +4015,14 @@ sys_set_grub_timeout() {
     echo "Grub timeout has been set to $TIMEOUT seconds."
 }
 
+sys_cleanup-ubuntu(){
+	systemctl stop snapd && systemctl disable snapd && apt purge snapd
+	# apt-mark hold snapd
+	apt purge apport lxd-agent-loader apparmor ufw rsyslog vim-common vim-tiny mtr-tiny tcpdump busybox-static ubuntu-pro-client
+	apt autoremove --purge
+	apt clean
+}
+
 sys_config_setup() {
     local restore_choice
     local bashrc="/etc/bash.bashrc"
@@ -4057,11 +4114,14 @@ EOFX
     if [ -e "/etc/motd.backup" ]; then
         echo "Skipping Backup (already exists) '/etc/motd.backup'."
     else
-        echo -e "Creating backup (/etc/motd.backup)...\n"
-        cp /etc/motd /etc/motd.backup
+		if [ -e "/etc/motd" ]; then
+			echo -e "Creating backup (/etc/motd.backup)...\n"
+			cp /etc/motd /etc/motd.backup
+		fi
     fi
     echo -n "" >/etc/motd
-    chmod -x /etc/update-motd.d/10-uname
+
+	chmod -x /etc/update-motd.d/*
 
     local sinfo_script="/usr/local/bin/sinfo"
     # Use a here document to create the script content
@@ -5126,6 +5186,12 @@ main "$@"
 #     echo "$package_name is not installed."
 # fi
 
+### how to build APT packages file url, Example:
+# deb https://dl.cloudsmith.io/public/caddy/stable/deb/debian/dists any-version main
+# The Packages file is located at: [Base URL]/dists/[Codename]/[Component]/binary-[Architecture]/Packages{.gz} #and /Release
+# [Base URL]/pool/ directory with actual .deb files
+# [Architecture] amd64, arm64, i386
+# curl -s "https://dl.cloudsmith.io/public/caddy/stable/deb/debian/dists/any-version/main/binary-amd64/Packages"
 ##########################
 # Wordpress
 ##########################
@@ -5448,6 +5514,13 @@ main "$@"
 ##########################
 # apt install ntpsec-ntpdate
 # ntpdate -q time.android.com
+##########################
+# npm
+##########################
+# Increasing Node.js App Version Guide
+# npm version patch  # 1.0.0 → 1.0.1
+# npm version minor  # 1.0.0 → 1.1.0
+# npm version major  # 1.0.0 → 2.0.0
 ##########################
 #
 ##########################
