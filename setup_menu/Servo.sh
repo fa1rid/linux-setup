@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.0"
+servo_version="0.9.1"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -510,7 +510,7 @@ php_install() {
 			# Zend OPcache
 
 			# Less Commonly Used Extensions
-			# apt-get install php"${phpVer}"-{soap,pspell,xmlrpc}
+			# apt-get install php"${phpVer}"-{soap,pspell,xmlrpc,maxminddb}
 
 			# For dev
 			# apt-get install php${phpVer}-{dev}
@@ -2650,6 +2650,7 @@ net_manage() {
         echo "8. Install and configure Squid as HTTP/S proxy"
         echo "9. Install UDP-GRO Service"
         echo "10. Install TinyProxy"
+        echo "11. Flush iptables"
 
         echo "0. Quit"
         echo -e "\033[0m"
@@ -2666,10 +2667,55 @@ net_manage() {
         8) setup_squid_https_proxy ;;
         9) setup_gro_service ;;
         10) setup_tinyproxy ;;
+        11) net_flush_iptables ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+net_flush_iptables(){
+	local _ans
+	# confirmation prompt
+	echo 'About to flush iptables/nftables Continue? [y/N]: '
+	read -r _ans
+	case "${_ans,,}" in
+		y|yes) ;;
+		*) echo 'Aborted by user.'; return 4;;
+	esac
+	local TABLES=(filter nat mangle raw security)
+	local tbl
+  # Flush IPv4 iptables (iptables command)
+  if command -v iptables >/dev/null 2>&1; then
+    printf 'Flushing IPv4 iptables...\n'
+    for tbl in "${TABLES[@]}"; do
+      # flush, delete user chains, zero counters
+      iptables -t $tbl -F 2>/dev/null || true
+      iptables -t $tbl -X 2>/dev/null || true
+      iptables -t $tbl -Z 2>/dev/null || true
+    done
+    # reset builtin policies (best-effort)
+    for chain in INPUT FORWARD OUTPUT; do
+      iptables -P $chain ACCEPT 2>/dev/null || true
+    done
+  else
+    printf 'Note: iptables not found; skipping IPv4 iptables flush.\n'
+  fi
+
+  # Flush IPv6 iptables (ip6tables)
+  if command -v ip6tables >/dev/null 2>&1; then
+    printf 'Flushing IPv6 ip6tables...\n'
+    for tbl in "${TABLES[@]}"; do
+      ip6tables -t $tbl -F 2>/dev/null || true
+      ip6tables -t $tbl -X 2>/dev/null || true
+      ip6tables -t $tbl -Z 2>/dev/null || true
+    done
+    for chain in INPUT FORWARD OUTPUT; do
+      ip6tables -P $chain ACCEPT 2>/dev/null || true
+    done
+  else
+      printf 'Note: ip6tables not found; skipping IPv6 iptables flush.\n'
+  fi
 }
 
 setup_tinyproxy(){
@@ -3244,7 +3290,7 @@ net_tune_kernel() {
     # sysctl vm.dirty_ratio
     # sysctl vm.dirty_background_ratio
     # sysctl vm.vfs_cache_pressure
-    # # sysctl net.ipv4.tcp_tw_recycle
+    # sysctl net.ipv4.tcp_tw_recycle
     # sysctl net.ipv4.tcp_window_scaling
     # sysctl net.ipv4.ip_local_port_range
     # sysctl net.ipv4.tcp_fin_timeout
@@ -4018,7 +4064,8 @@ sys_set_grub_timeout() {
 sys_cleanup-ubuntu(){
 	systemctl stop snapd && systemctl disable snapd && apt purge snapd
 	# apt-mark hold snapd
-	apt purge apport lxd-agent-loader apparmor ufw rsyslog vim-common vim-tiny mtr-tiny tcpdump busybox-static ubuntu-pro-client
+	# apt show ubuntu-standard ubuntu-minimal
+	apt purge apport lxd-agent-loader apparmor ufw rsyslog vim-common vim-tiny mtr-tiny tcpdump busybox-static ubuntu-pro-client dosfstools ed friendly-recovery ftp hdparm info iputils-tracepath lshw lsof numactl ntfs-3g parted strace sysstat time trace-cmd usbutils
 	apt autoremove --purge
 	apt clean
 }
@@ -4066,7 +4113,7 @@ sys_config_setup() {
     local RESET="\[\033[0m\]"
 
     # Set the customized PS1 variable
-    local CUSTOM_PS1="'\${debian_chroot:+(\$debian_chroot)}${RED}\\u${YELLOW}@${CYAN}\\h ${YELLOW}\\w ${PINK}\\\$ ${RESET}'"
+    local CUSTOM_PS1="'\${debian_chroot:+(\$debian_chroot)}${RED}\\u${YELLOW}@${CYAN}\\h ${YELLOW}\\w${PINK}\\\$ ${RESET}'"
     local escaped_PS1
     escaped_PS1=$(echo "$CUSTOM_PS1" | sed 's/[\/&]/\\&/g')
 
@@ -5235,6 +5282,7 @@ main "$@"
 ##########################
 # Networking
 ##########################
+# https://man7.org/linux/man-pages/man8/ip-rule.8.html
 # To find out which process is using port 8888, run:
 # lsof -i :8888
 
@@ -5280,6 +5328,13 @@ main "$@"
 # ethtool -G eth0 rx 4096 tx 4096
 
 # traceroute -nm 2 1.1.1.1
+
+# DNS
+# dig @1.1.1.1 google.com +tries=1 +time=2
+# Force TCP (sometimes UDP is blocked)
+# dig +tcp @1.1.1.1 google.com +tries=1 +time=2
+# dig -b binds the source IP so kernel chooses wg0 for the outgoing packet.
+# dig -b 192.168.. @1.1.1.1 google.com +tries=1 +time=2
 ##########################
 # Change System local/keyboard
 ##########################
@@ -5522,5 +5577,32 @@ main "$@"
 # npm version minor  # 1.0.0 → 1.1.0
 # npm version major  # 1.0.0 → 2.0.0
 ##########################
+# IP to Location
+##########################
+# https://mailfud.org/geoip-legacy/
+##########################
+# Wireguard
+##########################
+# apt install --no-install-recommends wireguard-tools
+# wg --version
+# chmod 600 /etc/wireguard/wg0.conf
+# To START the VPN: wg-quick up wg0
+# To CHECK the status: wg
+# To STOP the VPN:  wg-quick down wg0
+# systemctl enable wg-quick@wg0.service
+# conf
+# Stop wg-quick From Changing Your Default Route
+# In the [Interface] section, add the line: Table = off
+# Stop wg-quick From Changing DNS: DNS = <-- REMOVE or comment out
+##########################
+# systemctl
+##########################
+# systemctl list-units --all 'wg-quick@*'
+# clears failed-recorded units (single or all)
+# systemctl reset-failed 'wg-quick@wg0'
+# or for all
+# systemctl reset-failed
+##########################
 #
 ##########################
+
