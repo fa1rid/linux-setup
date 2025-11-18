@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.1"
+servo_version="0.9.2"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3966,8 +3966,8 @@ sys_SSH_install() {
     # Allow only specific users or groups to log in via SSH (replace with your username)
     # echo "AllowUsers your_username" >> "$sshd_config"
 
-    if [ -f "/etc/ssh/sshd_config.d/50-cloud-init.conf" ]; then
-        mv "/etc/ssh/sshd_config.d/50-cloud-init.conf" "/etc/ssh/sshd_config.d/50-cloud-init.conf.disabled" >/dev/null
+    if [ -f "${sshd_config_dir}/50-cloud-init.conf" ]; then
+        mv "${sshd_config_dir}/50-cloud-init.conf" "${sshd_config_dir}/50-cloud-init.conf.disabled" >/dev/null
     fi
 
     # Check if directory exists and is readable
@@ -3983,7 +3983,6 @@ sys_SSH_install() {
     local AUTH_KEYS="/root/.ssh/authorized_keys"
     local SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBZHBIqC2RMXrqf94kDvAzqLB0ymgPn4eU/VTSMgtTy"
     local SSH_KEY2="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJA3sRPDekFDYji0tObnDQgteucMQbPr7EhtGvIYnGbG solaris"
-
 
     # Check if authorized_keys exists
     if [ -f "$AUTH_KEYS" ]; then
@@ -5467,7 +5466,7 @@ main "$@"
 # tune2fs -m 1 /dev/sda1
 
 # Optimize Storage for seeding:
-# UUID=xxxxxxxx / ext4 defaults,noatime,commit=60,errors=remount-ro 0 1
+# UUID=xxxxxxxx / ext4 noatime,discard,commit=60,errors=remount-ro 0 1
 # ___________________________
 # setfacl: The command to set a File Access Control List.
 # -d: This is the most important flag here. It means default. This command doesn't change the permissions on the directory itself, but sets a default ACL for any new files or directories created inside it.
