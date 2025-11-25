@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.2"
+servo_version="0.9.3"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1954,26 +1954,27 @@ memcached_remove() {
 }
 
 docker_install() {
+	curl -fsSL https://get.docker.com | sh
     # Add Docker's official GPG key:
-    apt-get update && apt-get install -y ca-certificates curl gnupg
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
+    # apt-get update && apt-get install -y ca-certificates curl gnupg
+    # install -m 0755 -d /etc/apt/keyrings
+    # curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    # chmod a+r /etc/apt/keyrings/docker.gpg
 
-    # Add the repository to Apt sources:
-    local architecture
-    architecture=$(dpkg --print-architecture)
-    local codename
-    codename=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)
+    # # Add the repository to Apt sources:
+    # local architecture
+    # architecture=$(dpkg --print-architecture)
+    # local codename
+    # codename=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)
 
-    echo "deb [arch=$architecture signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $codename stable" |
-        tee /etc/apt/sources.list.d/docker.list >/dev/null
-    apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    # echo "deb [arch=$architecture signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $codename stable" |
+    #     tee /etc/apt/sources.list.d/docker.list >/dev/null
+    # apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 }
 
 docker_remove() {
     # Remove the official docker
-    apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras docker-model-plugin
     # for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do apt-get -y remove $pkg; done
     # Remove debian's docker
     # for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get -y remove $pkg; done
@@ -3238,6 +3239,7 @@ net_tune_kernel() {
 
     echo "net.ipv4.tcp_rmem = 4096 1048576 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.tcp_wmem = 4096 1048576 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.udp_mem = 8388608 12582912 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
 
     echo "net.ipv4.tcp_mtu_probing = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.tcp_no_metrics_save = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
@@ -3449,7 +3451,7 @@ get_arch() {
     #     bitness="32-bit"
     # fi
     # Return the values
-    echo "$architecture"
+    # echo "$architecture"
 }
 
 sys_manage() {
@@ -5430,6 +5432,12 @@ main "$@"
 # lsblk
 # lsblk -o name,label,size,type,FSROOTS,FSTYPE,FSSIZE,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINT
 
+# Optimize Storage for high performance:
+# nano /etc/fstab
+# UUID=xxxxxxxx / ext4 noatime,discard,commit=60,errors=remount-ro 0 1
+# systemctl daemon-reload
+# mount -o remount /
+
 # apt-get install -y acl
 # mkdir -p /mnt/media
 # chown root:media /mnt/media
@@ -5464,9 +5472,6 @@ main "$@"
 
 # To reduce reserved space to 1% (safer option for system stability):
 # tune2fs -m 1 /dev/sda1
-
-# Optimize Storage for seeding:
-# UUID=xxxxxxxx / ext4 noatime,discard,commit=60,errors=remount-ro 0 1
 # ___________________________
 # setfacl: The command to set a File Access Control List.
 # -d: This is the most important flag here. It means default. This command doesn't change the permissions on the directory itself, but sets a default ACL for any new files or directories created inside it.
