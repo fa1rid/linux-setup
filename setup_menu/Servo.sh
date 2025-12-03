@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.3"
+servo_version="0.9.4"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -779,34 +779,32 @@ php_install_myadmin() {
 
 }
 
+nginx_conf_domain_get() {
+	local path="$1"
+	# Extract the base filename
+	local domain_name="${path##*/}"
+
+	# Remove the file extension
+	domain_name="${domain_name%.*}"
+
+	# Get domain with subomain
+	# domain_name="${base_filename##*-}"
+
+	# Get domain only - Use awk to split the string by hyphen and capture the last part after the last dot
+	domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
+
+	domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
+
+	if is_valid_domain "$domain_name"; then
+		echo "$domain_name"
+		return 0
+	else
+		echo "${domain_name} is not a valid domain."
+		return 1
+	fi
+}
+	
 nginx_manage() {
-
-    nginx_conf_domain_get() {
-        local path="$1"
-
-        # Extract the base filename
-        local domain_name="${path##*/}"
-
-        # Remove the file extension
-        domain_name="${domain_name%.*}"
-
-        # Get domain with subomain
-        # domain_name="${base_filename##*-}"
-
-        # Get domain only - Use awk to split the string by hyphen and capture the last part after the last dot
-        domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
-
-        domain_name=$(echo "$domain_name" | awk -F'[-.]' '{print $(NF-1) "." $NF}')
-
-        if is_valid_domain "$domain_name"; then
-            echo "$domain_name"
-            return 0
-        else
-            echo "${domain_name} is not a valid domain."
-            return 1
-        fi
-    }
-
     local choice
     while true; do
         echo "Choose an option:"
@@ -2270,6 +2268,7 @@ rsync_manage() {
         echo "2. Rsync push letsencrypt"
         echo "3. rsync_push_ssl (guided)"
         echo "4. Install rsync daemon"
+        echo "5. Install rclone"
         echo "0. Quit"
         echo -e "\033[0m"
 
@@ -2280,10 +2279,15 @@ rsync_manage() {
         2) rsync_push_letsencrypt ;;
         3) rsync_push_ssl ;;
         4) install_rsync_daemon ;;
+        5) install_rclone ;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
     done
+}
+
+install_rclone() {
+	curl https://rclone.org/install.sh | sudo bash
 }
 
 rsync_install() {
@@ -3164,6 +3168,12 @@ EOF
     # ip link set dev softether up
 
     read -rp "Place your 'vpn_server.config' in ${install_dir} and press Enter"
+
+	systemctl stop vpnserver
+	# make the directory immutable
+	chattr +i ${install_dir}/server_log
+	# To remove the immutable flag:
+	# chattr -i ${install_dir}/server_log
 
     systemctl daemon-reload && systemctl enable vpnserver && systemctl restart vpnserver
 }
@@ -4271,63 +4281,64 @@ media_manage() {
 }
 
 media_mediainfo_install() {
-    # Determine the system architecture
+    local repo_ver="1.0-26"
+    local repo_url="https://mediaarea.net/repo/deb/repo-mediaarea_${repo_ver}_all.deb"
+    local temp_deb="/tmp/repo-mediaarea.deb"
+
+    # Detect Architecture
+    local arch
     arch=$(dpkg --print-architecture)
-    echo "Detected architecture: $arch"
-
-    if [ "$arch" = "amd64" ] || [ "$arch" = "i386" ]; then
-        echo "Setting up MediaArea repository for x86..."
-
-        # Download the repository package for x86 systems
-        wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-26_all.deb || {
-            echo "Error: Failed to download repository package for x86."
+    case "$arch" in
+        amd64|i386|arm64|armhf)
+            echo "Detected architecture: $arch"
+            ;;
+        *)
+            echo "Error: Architecture '$arch' is not explicitly supported by this function." >&2
             return 1
-        }
+            ;;
+    esac
 
-        # Install the downloaded package
-        dpkg -i repo-mediaarea_1.0-26_all.deb || {
-            echo "Error: Failed to install the repository package."
-            rm -f repo-mediaarea_1.0-26_all.deb
-            return 1
-        }
-        # Clean up the downloaded file
-        rm -f repo-mediaarea_1.0-25_all.deb
+    # Detect Distribution and Codename
+    if ! command -v lsb_release >/dev/null; then
+        apt-get update && apt-get install -y lsb-release
+    fi
 
-    elif [ "$arch" = "arm64" ] || [ "$arch" = "armhf" ]; then
-        echo "Setting up MediaArea repository for ARM (arm64/armhf)..."
+    local distro
+    distro=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
+    local codename
+    codename=$(lsb_release -sc)
 
-        # Download and install the repository key
-        wget "https://mediaarea.net/repo/deb/debian/keyring.gpg" -O /etc/apt/trusted.gpg.d/mediaarea.gpg || {
-            echo "Error: Failed to download the repository key."
-            return 1
-        }
+    # Normalize Raspbian to behave like Debian if needed, though MediaArea often detects it fine.
+    # The official repo deb handles the sources.list generation based on system detection.
+    
+    echo "Detected Distribution: $distro ($codename)"
 
-        # Write the repository entry for ARM architectures
-        echo "deb https://mediaarea.net/repo/deb/raspbian bookworm main" > /etc/apt/sources.list.d/mediaarea.list || {
-            echo "Error: Failed to write repository list."
-            return 1
-        }
+    # Install Dependencies
+    apt-get update && apt-get install -y wget apt-transport-https gnupg
 
+    # Download and Install MediaArea Repository Configuration
+    if wget -q -O "$temp_deb" "$repo_url"; then
+        echo "Installing repository configuration..."
+        dpkg -i "$temp_deb"
+        rm -f "$temp_deb"
     else
-        echo "Error: Unsupported architecture: $arch"
+        echo "Error: Failed to download repository package from $repo_url" >&2
         return 1
     fi
 
-    # Update package lists
-    apt-get update || {
-        echo "Error: apt-get update failed."
+    # Update and Install MediaInfo
+    echo "Updating package lists and installing MediaInfo..."
+    apt-get update
+    if apt-get install -y mediainfo; then
+        echo "------------------------------------------------"
+        echo "MediaInfo installed successfully!"
+        echo "Version: $(mediainfo --Version)"
+        echo "------------------------------------------------"
+    else
+        echo "Error: Failed to install mediainfo." >&2
         return 1
-    }
-
-    # Install mediainfo
-    apt-get install -y mediainfo || {
-        echo "Error: Installation of mediainfo failed."
-        return 1
-    }
-
-    echo "Mediainfo installation completed successfully."
+    fi
 }
-
 
 media_go_chromecast_install() {
     local arch
@@ -4396,19 +4407,45 @@ media_ffmpeg_install() {
     fi
 
     echo "Extracting $file..."
-    tar -xJf "$file" --strip-components=2 -C /usr/local/bin ${file%.tar.xz}/bin || echo "Failed to extract!" && ffmpeg -version | grep "ffmpeg version"
+    tar -xJf "$file" --strip-components=2 -C /usr/local/bin ${file%.tar.xz}/bin || echo "Failed to extract!" && ffmpeg -version | grep "ffmpeg version"; rm ${file}
 }
 
 media_mkvtoolnix_install() {
+    local DISTRO_ID=$(lsb_release -is)
+    local CODENAME=$(lsb_release -sc)
+    local REPO_PATH=""
+
+    # 1. Determine the repository path based on distribution ID
+    if [ "$DISTRO_ID" = "Debian" ]; then
+        REPO_PATH="debian"
+    elif [ "$DISTRO_ID" = "Ubuntu" ]; then
+        REPO_PATH="ubuntu"
+    else
+        echo "Unsupported distribution: $DISTRO_ID. This function is for Debian and Ubuntu only."
+        return 1
+    fi
+
+    # 2. Add GPG key (using recommended /etc/apt/keyrings path for modern systems)
     wget -O /usr/share/keyrings/gpg-pub-moritzbunkus.gpg https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg || { echo "Failed to add GPG key" && return 1; }
-    echo "deb [signed-by=/usr/share/keyrings/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/debian/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/mkvtoolnix.list
+
+    # 3. Add repository to sources list using the determined path and codename
+    echo "deb [signed-by=/usr/share/keyrings/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/${REPO_PATH}/ ${CODENAME} main" | tee /etc/apt/sources.list.d/mkvtoolnix.list > /dev/null
+
+    echo "Updating package list and installing mkvtoolnix..."
+
+    # 4. Update and install packages
     apt-get update && apt-get install -y mkvtoolnix
 }
+# media_mkvtoolnix_install() {
+#     wget -O /usr/share/keyrings/gpg-pub-moritzbunkus.gpg https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg || { echo "Failed to add GPG key" && return 1; }
+#     echo "deb [signed-by=/usr/share/keyrings/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/debian/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/mkvtoolnix.list
+#     apt-get update && apt-get install -y mkvtoolnix
+# }
 
 gg_bot_upload_assistant_setup() {
     local REPO_URL="https://gitlab.com/NoobMaster669/gg-bot-upload-assistant.git"
     local PROJECT_DIR="gg-bot-upload-assistant"
-    local TAG="3.1.5"
+    local TAG="3.2"
     local VENV_DIR="venv"
     local REQUIREMENTS_FILE="requirements/requirements.txt"
     local CONFIG_SAMPLE="samples/assistant/config.env"
@@ -4486,7 +4523,8 @@ gg_bot_upload_assistant_setup() {
     deactivate
     log "Virtual environment deactivated."
 
-    log "Installation process completed."
+    log "Removing"
+	apt-get remove -y python3-dev build-essential
 }
 
 rr_manage() {
@@ -4631,21 +4669,28 @@ autobrr_upgrade() {
 }
 
 prowlarr_install() {
-    mkdir -p /opt/Prowlarr/data
-    useradd -Nm -g media -s /bin/bash prowlarr
+	# Update upgrade func also
+	local USERNAME="prowlarr"
+	local GROUP="media"
+	local SHELL="/bin/bash"
 
-    wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/Prowlarr/app -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/Prowlarr && rm Prowlarr*.tar.gz
+    mkdir -p /opt/prowlarr/data
+	
+
+	id -u prowlarr &>/dev/null || ( useradd -Nm -g "$GROUP" -s "$SHELL" "$USERNAME" && echo "User '$USERNAME' created successfully." ) || echo "Error: Failed to create user '$USERNAME'"
+
+    wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/prowlarr/ -xzf Prowlarr*.tar.gz && chown $USERNAME:$GROUP -R /opt/prowlarr && rm Prowlarr*.tar.*
 
     cat << EOF | tee /etc/systemd/system/prowlarr.service > /dev/null
 [Unit]
 Description=Prowlarr Daemon
 After=syslog.target network.target
 [Service]
-User=prowlarr
-Group=media
+User=$USERNAME
+Group=$GROUP
 Type=simple
 
-ExecStart=/opt/Prowlarr/app/Prowlarr -nobrowser -data=/opt/Prowlarr/data/
+ExecStart=/opt/prowlarr/Prowlarr/Prowlarr -nobrowser -data=/opt/prowlarr/data/
 TimeoutStopSec=20
 KillMode=process
 Restart=on-failure
@@ -4654,13 +4699,13 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-    systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
-    systemctl enable --now prowlarr.service && systemctl status prowlarr.service || error_exit "Failed to enable and start the service."
+    systemctl daemon-reload && systemctl enable --now prowlarr.service && systemctl status prowlarr.service
+	# journalctl --no-hostname -e -u prowlarr
 }
 
 prowlarr_upgrade() {
     systemctl stop prowlarr.service
-    wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/Prowlarr/app -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/Prowlarr && rm Prowlarr*.tar.gz
+    wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/prowlarr -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/prowlarr && rm Prowlarr*.tar.*
 
     systemctl start prowlarr.service && systemctl status prowlarr.service
 }
@@ -4999,12 +5044,14 @@ nodejs_install() {
     echo "1. Node 18x"
     echo "2. Node 20x"
     echo "3. Node 22x"
+    echo "4. Node 24x"
     # Prompt user for version choice
     read -rp "Enter the number corresponding to the Node.js version you want to install: " choice
     case $choice in
     1) VERSION="18" ;;
     2) VERSION="20" ;;
     3) VERSION="22" ;;
+    4) VERSION="24" ;;
     *)
         echo "Invalid choice!"
         nodejs_install
@@ -5328,6 +5375,9 @@ main "$@"
 # ethtool -K eth0 gso on
 # ethtool -G eth0 rx 4096 tx 4096
 
+# list
+# ethtool -k eth0
+
 # traceroute -nm 2 1.1.1.1
 
 # DNS
@@ -5523,9 +5573,11 @@ main "$@"
 # journalctl --vacuum-time=2weeks
 # journalctl --vacuum-size=100M
 
-# Configure persistent and volatile limits
+# Configure persistent and volatile limits (journal size)
 # echo "SystemMaxUse=500M" | tee -a /etc/systemd/journald.conf
 # echo "RuntimeMaxUse=200M" | tee -a /etc/systemd/journald.conf
+# Make journald store logs only in RAM
+# echo "Storage=volatile" | tee -a /etc/systemd/journald.conf
 # systemctl restart systemd-journald
 ##########################
 # makemkv
