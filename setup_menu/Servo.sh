@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.4"
+servo_version="0.9.5"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3231,7 +3231,11 @@ EOFX
 }
 
 net_tune_kernel() {
-    apt-get install irqbalance && systemctl enable --now irqbalance
+	local _irqbalance
+	read -rp "Do you want to install and enable irqbalance? (y/n): " _irqbalance
+	if [[ "$_irqbalance" == "y" ]]; then
+		apt-get install irqbalance && systemctl enable --now irqbalance
+	fi
 
     # Tune Kernel
     echo "------------- Adding -------------"
@@ -3265,6 +3269,11 @@ net_tune_kernel() {
     echo "net.netfilter.nf_conntrack_buckets = 262144" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.ipv4.tcp_fin_timeout = 30" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30" | tee -a /etc/sysctl.d/tune_kernel.conf
+
+	# Increase ARP cache size
+    echo "net.ipv4.neigh.default.gc_thresh1 = 1024" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.neigh.default.gc_thresh2 = 4096" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.neigh.default.gc_thresh3 = 8192" | tee -a /etc/sysctl.d/tune_kernel.conf
 
     echo "vm.dirty_ratio = 10   " | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "vm.dirty_background_ratio = 5" | tee -a /etc/sysctl.d/tune_kernel.conf
@@ -3482,6 +3491,7 @@ sys_manage() {
         echo "11. Reload Cron (root profile)"
         echo "12. Install Auto Mount USB"
         echo "13. Cleanup ubuntu bloat"
+        echo "14. Install tmux"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -3503,6 +3513,7 @@ sys_manage() {
         11) sys_cron_reload ;;
         12) mount_usb_install ;;
         13) sys_cleanup-ubuntu;;
+        14) sys_tmux_install;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -3513,6 +3524,45 @@ sys_init() {
     sys_std_pkg_install
     sys_SSH_install
     sys_config_setup
+	sys_tmux_install
+}
+
+sys_tmux_install() {
+	local tmux_conf="$HOME/.config/tmux/tmux.conf"
+	mkdir -p "$HOME/.config/tmux"
+	apt-get install -y tmux
+
+    # Check if .tmux.conf already exists
+    if [[ -f "$tmux_conf" ]]; then
+        echo "Existing configuration file found at $tmux_conf."
+        echo "Appending MobaXterm/mouse settings to the file."
+    else
+        echo "Creating new tmux configuration file at $tmux_conf."
+        touch "$tmux_conf"
+    fi
+
+    # Define the configuration settings to be added
+    cat << 'EOF' >> "$tmux_conf"
+unbind C-B
+set -g prefix `
+bind ` send-prefix
+set -g terminal-overrides ',xterm*:smcup@:rmcup@'
+set -g mouse on
+set-option -g status-left ""
+set-option -g status-right " #S "
+set -g window-status-format ' #W '
+set -g window-status-current-format ' #W '
+# set -g status-style bg=default,fg=black,bright
+set -g window-status-bell-style "bg=red,nobold"
+set -g window-status-current-style "#{?window_zoomed_flag,bg=yellow,bg=white,nobold}"
+set -g base-index 1
+set -g pane-base-index 1
+set -g renumber-windows on
+set -g history-limit 10000
+# set -g default-terminal "${TERM}"
+# set -sg terminal-overrides ",*:RGB"
+EOF
+    echo "To apply to an *existing* session, run: tmux source-file $tmux_conf"
 }
 
 sys_cron_reload() {
@@ -4028,31 +4078,29 @@ sys_SSH_install() {
     # Restart SSH service (for changes to take effect immediately)
 
     # Check if the ssh.socket unit is active and enabled.
-    if systemctl is-active --quiet ssh.socket || systemctl is-enabled --quiet ssh.socket; then
-        echo "SSH is running as a socket. Reloading and restarting."
-        systemctl daemon-reload && systemctl restart ssh.socket
-    elif systemctl is-active --quiet ssh || systemctl is-enabled --quiet ssh; then
-        echo "SSH is running as a service (ssh). Restarting."
-        systemctl restart ssh
-    else
-        echo "Attempting to restart sshd service as a fallback."
-        systemctl restart sshd
+    if systemctl is-enabled --quiet ssh.socket; then
+        echo "ssh.socket is enabled. Disabling.."
+        systemctl disable ssh.socket || echo "Failed to disable ssh.socket"
+	fi
+	if systemctl is-active --quiet ssh.socket; then
+		echo "ssh.socket is running. Stopping.."
+		systemctl stop ssh.socket || echo "Failed to stop ssh.socket"
+	fi
+    if ! systemctl is-enabled --quiet ssh.service; then
+        echo "ssh.service is not enabled. Enabling...."
+        systemctl enable ssh.service || echo "Failed to enable ssh.service"
     fi
+    systemctl restart ssh.service || echo "Failed to restart ssh.service"
 
     # Verify the status after attempting a restart.
-    if systemctl is-active --quiet ssh.socket; then
-        echo "ssh.socket is active."
-    elif systemctl is-active --quiet ssh; then
-        echo "ssh service is active."
-    elif systemctl is-active --quiet sshd; then
-        echo "sshd service is active."
-    else
+    if ! systemctl is-active --quiet ssh; then
         echo "Warning: SSH server does not appear to be active after restart attempt."
     fi
 
 }
 
 sys_set_grub_timeout() {
+	# Add mitigations=off to GRUB_CMDLINE_LINUX_DEFAULT= to increase performance
     local TIMEOUT=3
 
     [ ! -f "/etc/default/grub" ] && {
