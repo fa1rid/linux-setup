@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.5"
+servo_version="0.9.6"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1968,6 +1968,8 @@ docker_install() {
     # echo "deb [arch=$architecture signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $codename stable" |
     #     tee /etc/apt/sources.list.d/docker.list >/dev/null
     # apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    # apt-mark unhold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 }
 
 docker_remove() {
@@ -4132,6 +4134,15 @@ sys_cleanup-ubuntu(){
 sys_config_setup() {
     local restore_choice
     local bashrc="/etc/bash.bashrc"
+	local f
+
+	for f in /etc/iptables/rules.{v4,v6}; do
+		[ -f "$f" ] && mv "$f" "$f.org"
+	done
+
+	for f in /root/.bashrc /root/.profile; do
+		[ -f "$f" ] && rm "$f"
+	done
 
     echo "Updating Grub timeout.."
     sys_set_grub_timeout
@@ -4808,6 +4819,9 @@ qBittorrent_manage() {
         local choice
         local download_url
         local arch
+		local dl_dir="/root/dl"
+		chmod 701 /root
+
         echo "1. Latest"
         echo "2. v4.6.7"
         echo "3. v5.1.2"
@@ -4854,6 +4868,7 @@ qBittorrent_manage() {
             useradd -Nm -g media -s /bin/bash qbittorrent
         fi
         mkdir -p "$config_dir"
+        
 
         # Download qBittorrent
         wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
@@ -4873,19 +4888,35 @@ qBittorrent_manage() {
         # Hash the password
         password_hash=$(create_pass "$password")
 
+mkdir -p "$dl_dir"
         # Create Config File
         cat <<EOF >"$config_dir/qBittorrent.conf"
-[LegalNotice]
-Accepted=true
+[Application]
+FileLogger\Enabled=false
 
 [BitTorrent]
+Session\AlternativeGlobalDLSpeedLimit=5
+Session\AlternativeGlobalUPSpeedLimit=5
+Session\BTProtocol=TCP
+Session\CheckingMemUsageSize=128
+Session\ConnectionSpeed=100
 Session\DHTEnabled=false
+Session\DefaultSavePath=$dl_dir
+Session\FilePoolSize=500
+Session\LSDEnabled=false
 Session\MaxActiveDownloads=20
 Session\MaxActiveTorrents=500
 Session\MaxActiveUploads=500
 Session\MaxUploads=400
 Session\MaxUploadsPerTorrent=200
-Session\BTProtocol=TCP
+Session\MultiConnectionsPerIp=true
+Session\PeerTurnover=2
+Session\PeerTurnoverInterval=30
+Session\SendBufferLowWatermark=20
+Session\SendBufferWatermark=1000
+Session\SendBufferWatermarkFactor=100
+Session\SocketBacklogSize=100
+
 ; Session\CoalesceReadWrite=true
 ; Session\ConnectionSpeed=150
 ; Session\IDNSupportEnabled=true
@@ -4893,13 +4924,12 @@ Session\BTProtocol=TCP
 ; Session\PeerToS=128
 ; Session\PeerTurnover=10
 ; Session\PieceExtentAffinity=true
-; Session\Preallocation=true
-; Session\SendBufferLowWatermark=1048
-; Session\SendBufferWatermark=5120
-; Session\SendBufferWatermarkFactor=200
 ; Session\SocketBacklogSize=300
 ; Session\StopTrackerTimeout=5
 ; Session\SuggestMode=true
+
+[LegalNotice]
+Accepted=true
 
 [Network]
 PortForwardingEnabled=false
