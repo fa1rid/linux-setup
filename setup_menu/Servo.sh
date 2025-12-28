@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.6"
+servo_version="0.9.7"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3281,7 +3281,7 @@ net_tune_kernel() {
     echo "vm.dirty_background_ratio = 5" | tee -a /etc/sysctl.d/tune_kernel.conf
     echo "vm.vfs_cache_pressure = 50" | tee -a /etc/sysctl.d/tune_kernel.conf
 
-    # echo "net.ipv4.tcp_tw_reuse = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+    echo "net.ipv4.tcp_tw_reuse = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
     # echo "net.ipv4.tcp_adv_win_scale = 2" | tee -a /etc/sysctl.d/tune_kernel.conf
     # echo "net.ipv4.tcp_timestamps = 0" | tee -a /etc/sysctl.d/tune_kernel.conf
 
@@ -4889,6 +4889,7 @@ qBittorrent_manage() {
         password_hash=$(create_pass "$password")
 
 mkdir -p "$dl_dir"
+chmod 777 "$dl_dir"
         # Create Config File
         cat <<EOF >"$config_dir/qBittorrent.conf"
 [Application]
@@ -4902,6 +4903,7 @@ Session\CheckingMemUsageSize=128
 Session\ConnectionSpeed=100
 Session\DHTEnabled=false
 Session\DefaultSavePath=$dl_dir
+Session\DiskCacheTTL=120
 Session\FilePoolSize=500
 Session\LSDEnabled=false
 Session\MaxActiveDownloads=20
