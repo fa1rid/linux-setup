@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.7"
+servo_version="0.9.9"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -2435,28 +2435,44 @@ rsync_push_letsencrypt() {
 
 rsync_push_ssl() {
     local path="$1"
+    
+    # 1. Check if path selection fails
     if [[ -z "$path" ]]; then
         path=$(select_from_dir "/etc/ssl/")
+        [[ -z "$path" ]] && return 1 
     fi
+
     path="${path%%+(/)}"
     local domain="${path##*/}"
     local host="$2"
     local port="$3"
     local user="$4"
+
+    # 2. Handle interactive inputs
     if [[ -z "$host" ]]; then
         read -rp "Enter host or IP: " host
+        [[ -z "$host" ]] && return 1
     fi
     if [[ -z "$port" ]]; then
         read -rp "Enter port: " port
+        [[ -z "$port" ]] && return 1
     fi
     if [[ -z "$user" ]]; then
         read -rp "Enter user (default root): " user
-        if [[ -z "$user" ]]; then
-            user=root
-        fi
+        user="${user:-root}"
     fi
+
+    # 3. Execute rsync and capture result
     rsync --log-file="/var/log/rsync/push_ssl.log" -uahzPL "${path}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
-    echo "Log written to '/var/log/rsync/push_ssl.log'"
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        echo "Success: Log written to '/var/log/rsync/push_ssl.log'"
+    else
+        echo "Error: rsync failed with exit code $exit_code" >&2
+    fi
+
+    return $exit_code
 }
 
 compress() {
@@ -3494,6 +3510,7 @@ sys_manage() {
         echo "12. Install Auto Mount USB"
         echo "13. Cleanup ubuntu bloat"
         echo "14. Install tmux"
+        echo "15. Set Journal to use RAM"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -3516,6 +3533,7 @@ sys_manage() {
         12) mount_usb_install ;;
         13) sys_cleanup-ubuntu;;
         14) sys_tmux_install;;
+        15) sys_journal_conf;;
         0) return 0 ;;
         *) echo "Invalid choice." ;;
         esac
@@ -3527,6 +3545,15 @@ sys_init() {
     sys_SSH_install
     sys_config_setup
 	sys_tmux_install
+}
+
+sys_journal_conf() {
+	# journal size
+	echo "SystemMaxUse=500M" | tee -a /etc/systemd/journald.conf # Persistent (Disk)
+	echo "RuntimeMaxUse=200M" | tee -a /etc/systemd/journald.conf # Volatile (RAM)
+	# Make journald store logs only in RAM
+	echo "Storage=volatile" | tee -a /etc/systemd/journald.conf
+	systemctl restart systemd-journald
 }
 
 sys_tmux_install() {
@@ -3962,7 +3989,8 @@ sys_std_pkg_install() {
         lynx \
 		whiptail \
 		iputils-ping \
-		apt-utils
+		apt-utils \
+		less
         # net-tools \
 
     if dpkg -l | grep -q "exim4"; then
@@ -3989,11 +4017,24 @@ config_set() {
 sys_SSH_install() {
     local sshd_config="/etc/ssh/sshd_config"
     local sshd_config_dir="/etc/ssh/sshd_config.d"
+	local DIR="/root/.ssh"
+	local CONF="$DIR/config"
 
     if ! dpkg -l | grep -q "^ii\s*openssh-server\s"; then
         # Update package lists & Install SSH server
         apt-get update && apt-get install -y openssh-server || return 1
     fi
+	
+	# Create directory only if missing; warn if it fails
+	[[ ! -d "$DIR" ]] && { mkdir -m 700 "$DIR" || { echo "⚠️ Error: Root path blocked"; exit 1; }; }
+
+	# Smart check: If file exists AND contains the setting, warn. Else, append.
+	if [[ -f "$CONF" ]] && grep -q "StrictHostKeyChecking" "$CONF"; then
+		echo "⚠️ Warning: Setting for StrictHostKeyChecking already exists in $CONF"
+	else
+		printf "Host *\n    StrictHostKeyChecking accept-new\n" >> "$CONF" && chmod 600 "$CONF"
+		echo "✅ Updated: $CONF"
+	fi
 
     # Backup the original configuration
     if [ -e "${sshd_config}_backup" ]; then
@@ -4046,7 +4087,7 @@ sys_SSH_install() {
 
     local AUTH_KEYS="/root/.ssh/authorized_keys"
     local SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBZHBIqC2RMXrqf94kDvAzqLB0ymgPn4eU/VTSMgtTy"
-    local SSH_KEY2="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJA3sRPDekFDYji0tObnDQgteucMQbPr7EhtGvIYnGbG solaris"
+    local SSH_KEY2="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJA3sRPDekFDYji0tObnDQgteucMQbPr7EhtGvIYnGbG master"
 
     # Check if authorized_keys exists
     if [ -f "$AUTH_KEYS" ]; then
@@ -4590,8 +4631,8 @@ rr_manage() {
     while true; do
         echo -e "\033[33m"
         echo "Choose an option:"
-        echo "1. Install Autobrr (root)"
-        echo "2. Upgrade Autobrr"
+        echo "1. Install autobrr (autobrr)"
+        echo "2. Upgrade autobrr"
         echo "3. Manage qBittorrent"
         echo "4. Install cross-seed"
         echo "5. Install Prowlarr (prowlarr)"
@@ -4664,6 +4705,25 @@ EOF
 
 autobrr_install() {
     local subdomain
+	local SERVICE_USER="autobrr"
+	local SERVICE_GROUP="autobrr"
+
+	# Check if the group exists, if not, create it
+	if ! getent group "$SERVICE_GROUP" > /dev/null; then
+		echo "Creating group $SERVICE_GROUP"
+		groupadd --system "$SERVICE_GROUP"
+	fi
+
+	# Check if the user exists, if not, create it
+	if ! id "$SERVICE_USER" > /dev/null 2>&1; then
+		echo "Creating system user $SERVICE_USER"
+		useradd --system \
+				--gid "$SERVICE_GROUP" \
+				--no-create-home \
+				--shell /usr/sbin/nologin \
+				--comment "Service account for autobrr" \
+				"$SERVICE_USER"
+	fi
 
     mkdir -p /opt/autobrr/config
     wget "$(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
@@ -4674,8 +4734,8 @@ After=syslog.target network-online.target
 
 [Service]
 Type=simple
-User=root
-Group=root
+User=$SERVICE_USER
+Group=$SERVICE_GROUP
 ExecStart=/opt/autobrr/autobrr --config=/opt/autobrr/config/
 
 [Install]
@@ -4715,6 +4775,8 @@ server {
 
 }
 EOF
+	chown -R "$SERVICE_USER":"$SERVICE_GROUP" "/opt/autobrr"
+	chmod -R 750 "/opt/autobrr"
     nginx_cert_install
     systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
     systemctl enable --now autobrr.service && systemctl status autobrr.service || error_exit "Failed to enable and start the service."
@@ -4722,8 +4784,12 @@ EOF
 }
 
 autobrr_upgrade() {
+	local SERVICE_USER="autobrr"
+	local SERVICE_GROUP="autobrr"
     systemctl stop autobrr.service
     wget "$(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
+	chown -R "$SERVICE_USER":"$SERVICE_GROUP" "/opt/autobrr"
+	chmod -R 750 "/opt/autobrr"
     systemctl start autobrr.service && systemctl status autobrr.service
 }
 
@@ -5392,6 +5458,11 @@ main "$@"
 # -w,    match only whole words
 # -x,    match only whole lines
 # -v,    select non-matching lines
+
+# grep -rnw '/path/to/directory' -e 'search-string'
+# -r (or -R): Recursive search (includes all subdirectories).
+# -n: Displays the line number where the match was found.
+# -w: Matches the whole word only (prevents "search" from matching "searching").
 
 ##########################
 # Users & sudo
