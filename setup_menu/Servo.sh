@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="0.9.9"
+servo_version="1.0.1"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -3559,7 +3559,9 @@ sys_journal_conf() {
 sys_tmux_install() {
 	local tmux_conf="$HOME/.config/tmux/tmux.conf"
 	mkdir -p "$HOME/.config/tmux"
-	apt-get install -y tmux
+	if ! command -v tmux &> /dev/null; then
+		apt-get install -y tmux
+	fi
 
     # Check if .tmux.conf already exists
     if [[ -f "$tmux_conf" ]]; then
@@ -3571,12 +3573,15 @@ sys_tmux_install() {
     fi
 
     # Define the configuration settings to be added
-    cat << 'EOF' >> "$tmux_conf"
+    cat << 'EOF' > "$tmux_conf"
 unbind C-B
 set -g prefix `
 bind ` send-prefix
 set -g terminal-overrides ',xterm*:smcup@:rmcup@'
-set -g mouse on
+set -g mouse off
+bind q set -g mouse\; display-message "Mouse: #{?mouse,ON,OFF}"
+unbind -n WheelUpPane
+unbind -n WheelDownPane
 set-option -g status-left ""
 set-option -g status-right " #S "
 set -g window-status-format ' #W '
@@ -5339,7 +5344,7 @@ main() {
             "mariadb_manage             | Database"
             "php_manage                 | PHP"
             "certbot_manage             | Certbot"
-            "rsync_manage               | Rsync"
+            "rsync_manage               | Rsync/Rclone"
             "memcached_manage           | Memcached"
             "docker_manage              | Docker"
             "nodejs_manage              | Node.js"
