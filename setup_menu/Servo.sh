@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="1.0.1"
+servo_version="1.0.2"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1391,7 +1391,7 @@ nginx_vhost_create() {
     if id "${vuser}" &>/dev/null; then
         echo "User ${vuser} exists."
     else
-        echo "User ${vuser} does not exist."
+        echo "Creating new user: ${vuser}"
         useradd -N -m -s "$(which bash)" -d "/var/www/${vuser}" "${vuser}"
         rm -rf /var/www/"${vuser}"/{.bashrc,.profile,.bash_logout}
         passwd -l "$vuser"
@@ -1811,18 +1811,64 @@ db_show_databases() {
 }
 
 db_create() {
-    local DB_NAME DB_USER DB_USER_PASS
-    db_show_databases
-    read -rp "Enter a name for the database: " DB_NAME
-    read -rp "Enter a db username: " DB_USER
-    read -rp "Enter a password for the db user: " DB_USER_PASS
-    # Create a new database and user
-    $DB_CMD -e "CREATE DATABASE $DB_NAME;"
-    $DB_CMD -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
-    $DB_CMD -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-    $DB_CMD -e "FLUSH PRIVILEGES;"
+	# db_create <db_name> <db_user> <db_password> [host]
+    local DB_NAME DB_USER DB_USER_PASS DB_HOST host_choice
 
-    echo "Done."
+    # Positional arguments
+    DB_NAME="$1"
+    DB_USER="$2"
+    DB_USER_PASS="$3"
+    DB_HOST="$4"
+
+    # Interactive fallback
+    if [[ -z "$DB_NAME" ]]; then
+        db_show_databases
+        read -rp "Enter a name for the database: " DB_NAME
+    fi
+
+    if [[ -z "$DB_USER" ]]; then
+        read -rp "Enter a db username: " DB_USER
+    fi
+
+    if [[ -z "$DB_USER_PASS" ]]; then
+        read -srp "Enter a password for the db user: " DB_USER_PASS
+        echo
+    fi
+
+    # Host handling
+    if [[ -z "$DB_HOST" ]]; then
+        echo "User host:"
+        echo "  1) localhost (recommended)"
+        echo "  2) Any host (%)"
+        read -rp "Choose [1-2]: " host_choice
+
+        case "$host_choice" in
+            2) DB_HOST="%" ;;
+            *) DB_HOST="localhost" ;;
+        esac
+    else
+        case "$DB_HOST" in
+            any|% ) DB_HOST="%" ;;
+            * ) DB_HOST="localhost" ;;
+        esac
+    fi
+
+    # Validation
+    [[ -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_USER_PASS" ]] && {
+        echo "Error: missing required values"
+        return 1
+    }
+
+    # Escape single quotes in password
+    DB_USER_PASS_ESCAPED=${DB_USER_PASS//\'/\'\'}
+
+    # Execute
+    $DB_CMD -e "
+        CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;
+        CREATE USER IF NOT EXISTS '$DB_USER'@'$DB_HOST' IDENTIFIED BY '$DB_USER_PASS_ESCAPED';
+        GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'$DB_HOST';
+        FLUSH PRIVILEGES;
+    "
 }
 
 db_config_read() {
@@ -3510,7 +3556,7 @@ sys_manage() {
         echo "12. Install Auto Mount USB"
         echo "13. Cleanup ubuntu bloat"
         echo "14. Install tmux"
-        echo "15. Set Journal to use RAM"
+        echo "15. Set Journal to use RAM (Use if you have 4GB+ RAM)"
         echo "0. Quit"
         echo -e "\033[0m"
         read -rp "Enter your choice: " choice
@@ -3545,7 +3591,20 @@ sys_init() {
     sys_SSH_install
     sys_config_setup
 	sys_tmux_install
+	rsync_install
 }
+
+sys_init_php_nginx() {
+    sys_std_pkg_install
+    sys_SSH_install
+    sys_config_setup
+	sys_tmux_install
+	php_install
+	nginx_install
+	sys_rsnapshot_install
+	rsync_install
+}
+
 
 sys_journal_conf() {
 	# journal size
@@ -5080,18 +5139,37 @@ EOF
 
     }
 
-    config_set() {
-        local key="$1"
-        local val="$2"
-        local file="$3"
-        awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]*.*", key val); print}' "$file" | awk '{if (NF > 0) {if (!seen[$0]++) print} else {print}}' >"${file}.tmp" && mv "${file}.tmp" "$file"
-    }
+    qbit_config_set() {
+		local section="Preferences"
+		local key="$1"
+		local val="$2"
+		local file="$3"
+
+		if ! crudini --set --ini-options=nospace "$file" "$section" "$key" "$val"; then
+			echo "ERROR: Failed to write to $file" >&2
+			return 1
+		fi
+		local current_val
+		current_val=$(crudini --get "$file" "$section" "$key" 2>/dev/null)
+
+		if [[ "$current_val" == "$val" ]]; then
+			echo "SUCCESS: $key set and verified."
+			return 0
+		else
+			echo "ERROR: Verification failed for $key!" >&2
+			return 1
+		fi
+	}
 
     # Function to reset username and password for the web UI
     reset_username_password() {
+		if ! command -v crudini &> /dev/null; then
+			apt-get install crudini -y || { echo "Failed to install crudini"; return 1; }
+		fi
+		
         # Ask for new username and password
         read -rp "Enter new username for qBittorrent WebUI: " new_username
-        read -rsp "Enter new password for qBittorrent WebUI: " new_password
+        read -rsp "Enter new password for qBittorrent WebUI (hidden): " new_password
         echo # Newline after password input
 
         # Hash the password
@@ -5103,16 +5181,12 @@ EOF
         # Update Config File with new username and password
         if [[ -f "$config_dir/qBittorrent.conf" ]]; then
 
-            systemctl stop qbittorrent.service || error_exit "Failed to stop qbittorrent.service"
+            systemctl stop qbittorrent.service || { echo "Failed to stop qbittorrent.service"; return 1; }
 
-            config_set 'WebUI\\\\Username=' "$new_username" "$config_dir/qBittorrent.conf" || error_exit "Failed to find Username line"
-            config_set 'WebUI\\\\Password_PBKDF2=' "$new_password_hash" "$config_dir/qBittorrent.conf" || error_exit "Failed to find Password line"
-            echo "Username and password updated successfully!"
+			qbit_config_set "WebUI\\Username" "$new_username" "$config_dir/qBittorrent.conf" || return 1
+			qbit_config_set "WebUI\\Password_PBKDF2" "$new_password_hash" "$config_dir/qBittorrent.conf" || return 1
 
-            echo "Value from config file:"
-            cat "$config_dir/qBittorrent.conf" | grep "Password_PBKDF2"
-
-            systemctl start qbittorrent.service || error_exit "Failed to start qbittorrent.service"
+            systemctl start qbittorrent.service || { echo "Failed to start qbittorrent.service"; return 1; }
 
         else
             error_exit "qBittorrent configuration file not found. Please install qBittorrent first."
@@ -5558,13 +5632,12 @@ main "$@"
 # Rsync
 ##########################
 ## Commands to Migrate Solaris Server
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.ssh/id_ed25519.pub" "/root/.ssh/id_ed25519" -e "ssh -p 4444" "root@${ip}:/root/.ssh/"
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/cloudflare/" -e "ssh -p 4444" "root@${ip}:/etc/cloudflare/"
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/root/.config/rsnapshot/" -e "ssh -p 4444" "root@${ip}:/root/.config/rsnapshot/"
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/etc/letsencrypt/" -e "ssh -p 4444" "root@${ip}:/etc/letsencrypt/"
-# rsync --log-file="/var/log/rsync/letsencrypt.log" --stats -uavhzPL "/var/www/solaris/solarissolutions.co/" -e "ssh -p 4444" "root@${ip):/var/www/solaris/solarissolutions.co/"
-# rsync -ahPL -e "ssh -p 4444" "root@10.0.0.3:/root/Downloads/" "."
-# rsync -ahPL "/usr/local/softether/vpn_server.config" -e "ssh -p 4444" "root@10.0.0.4:/usr/local/softether/vpn_server.config"
+# rsync --stats -zahL --info=progress2 --info=name0 --no-inc-recursive "/root/.ssh/id_ed25519.pub" "/root/.ssh/id_ed25519" -e "ssh -p 4444" "root@${ip}:/root/.ssh/"
+# rsync --stats -zahL --info=progress2 --info=name0 --no-inc-recursive "/root/.config/rsnapshot/" -e "ssh -p 4444" "root@${ip}:/root/.config/rsnapshot/"
+# rsync --stats -zahL --info=progress2 --info=name0 --no-inc-recursive "/var/www/solaris/solarissolutions.co/" -e "ssh -p 4444" "root@${ip):/var/www/solaris/solarissolutions.co/"
+
+# rsync --log-file="/var/log/rsync/...log" -zahL --info=progress2 --info=name0 --no-inc-recursive -e "ssh -p 4444" "root@10.0.0.3:/root/Downloads/" "."
+
 # -u         skip files that are newer on the receiver
 # -a         archive mode is -rlptgoD (no -A,-X,-U,-N,-H)
 # -r           recurse into directories
@@ -5731,6 +5804,7 @@ main "$@"
 
 # Configure persistent and volatile limits (journal size)
 # echo "SystemMaxUse=500M" | tee -a /etc/systemd/journald.conf
+# Use this only if you have enough RAM (4GB at least)
 # echo "RuntimeMaxUse=200M" | tee -a /etc/systemd/journald.conf
 # Make journald store logs only in RAM
 # echo "Storage=volatile" | tee -a /etc/systemd/journald.conf
