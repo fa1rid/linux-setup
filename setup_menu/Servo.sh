@@ -12,42 +12,42 @@ servo_version="1.0.2"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-    # Bash programmable completion
-    _completion() {
-        local cur prev cword opts #words
-        # COMPREPLY=($words)
-        # return
-        _init_completion -n = || return
+	# Bash programmable completion
+	_completion() {
+		local cur prev cword opts #words
+		# COMPREPLY=($words)
+		# return
+		_init_completion -n = || return
 
-        opts="compress decompress db_backup db_restore perm_set gen_pass rsync_push_letsencrypt rsync_push_ssl"
-        if ((cword == 1)); then
-            COMPREPLY=($(compgen -W "$opts" -- "$cur"))
-            return
-        fi
+		opts="compress decompress db_backup db_restore perm_set gen_pass rsync_push_letsencrypt rsync_push_ssl"
+		if ((cword == 1)); then
+			COMPREPLY=($(compgen -W "$opts" -- "$cur"))
+			return
+		fi
 
-        if ((cword == 2)); then
-            case "${prev}" in
-            compress)
-                local formats="zip tar gz bz2 xz 7z"
-                COMPREPLY=($(compgen -W "${formats}" -- ${cur}))
-                return
-                ;;
-                # decompress)
-                #     # printf "Hint: You need to pass the path.\n"
-                #     # Implement dynamic completions here based on available files
-                #     return
-                # ;;
-            *) ;;
-            esac
-        fi
-        _filedir
-        # COMPREPLY+=($(compgen -o plusdirs -A file "$cur"))
+		if ((cword == 2)); then
+			case "${prev}" in
+			compress)
+				local formats="zip tar gz bz2 xz 7z"
+				COMPREPLY=($(compgen -W "${formats}" -- ${cur}))
+				return
+				;;
+				# decompress)
+				#     # printf "Hint: You need to pass the path.\n"
+				#     # Implement dynamic completions here based on available files
+				#     return
+				# ;;
+			*) ;;
+			esac
+		fi
+		_filedir
+		# COMPREPLY+=($(compgen -o plusdirs -A file "$cur"))
 
-    }
-    complete -F _completion Servo.sh
-    return
-    # complete -p Servo.sh
-    # complete -r Servo.sh
+	}
+	complete -F _completion Servo.sh
+	return
+	# complete -p Servo.sh
+	# complete -r Servo.sh
 fi
 # Check if the script is run as root
 # if [[ $EUID -ne 0 ]]; then
@@ -55,7 +55,7 @@ fi
 #     exit 1
 # fi
 if [[ ! -e /usr/share/bash-completion/completions/Servo.sh ]]; then
-    ln -s /usr/local/bin/Servo.sh /usr/share/bash-completion/completions/
+	ln -s /usr/local/bin/Servo.sh /usr/share/bash-completion/completions/
 fi
 #########################################
 
@@ -72,244 +72,244 @@ PHP_Versions=("7.4" "8.2")
 
 # Check if MariaDB is installed
 if command -v mariadb &>/dev/null; then
-    DB_CMD="mariadb"
+	DB_CMD="mariadb"
 elif command -v mysql &>/dev/null; then
-    DB_CMD="mysql"
+	DB_CMD="mysql"
 fi
 
 if command -v mariadb-dump &>/dev/null; then
-    DUMP_CMD="mariadb-dump"
+	DUMP_CMD="mariadb-dump"
 elif command -v mysqldump &>/dev/null; then
-    DUMP_CMD="mysqldump"
+	DUMP_CMD="mysqldump"
 fi
 
 #########################################
 
 path_exists() {
-    local path=$1
-    if [ -e "$path" ]; then
-        return 0
-    else
-        return 1
-    fi
+	local path=$1
+	if [ -e "$path" ]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 file_exists() {
-    local file_path=$1
-    if [ -f "$file_path" ]; then
-        return 0
-    else
-        return 1
-    fi
+	local file_path=$1
+	if [ -f "$file_path" ]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 # Validate if a command is available on the system
 validate_command() {
-    if ! command -v "$1" &>/dev/null; then
-        echo "Error: $1 is not installed on this system."
-        return 1
-    fi
-    return 0
+	if ! command -v "$1" &>/dev/null; then
+		echo "Error: $1 is not installed on this system."
+		return 1
+	fi
+	return 0
 }
 
 is_valid_domain() {
-    local domain="$1"
-    local regex="^(http(s)?://)?[a-zA-Z0-9.-]+(\.[a-zA-Z]{2,})+$"
+	local domain="$1"
+	local regex="^(http(s)?://)?[a-zA-Z0-9.-]+(\.[a-zA-Z]{2,})+$"
 
-    if [[ $domain =~ $regex ]]; then
-        return 0 # Valid domain
-    else
-        return 1 # Invalid domain
-    fi
+	if [[ $domain =~ $regex ]]; then
+		return 0 # Valid domain
+	else
+		return 1 # Invalid domain
+	fi
 }
 
 gen_pass() {
-    local length="$1"
-    local min_numbers="$2"
-    local min_special_chars="$3"
+	local length="$1"
+	local min_numbers="$2"
+	local min_special_chars="$3"
 
-    if [[ -z "$length" ]]; then
-        length=20
-    fi
+	if [[ -z "$length" ]]; then
+		length=20
+	fi
 
-    if [[ -z "$min_numbers" ]]; then
-        min_numbers=3
-    fi
+	if [[ -z "$min_numbers" ]]; then
+		min_numbers=3
+	fi
 
-    if [[ -z "$min_special_chars" ]]; then
-        min_special_chars=0
-    fi
+	if [[ -z "$min_special_chars" ]]; then
+		min_special_chars=0
+	fi
 
-    # Validate input
-    if ((length < min_numbers + min_special_chars)); then
-        echo "Error: The total length should be at least as large as the sum of minimum numbers and minimum special characters."
-        return 1
-    fi
+	# Validate input
+	if ((length < min_numbers + min_special_chars)); then
+		echo "Error: The total length should be at least as large as the sum of minimum numbers and minimum special characters."
+		return 1
+	fi
 
-    # Define character sets
-    local lowercase='abcdefghijklmnopqrstuvwxyz'
-    local uppercase='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    local numbers='0123456789'
-    local special_chars='!@#$%^&*'
+	# Define character sets
+	local lowercase='abcdefghijklmnopqrstuvwxyz'
+	local uppercase='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+	local numbers='0123456789'
+	local special_chars='!@#$%^&*'
 
-    # Initialize the variables
-    local password=""
-    local rand_num=""
-    local rand_special=""
-    local rand_char=""
+	# Initialize the variables
+	local password=""
+	local rand_num=""
+	local rand_special=""
+	local rand_char=""
 
-    # Ensure minimum numbers
-    for ((i = 0; i < min_numbers; i++)); do
-        rand_num="${numbers:RANDOM%${#numbers}:1}"
-        password="${password}${rand_num}"
-    done
+	# Ensure minimum numbers
+	for ((i = 0; i < min_numbers; i++)); do
+		rand_num="${numbers:RANDOM%${#numbers}:1}"
+		password="${password}${rand_num}"
+	done
 
-    # Ensure minimum special characters
-    for ((i = 0; i < min_special_chars; i++)); do
-        rand_special="${special_chars:RANDOM%${#special_chars}:1}"
-        password="${password}${rand_special}"
-    done
+	# Ensure minimum special characters
+	for ((i = 0; i < min_special_chars; i++)); do
+		rand_special="${special_chars:RANDOM%${#special_chars}:1}"
+		password="${password}${rand_special}"
+	done
 
-    # Calculate the remaining characters needed
-    remaining_length=$((length - min_numbers - min_special_chars))
+	# Calculate the remaining characters needed
+	remaining_length=$((length - min_numbers - min_special_chars))
 
-    # Generate the remaining random characters
-    for ((i = 0; i < remaining_length; i++)); do
-        rand_char="${lowercase}${uppercase}"
-        rand_char="${rand_char:RANDOM%${#rand_char}:1}"
-        password="${password}${rand_char}"
-    done
+	# Generate the remaining random characters
+	for ((i = 0; i < remaining_length; i++)); do
+		rand_char="${lowercase}${uppercase}"
+		rand_char="${rand_char:RANDOM%${#rand_char}:1}"
+		password="${password}${rand_char}"
+	done
 
-    # Shuffle the password characters
-    password=$(echo "$password" | fold -w1 | shuf | tr -d '\n')
-    echo "$password"
+	# Shuffle the password characters
+	password=$(echo "$password" | fold -w1 | shuf | tr -d '\n')
+	echo "$password"
 
-    # Usage
-    # total_length="$1"
-    # min_num="$2"
-    # min_special="$3"
+	# Usage
+	# total_length="$1"
+	# min_num="$2"
+	# min_special="$3"
 }
 
 # Function to generate a random password
 generate_pass() {
-    local LENGTH="$1"
-    if [[ -z "$LENGTH" ]]; then
-        LENGTH=20 # Default password length
-    fi
-    local password
-    password=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$LENGTH")
-    echo "$password"
-    # LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+{}:<>?' </dev/urandom | head -c "$LENGTH"
+	local LENGTH="$1"
+	if [[ -z "$LENGTH" ]]; then
+		LENGTH=20 # Default password length
+	fi
+	local password
+	password=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$LENGTH")
+	echo "$password"
+	# LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+{}:<>?' </dev/urandom | head -c "$LENGTH"
 }
 
 # Function to list directory contents and prompt for selection
 select_from_dir() {
-    # Usage: select_from_dir [directory]
-    clear >&2
-    local directory="$1"
-    local selection=
-    local selected_item
+	# Usage: select_from_dir [directory]
+	clear >&2
+	local directory="$1"
+	local selection=
+	local selected_item
 
-    if [ -z "$directory" ]; then
-        read -rp "Enter directory path: " directory
-    fi
+	if [ -z "$directory" ]; then
+		read -rp "Enter directory path: " directory
+	fi
 
-    # Check if the path ends with a slash and remove it if present
-    directory="${directory%/}"
-    echo "Select a file/folder from $directory:" >&2
-    echo "0. Return" >&2
+	# Check if the path ends with a slash and remove it if present
+	directory="${directory%/}"
+	echo "Select a file/folder from $directory:" >&2
+	echo "0. Return" >&2
 
-    local count=1
-    for item in "$directory"/*; do
-        if [ -e "$item" ]; then
-            if [ -d "$item" ]; then
-                echo -e "\033[32m${count}. $(basename "$item")\033[0m" >&2
-            else
-                echo -e "\033[34m${count}. $(basename "$item")\033[0m" >&2
-            fi
-            count=$((count + 1))
-        fi
-    done
-    while [ -z "$selection" ]; do
-        read -r selection
+	local count=1
+	for item in "$directory"/*; do
+		if [ -e "$item" ]; then
+			if [ -d "$item" ]; then
+				echo -e "\033[32m${count}. $(basename "$item")\033[0m" >&2
+			else
+				echo -e "\033[34m${count}. $(basename "$item")\033[0m" >&2
+			fi
+			count=$((count + 1))
+		fi
+	done
+	while [ -z "$selection" ]; do
+		read -r selection
 
-        if [[ ! "$selection" =~ ^[0-9]+$ ]]; then
-            echo "Invalid input. Please enter a number." >&2
-            selection=
-            continue
-        fi
+		if [[ ! "$selection" =~ ^[0-9]+$ ]]; then
+			echo "Invalid input. Please enter a number." >&2
+			selection=
+			continue
+		fi
 
-        if [ "$selection" -eq 0 ]; then
-            break
-        fi
+		if [ "$selection" -eq 0 ]; then
+			break
+		fi
 
-        if [ "$selection" -ge 1 ] && [ "$selection" -lt "$count" ]; then
-            selected_item=$(ls -1 "$directory" | sed -n "${selection}p")
-            echo "$directory/$selected_item"
-            break
-        else
-            echo "Invalid selection. Please choose a valid option." >&2
-            selection=
-        fi
+		if [ "$selection" -ge 1 ] && [ "$selection" -lt "$count" ]; then
+			selected_item=$(ls -1 "$directory" | sed -n "${selection}p")
+			echo "$directory/$selected_item"
+			break
+		else
+			echo "Invalid selection. Please choose a valid option." >&2
+			selection=
+		fi
 
-    done
+	done
 }
 
 # Function to fix files and folders permissions
 perm_set() {
 
-    # chown -R user:group TARGET
-    # find TARGET -type d -exec chmod 775 {} \;
-    # find TARGET -type f -exec chmod 664 {} \;
-    # chmod 640 TARGET/wp-config.php
+	# chown -R user:group TARGET
+	# find TARGET -type d -exec chmod 775 {} \;
+	# find TARGET -type f -exec chmod 664 {} \;
+	# chmod 640 TARGET/wp-config.php
 
-    local target="$1"
-    local user="$2"
-    local group="$3"
+	local target="$1"
+	local user="$2"
+	local group="$3"
 
-    # Prompt for input if any argument is missing
-    if [ -z "$target" ]; then
-        read -rp "Enter the target directory: " target
-    fi
+	# Prompt for input if any argument is missing
+	if [ -z "$target" ]; then
+		read -rp "Enter the target directory: " target
+	fi
 
-    if [ -z "$user" ]; then
-        read -rp "Enter the user: " user
-    fi
+	if [ -z "$user" ]; then
+		read -rp "Enter the user: " user
+	fi
 
-    if [ -z "$group" ]; then
-        read -rp "Enter the group: " group
-    fi
+	if [ -z "$group" ]; then
+		read -rp "Enter the group: " group
+	fi
 
-    # Check if all arguments are provided
-    if [ -z "$target" ] || [ -z "$user" ] || [ -z "$group" ]; then
-        echo "Usage: ${FUNCNAME[0]} <target> <user> <group>"
-        return 1
-    fi
+	# Check if all arguments are provided
+	if [ -z "$target" ] || [ -z "$user" ] || [ -z "$group" ]; then
+		echo "Usage: ${FUNCNAME[0]} <target> <user> <group>"
+		return 1
+	fi
 
-    # Fix ownership
-    chown -R "$user:$group" "$target"
+	# Fix ownership
+	chown -R "$user:$group" "$target"
 
-    # Set directory permissions to 775 and file permissions to 664
-    find "$target" -type d -exec chmod 775 {} \;
-    find "$target" -type f -exec chmod 664 {} \;
+	# Set directory permissions to 775 and file permissions to 664
+	find "$target" -type d -exec chmod 775 {} \;
+	find "$target" -type f -exec chmod 664 {} \;
 
-    echo "Permissions fixed for '$target'."
+	echo "Permissions fixed for '$target'."
 }
 
 # Function to comment or uncomment lines in a config file
 comment_uncomment() {
-    local search_pattern="$1"
-    local config_file="$2"
-    local comment_uncomment="$3"
+	local search_pattern="$1"
+	local config_file="$2"
+	local comment_uncomment="$3"
 
-    # Check if the config file exists
-    if [ ! -f "$config_file" ]; then
-        echo "Error: Config file '$config_file' not found."
-        return 1
-    fi
+	# Check if the config file exists
+	if [ ! -f "$config_file" ]; then
+		echo "Error: Config file '$config_file' not found."
+		return 1
+	fi
 
-    # Define the AWK script
-    local awk_script='
+	# Define the AWK script
+	local awk_script='
   {
     # Count leading whitespace (tabs or spaces)
     whitespace_count = match($0, /^[ \t]*/)
@@ -335,150 +335,150 @@ comment_uncomment() {
   }
   '
 
-    # Use AWK to process the config file and redirect the output to a temporary file
-    awk -v search_pattern="$search_pattern" -v comment_uncomment="$comment_uncomment" "$awk_script" "$config_file" >"$config_file.tmp" || {
-        echo " Error in awk in comment_uncomment IN '$config_file'"
-        return 1
-    }
+	# Use AWK to process the config file and redirect the output to a temporary file
+	awk -v search_pattern="$search_pattern" -v comment_uncomment="$comment_uncomment" "$awk_script" "$config_file" >"$config_file.tmp" || {
+		echo " Error in awk in comment_uncomment IN '$config_file'"
+		return 1
+	}
 
-    # Replace the original config file with the temporary file
-    mv "$config_file.tmp" "$config_file" || {
-        echo " Error in mv in comment_uncomment IN '$config_file'"
-        return 1
-    }
+	# Replace the original config file with the temporary file
+	mv "$config_file.tmp" "$config_file" || {
+		echo " Error in mv in comment_uncomment IN '$config_file'"
+		return 1
+	}
 
-    # echo "Success ${comment_uncomment}ing IN '$config_file'"
-    echo "Success"
+	# echo "Success ${comment_uncomment}ing IN '$config_file'"
+	echo "Success"
 
-    # Example usage:
-    # comment_uncomment "search_pattern" "/path/to/config/file" "comment"
-    # comment_uncomment "search_pattern" "/path/to/config/file" "uncomment"
+	# Example usage:
+	# comment_uncomment "search_pattern" "/path/to/config/file" "comment"
+	# comment_uncomment "search_pattern" "/path/to/config/file" "uncomment"
 }
 
 # Function to add a new line under a pattern with correct indentation
 add_line_under_pattern() {
-    local pattern_to_match="$1"
-    local config_file="$2"
-    local new_line="$3"
+	local pattern_to_match="$1"
+	local config_file="$2"
+	local new_line="$3"
 
-    # Check if the config file exists
-    if [ ! -f "$config_file" ]; then
-        echo "Config file not found: $config_file"
-        return 1
-    fi
+	# Check if the config file exists
+	if [ ! -f "$config_file" ]; then
+		echo "Config file not found: $config_file"
+		return 1
+	fi
 
-    # Escape special characters in the pattern
-    local escaped_pattern
-    escaped_pattern=$(sed 's/[][\/.^$*]/\\&/g' <<<"$pattern_to_match")
+	# Escape special characters in the pattern
+	local escaped_pattern
+	escaped_pattern=$(sed 's/[][\/.^$*]/\\&/g' <<<"$pattern_to_match")
 
-    # Get the indentation of the pattern line
-    local indentation
-    indentation=$(sed -n "/$escaped_pattern/{s/^\([[:space:]]*\).*$/\1/;p;q}" "$config_file")
+	# Get the indentation of the pattern line
+	local indentation
+	indentation=$(sed -n "/$escaped_pattern/{s/^\([[:space:]]*\).*$/\1/;p;q}" "$config_file")
 
-    # Check if the new line already exists after the pattern line
-    if grep -qFx "${indentation}${new_line}" "$config_file"; then
-        echo "The new line already exists after the pattern. No duplicate line added."
-    else
-        # Use sed to insert the new line under the pattern with the same indentation
-        sed -i "\%$escaped_pattern%a\\${indentation}${new_line}" "$config_file" && echo "Success" || echo "Failed: ADDING '$new_line' UNDER '$pattern_to_match' IN '$config_file' "
+	# Check if the new line already exists after the pattern line
+	if grep -qFx "${indentation}${new_line}" "$config_file"; then
+		echo "The new line already exists after the pattern. No duplicate line added."
+	else
+		# Use sed to insert the new line under the pattern with the same indentation
+		sed -i "\%$escaped_pattern%a\\${indentation}${new_line}" "$config_file" && echo "Success" || echo "Failed: ADDING '$new_line' UNDER '$pattern_to_match' IN '$config_file' "
 
-    fi
+	fi
 
-    # Example usage:
-    # add_line_under_pattern "include /etc/nginx/snippets/ssl" /path/to/your/config/file.conf "new_line_to_append"
+	# Example usage:
+	# add_line_under_pattern "include /etc/nginx/snippets/ssl" /path/to/your/config/file.conf "new_line_to_append"
 
 }
 
 php_manage() {
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install PHP"
-        echo "2. Remove (purge) PHP"
-        echo "3. Install PHPMyAdmin"
-        echo "0. Quit"
+	while true; do
+		echo "Choose an option:"
+		echo "1. Install PHP"
+		echo "2. Remove (purge) PHP"
+		echo "3. Install PHPMyAdmin"
+		echo "0. Quit"
 
-        read -rp "Enter your choice: " choice
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) php_install ;;
-        2) php_remove ;;
-        3) php_install_myadmin ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) php_install ;;
+		2) php_remove ;;
+		3) php_install_myadmin ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 # Function to install PHP
 php_install() {
-    local memory_limit
-    local time_zone
-    local upload_max_filesize
-    local post_max_size
-    local enableJIT
-    local time_zone_escaped
-    local composer_php_ver
+	local memory_limit
+	local time_zone
+	local upload_max_filesize
+	local post_max_size
+	local enableJIT
+	local time_zone_escaped
+	local composer_php_ver
 
-    # memory_limit
-    read -rp "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
-    # Use the user input if provided, or the default value if the input is empty
-    if [ -z "$memory_limit" ]; then
-        memory_limit=256
-    fi
-    echo "Memory_limit is: ${memory_limit}"
+	# memory_limit
+	read -rp "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
+	# Use the user input if provided, or the default value if the input is empty
+	if [ -z "$memory_limit" ]; then
+		memory_limit=256
+	fi
+	echo "Memory_limit is: ${memory_limit}"
 
-    # time_zone
-    read -rp "Enter time_zone (or press Enter to use the default 'Asia/Dubai'): " time_zone
-    # Use the user input if provided, or the default value if the input is empty
-    if [ -z "$time_zone" ]; then
-        time_zone="Asia/Dubai"
-    fi
-    echo "time_zone is: ${time_zone}"
+	# time_zone
+	read -rp "Enter time_zone (or press Enter to use the default 'Asia/Dubai'): " time_zone
+	# Use the user input if provided, or the default value if the input is empty
+	if [ -z "$time_zone" ]; then
+		time_zone="Asia/Dubai"
+	fi
+	echo "time_zone is: ${time_zone}"
 
-    # upload_max_filesize
-    read -rp "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
-    # Use the user input if provided, or the default value if the input is upload_max_filesize
-    if [ -z "$upload_max_filesize" ]; then
-        upload_max_filesize=100
-    fi
-    echo "upload_max_filesize is: ${upload_max_filesize}"
-    sleep 1
-    # Calculate post_max_size
-    post_max_size=$((upload_max_filesize + 1))
+	# upload_max_filesize
+	read -rp "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
+	# Use the user input if provided, or the default value if the input is upload_max_filesize
+	if [ -z "$upload_max_filesize" ]; then
+		upload_max_filesize=100
+	fi
+	echo "upload_max_filesize is: ${upload_max_filesize}"
+	sleep 1
+	# Calculate post_max_size
+	post_max_size=$((upload_max_filesize + 1))
 
-#################################
+	#################################
 	# First, detect the OS
-    local OS=$(lsb_release -is)
-    local OS_Codename=$(lsb_release -cs)
-    if [ "$OS" = "Ubuntu" ]; then
-        # This is Ubuntu, use the PPA
-        if [ -f "/etc/apt/sources.list.d/ondrej-ubuntu-php-$(lsb_release -cs).sources" ]; then
-            echo -e "\nOndrej Sury's PHP PPA already exists."
-        else
-            echo -e "\nAdding Ondrej Sury's PHP PPA for Ubuntu."
-            # software-properties-common is needed for add-apt-repository
-            apt-get update && apt-get install -y software-properties-common ca-certificates lsb-release
-            add-apt-repository ppa:ondrej/php -y
-        fi
-    elif [ "$OS" = "Debian" ]; then
-        if [ -f "/etc/apt/sources.list.d/php.list" ]; then
-        echo "PHP Repo Exists"
+	local OS=$(lsb_release -is)
+	local OS_Codename=$(lsb_release -cs)
+	if [ "$OS" = "Ubuntu" ]; then
+		# This is Ubuntu, use the PPA
+		if [ -f "/etc/apt/sources.list.d/ondrej-ubuntu-php-$(lsb_release -cs).sources" ]; then
+			echo -e "\nOndrej Sury's PHP PPA already exists."
+		else
+			echo -e "\nAdding Ondrej Sury's PHP PPA for Ubuntu."
+			# software-properties-common is needed for add-apt-repository
+			apt-get update && apt-get install -y software-properties-common ca-certificates lsb-release
+			add-apt-repository ppa:ondrej/php -y
+		fi
+	elif [ "$OS" = "Debian" ]; then
+		if [ -f "/etc/apt/sources.list.d/php.list" ]; then
+			echo "PHP Repo Exists"
 		else
 			# Adding sury's PHP repo
 			echo "Installing sury's PHP repo"
 			curl -sSL https://packages.sury.org/php/README.txt | bash -x
 			echo
 		fi
-    else
-        echo "Unsupported operating system: $OS"
-        return 1
-    fi
-#################################
+	else
+		echo "Unsupported operating system: $OS"
+		return 1
+	fi
+	#################################
 
 	# Display available versions
 	echo "Available PHP versions:"
 	for i in "${!PHP_Versions[@]}"; do
-		echo "$((i+1)). PHP ${PHP_Versions[$i]}"
+		echo "$((i + 1)). PHP ${PHP_Versions[$i]}"
 	done
 
 	# Get user choices
@@ -486,19 +486,19 @@ php_install() {
 	read -r choices
 
 	# Convert comma-separated choices to array
-	IFS=',' read -ra selected_indices <<< "$choices"
+	IFS=',' read -ra selected_indices <<<"$choices"
 
 	# Process selected versions
 	for choice in "${selected_indices[@]}"; do
 		# Remove any whitespace
 		choice=$(echo $choice | tr -d ' ')
-		
+
 		if [[ $choice -ge 1 && $choice -le ${#PHP_Versions[@]} ]]; then
-			selected_index=$((choice-1))
+			selected_index=$((choice - 1))
 			phpVer="${PHP_Versions[$selected_index]}"
 
 			echo -e "\nInstalling PHP ${phpVer}"
-			
+
 			# if [ -f "/etc/php/${phpVer}/fpm/pool.d/www.disabled" ]; then
 			#     mv "/etc/php/${phpVer}/fpm/pool.d/www.disabled" "/etc/php/${phpVer}/fpm/pool.d/www.conf"
 			# fi
@@ -550,85 +550,85 @@ php_install() {
 		fi
 	done
 
-    # Install Composer
-    if [ -f "/usr/local/bin/composer" ]; then
-        echo "Composer already installed"
-    else
-        read -rp "Enter PHP version to install composer: (default 8.2) " composer_php_ver
-        # Use the user input if provided, or the default value if the input is empty
-        if [ -z "$composer_php_ver" ]; then
-            composer_php_ver=8.2
-        fi
-        curl -sS https://getcomposer.org/installer | "php${composer_php_ver}"
-        echo "Moving 'composer.phar' to '/usr/local/bin/composer'"
-        mv composer.phar /usr/local/bin/composer
-    fi
+	# Install Composer
+	if [ -f "/usr/local/bin/composer" ]; then
+		echo "Composer already installed"
+	else
+		read -rp "Enter PHP version to install composer: (default 8.2) " composer_php_ver
+		# Use the user input if provided, or the default value if the input is empty
+		if [ -z "$composer_php_ver" ]; then
+			composer_php_ver=8.2
+		fi
+		curl -sS https://getcomposer.org/installer | "php${composer_php_ver}"
+		echo "Moving 'composer.phar' to '/usr/local/bin/composer'"
+		mv composer.phar /usr/local/bin/composer
+	fi
 
-    echo "PHP installation and configuration complete."
+	echo "PHP installation and configuration complete."
 
 }
 
 # Function to remove PHP
 php_remove() {
-    local confirm
-    read -rp "This will purge PHP and its configuration.. Are you sure? (y/n): " confirm
+	local confirm
+	read -rp "This will purge PHP and its configuration.. Are you sure? (y/n): " confirm
 
-    if [[ $confirm != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
+	if [[ $confirm != "y" ]]; then
+		echo "Aborting."
+		return 0
+	fi
 
-    for phpVer in "${PHP_Versions[@]}"; do
+	for phpVer in "${PHP_Versions[@]}"; do
 
-        # Purge PHP packages
-        apt purge -y "php${phpVer}-"* && apt-get autoremove -y
+		# Purge PHP packages
+		apt purge -y "php${phpVer}-"* && apt-get autoremove -y
 
-    done
+	done
 
-    # Remove PHP configuration files
-    rm -rf /etc/php/
+	# Remove PHP configuration files
+	rm -rf /etc/php/
 
-    echo "PHP and its configuration have been purged."
+	echo "PHP and its configuration have been purged."
 }
 
 php_conf_generate() {
-    local username=$1
-    local domain=$2
-    local phpVer=$3
-    local memory_limit
-    local time_zone
-    local time_zone
-    local upload_max_filesize
-    local post_max_size
+	local username=$1
+	local domain=$2
+	local phpVer=$3
+	local memory_limit
+	local time_zone
+	local time_zone
+	local upload_max_filesize
+	local post_max_size
 
-    # memory_limit
-    read -rp "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
-    # Use the user input if provided, or the default value if the input is empty
-    if [ -z "$memory_limit" ]; then
-        memory_limit=256
-    fi
-    echo "Memory_limit is: ${memory_limit}"
+	# memory_limit
+	read -rp "Enter memory_limit value in MB (or press Enter to use the default '256'): " memory_limit
+	# Use the user input if provided, or the default value if the input is empty
+	if [ -z "$memory_limit" ]; then
+		memory_limit=256
+	fi
+	echo "Memory_limit is: ${memory_limit}"
 
-    # time_zone
-    read -rp "Enter time_zone (or press Enter to use the default 'Asia/Dubai'): " time_zone
-    # Use the user input if provided, or the default value if the input is empty
-    if [ -z "$time_zone" ]; then
-        time_zone="Asia/Dubai"
-    fi
-    echo "time_zone is: ${time_zone}"
+	# time_zone
+	read -rp "Enter time_zone (or press Enter to use the default 'Asia/Dubai'): " time_zone
+	# Use the user input if provided, or the default value if the input is empty
+	if [ -z "$time_zone" ]; then
+		time_zone="Asia/Dubai"
+	fi
+	echo "time_zone is: ${time_zone}"
 
-    # upload_max_filesize
-    read -rp "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
-    # Use the user input if provided, or the default value if the input is upload_max_filesize
-    if [ -z "$upload_max_filesize" ]; then
-        upload_max_filesize=100
-    fi
-    echo "upload_max_filesize is: ${upload_max_filesize}"
-    sleep 1
-    # Calculate post_max_size
-    post_max_size=$((upload_max_filesize + 1))
+	# upload_max_filesize
+	read -rp "Enter upload_max_filesize in MB (max 100) (or press Enter to use the default '100'): " upload_max_filesize
+	# Use the user input if provided, or the default value if the input is upload_max_filesize
+	if [ -z "$upload_max_filesize" ]; then
+		upload_max_filesize=100
+	fi
+	echo "upload_max_filesize is: ${upload_max_filesize}"
+	sleep 1
+	# Calculate post_max_size
+	post_max_size=$((upload_max_filesize + 1))
 
-    cat >"/etc/php/${phpVer}/fpm/pool.d/${username}-${domain}.conf" <<EOF
+	cat >"/etc/php/${phpVer}/fpm/pool.d/${username}-${domain}.conf" <<EOF
 [${domain}]
 user = ${username}
 group = users
@@ -675,107 +675,107 @@ php_value[opcache.revalidate_freq] = 60
 ; [opcache.jit]
 ; A value of 50-100% of the current Opcache shared memory for Opcode might be the ideal value for opcache.jit_buffer_size.
 EOF
-    systemctl restart "php${phpVer}-fpm"
+	systemctl restart "php${phpVer}-fpm"
 }
 
 # Function to install PHPMyAdmin
 php_install_myadmin() {
-    local vuser
-    local domain
-    local web_dir
-    local PHPMYADMIN_VERSION
-    local INSTALL_DIR
-    local dbadmin_pass
-    local pmapass
-    local BLOWFISH_SECRET
+	local vuser
+	local domain
+	local web_dir
+	local PHPMYADMIN_VERSION
+	local INSTALL_DIR
+	local dbadmin_pass
+	local pmapass
+	local BLOWFISH_SECRET
 
-    while true; do
-        # Prompt for the username
-        read -rp "Enter vhost username: " vuser
-        # Prompt for the domain name
-        read -rp "Enter vhost domain name (e.g., example.com): " domain
+	while true; do
+		# Prompt for the username
+		read -rp "Enter vhost username: " vuser
+		# Prompt for the domain name
+		read -rp "Enter vhost domain name (e.g., example.com): " domain
 
-        web_dir="/var/www/${vuser}/${domain}"
+		web_dir="/var/www/${vuser}/${domain}"
 
-        # Check if the username contains only alphanumeric characters
-        if [[ ! -d "$web_dir" ]]; then
-            echo "Directory doesn't exit."
-            exit 1
-        else
-            break
-        fi
-    done
+		# Check if the username contains only alphanumeric characters
+		if [[ ! -d "$web_dir" ]]; then
+			echo "Directory doesn't exit."
+			exit 1
+		else
+			break
+		fi
+	done
 
-    read -rp "Enter new password for dbadmin user: " dbadmin_pass
-    read -rp "Make sure mariadb connection is configured and press enter to start installation"
+	read -rp "Enter new password for dbadmin user: " dbadmin_pass
+	read -rp "Make sure mariadb connection is configured and press enter to start installation"
 
-    PHPMYADMIN_VERSION="5.2.1" # Update this to the desired phpMyAdmin version
-    INSTALL_DIR="${web_dir}/public/dbadmin"
-    # read -rp "Enter new password for management user (pma)" pmapass
-    # Generate a password with default length
-    pmapass=$(gen_pass)
-    echo "pmapass: $pmapass"
+	PHPMYADMIN_VERSION="5.2.1" # Update this to the desired phpMyAdmin version
+	INSTALL_DIR="${web_dir}/public/dbadmin"
+	# read -rp "Enter new password for management user (pma)" pmapass
+	# Generate a password with default length
+	pmapass=$(gen_pass)
+	echo "pmapass: $pmapass"
 
-    # Create Database User for phpMyAdmin.
-    # $DB_CMD -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
-    # Fix for AWS managed databses (RDS):
-    $DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+	# Create Database User for phpMyAdmin.
+	# $DB_CMD -e "GRANT ALL PRIVILEGES ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+	# Fix for AWS managed databses (RDS):
+	$DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, PROCESS, REFERENCES, INDEX, ALTER, SHOW DATABASES, CREATE TEMPORARY TABLES, LOCK TABLES, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, EVENT, TRIGGER, SHOW VIEW, DELETE HISTORY, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EXECUTE ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY '${dbadmin_pass}' WITH GRANT OPTION;FLUSH PRIVILEGES;"
 
-    # Create Database User for phpMyAdmin management (for multi user use).
-    $DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
+	# Create Database User for phpMyAdmin management (for multi user use).
+	$DB_CMD -e "GRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost' IDENTIFIED BY '${pmapass}';"
 
-    # Download and Extract phpMyAdmin archive
-    mkdir -p "${INSTALL_DIR}"
+	# Download and Extract phpMyAdmin archive
+	mkdir -p "${INSTALL_DIR}"
 
-    if [ ! -f "phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz" ]; then
-        wget "https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz"
+	if [ ! -f "phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz" ]; then
+		wget "https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz"
 
-    fi
+	fi
 
-    if tar -xzvf "phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz" --strip-components=1 -C "${INSTALL_DIR}" >/dev/null 2>&1; then
-        echo "Extraction successful."
-    else
-        echo "Extraction failed."
-        return
-    fi
+	if tar -xzvf "phpMyAdmin-${PHPMYADMIN_VERSION}-english.tar.gz" --strip-components=1 -C "${INSTALL_DIR}" >/dev/null 2>&1; then
+		echo "Extraction successful."
+	else
+		echo "Extraction failed."
+		return
+	fi
 
-    # Create config file
-    cp "${INSTALL_DIR}/config.sample.inc.php" "${INSTALL_DIR}/config.inc.php"
+	# Create config file
+	cp "${INSTALL_DIR}/config.sample.inc.php" "${INSTALL_DIR}/config.inc.php"
 
-    # Load phpmyadmin database into the database
-    $DB_CMD <"${INSTALL_DIR}/sql/create_tables.sql"
+	# Load phpmyadmin database into the database
+	$DB_CMD <"${INSTALL_DIR}/sql/create_tables.sql"
 
-    # Generate a random blowfish secret for enhanced security
-    BLOWFISH_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-    sed -i "s|cfg\['blowfish_secret'\] = ''|cfg\['blowfish_secret'\] = '${BLOWFISH_SECRET}'|" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting blowfish_secret"
+	# Generate a random blowfish secret for enhanced security
+	BLOWFISH_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+	sed -i "s|cfg\['blowfish_secret'\] = ''|cfg\['blowfish_secret'\] = '${BLOWFISH_SECRET}'|" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting blowfish_secret"
 
-    # Set pma password
-    sed -i "s/pmapass/${pmapass}/" "${INSTALL_DIR}/config.inc.php" || echo "Error on pma password"
+	# Set pma password
+	sed -i "s/pmapass/${pmapass}/" "${INSTALL_DIR}/config.inc.php" || echo "Error on pma password"
 
-    # Uncomment all $cfg['Servers'] to enable configuration storage, a database and several tables used by the administrative pma database user. These tables enable a number of features in phpMyAdmin, including Bookmarks, comments, PDF generation, and more.
-    sed -i '/^\/\/.*Servers/s/^\/\/ //' "${INSTALL_DIR}/config.inc.php" || echo "Error on Uncomment all \$cfg['Servers']"
+	# Uncomment all $cfg['Servers'] to enable configuration storage, a database and several tables used by the administrative pma database user. These tables enable a number of features in phpMyAdmin, including Bookmarks, comments, PDF generation, and more.
+	sed -i '/^\/\/.*Servers/s/^\/\/ //' "${INSTALL_DIR}/config.inc.php" || echo "Error on Uncomment all \$cfg['Servers']"
 
-    # Make a new directory where phpMyAdmin will store its temporary files
-    # mkdir -p /var/lib/phpmyadmin/tmp
-    # chown -R www-data:www-data /var/lib/phpmyadmin
+	# Make a new directory where phpMyAdmin will store its temporary files
+	# mkdir -p /var/lib/phpmyadmin/tmp
+	# chown -R www-data:www-data /var/lib/phpmyadmin
 
-    # Set uplaod, save, and tmp Dir
-    # mkdir -p "${INSTALL_DIR}/tmp"
-    sed -i "s/\$cfg\['UploadDir'\] = '';/\$cfg\['UploadDir'\] = 'tmp';/" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting UploadDir"
-    sed -i "s/\$cfg\['SaveDir'\] = '';/\$cfg\['SaveDir'\] = 'tmp';/" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting SaveDir"
-    echo "\$cfg['TempDir'] = '${INSTALL_DIR}/tmp';" >>"${INSTALL_DIR}/config.inc.php"
+	# Set uplaod, save, and tmp Dir
+	# mkdir -p "${INSTALL_DIR}/tmp"
+	sed -i "s/\$cfg\['UploadDir'\] = '';/\$cfg\['UploadDir'\] = 'tmp';/" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting UploadDir"
+	sed -i "s/\$cfg\['SaveDir'\] = '';/\$cfg\['SaveDir'\] = 'tmp';/" "${INSTALL_DIR}/config.inc.php" || echo "Error on setting SaveDir"
+	echo "\$cfg['TempDir'] = '${INSTALL_DIR}/tmp';" >>"${INSTALL_DIR}/config.inc.php"
 
-    # Allow access from specific IP addresses (replace with your IP addresses)
-    # echo "\$cfg['Servers'][\$i]['AllowDeny']['rules'] = array('allow' => array('your_ip_address')); " >> $phpmyadmin_config
+	# Allow access from specific IP addresses (replace with your IP addresses)
+	# echo "\$cfg['Servers'][\$i]['AllowDeny']['rules'] = array('allow' => array('your_ip_address')); " >> $phpmyadmin_config
 
-    # Allow access from any IP addresses
-    sed -e '/controlhost/ s/^\/*/\/\/ /' -i "${INSTALL_DIR}/config.inc.php" || echo "Error on setting controlhost"
-    sed -e '/controlport/ s/^\/*/\/\/ /' -i "${INSTALL_DIR}/config.inc.php" || echo "Error on setting controlport"
+	# Allow access from any IP addresses
+	sed -e '/controlhost/ s/^\/*/\/\/ /' -i "${INSTALL_DIR}/config.inc.php" || echo "Error on setting controlhost"
+	sed -e '/controlport/ s/^\/*/\/\/ /' -i "${INSTALL_DIR}/config.inc.php" || echo "Error on setting controlport"
 
-    # Adjust permissions
-    chown -R "${vuser}:users" "${INSTALL_DIR}"
-    # chmod -R 770 "${INSTALL_DIR}"
-    chmod 660 "${INSTALL_DIR}/config.inc.php"
+	# Adjust permissions
+	chown -R "${vuser}:users" "${INSTALL_DIR}"
+	# chmod -R 770 "${INSTALL_DIR}"
+	chmod 660 "${INSTALL_DIR}/config.inc.php"
 
 }
 
@@ -803,133 +803,133 @@ nginx_conf_domain_get() {
 		return 1
 	fi
 }
-	
+
 nginx_manage() {
-    local choice
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install nginx"
-        echo "2. Remove (purge) nginx"
-        echo "3. Create vhost"
-        echo "4. Add cloudflare IPs (nginx) SYNC script with cron job"
-        echo "5. Install Cert"
-        echo "6. Uninstall Cert"
-        echo "7. Backup nginx config (vhosts and ssl snippets)"
-        echo "8. Restore nginx config"
-        echo "9. Install RTMP module"
-        echo "10. Install Caddy"
-        echo "0. Quit"
+	local choice
+	while true; do
+		echo "Choose an option:"
+		echo "1. Install nginx"
+		echo "2. Remove (purge) nginx"
+		echo "3. Create vhost"
+		echo "4. Add cloudflare IPs (nginx) SYNC script with cron job"
+		echo "5. Install Cert"
+		echo "6. Uninstall Cert"
+		echo "7. Backup nginx config (vhosts and ssl snippets)"
+		echo "8. Restore nginx config"
+		echo "9. Install RTMP module"
+		echo "10. Install Caddy"
+		echo "0. Quit"
 
-        read -rp "Enter your choice: " choice
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) nginx_install ;;
-        2) nginx_remove ;;
-        3) nginx_vhost_create ;;
-        4) nginx_cloudflare_add ;;
-        5) nginx_cert_install ;;
-        6) nginx_cert_uninstall ;;
-        7) nginx_backup_config ;;
-        8) nginx_restore_config ;;
-        9) nginx_install_rtmp ;;
-        10) nginx_install_caddy ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) nginx_install ;;
+		2) nginx_remove ;;
+		3) nginx_vhost_create ;;
+		4) nginx_cloudflare_add ;;
+		5) nginx_cert_install ;;
+		6) nginx_cert_uninstall ;;
+		7) nginx_backup_config ;;
+		8) nginx_restore_config ;;
+		9) nginx_install_rtmp ;;
+		10) nginx_install_caddy ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 nginx_install_caddy() {
-    apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-    apt update && apt install caddy && caddy list-modules
+	apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+	curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+	curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+	apt update && apt install caddy && caddy list-modules
 }
 
 nginx_install_rtmp() {
-    apt-get install libnginx-mod-rtmp
+	apt-get install libnginx-mod-rtmp
 }
 
 # Function to install Nginx
 nginx_install() {
-    local COMMON_NAME="localhost"
+	local COMMON_NAME="localhost"
 
-    # First, detect the OS
-    local OS=$(lsb_release -is)
-    local OS_Codename=$(lsb_release -cs)
+	# First, detect the OS
+	local OS=$(lsb_release -is)
+	local OS_Codename=$(lsb_release -cs)
 
-    if [ "$OS" = "Ubuntu" ]; then
-        # This is Ubuntu, use the PPA
-        if [ -f "/etc/apt/sources.list.d/ondrej-ubuntu-nginx-$(lsb_release -cs).sources" ]; then
-            echo -e "\nOndrej Sury's Nginx PPA already exists."
-        else
-            echo -e "\nAdding Ondrej Sury's Nginx PPA for Ubuntu."
-            # software-properties-common is needed for add-apt-repository
-            apt-get update && apt-get install -y software-properties-common
-            add-apt-repository ppa:ondrej/nginx -y
-        fi
-        
-        # Install Nginx and modules for Ubuntu
-        echo "Installing Nginx for Ubuntu..."
-        case "$OS_Codename" in
-            "noble")
-                echo "Installing brotli for Ubuntu 24 (Noble)..."
-                sudo apt-get install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install nginx on Ubuntu" && return 1; }
-                ;;
-            *)
-                echo "Unsupported Ubuntu version: $OS_Codename"
-                return 1
-                ;;
-        esac
+	if [ "$OS" = "Ubuntu" ]; then
+		# This is Ubuntu, use the PPA
+		if [ -f "/etc/apt/sources.list.d/ondrej-ubuntu-nginx-$(lsb_release -cs).sources" ]; then
+			echo -e "\nOndrej Sury's Nginx PPA already exists."
+		else
+			echo -e "\nAdding Ondrej Sury's Nginx PPA for Ubuntu."
+			# software-properties-common is needed for add-apt-repository
+			apt-get update && apt-get install -y software-properties-common
+			add-apt-repository ppa:ondrej/nginx -y
+		fi
 
-    elif [ "$OS" = "Debian" ]; then
-        # This is Debian, use the packages.sury.org repository
-        if grep -qR "packages.sury.org/nginx" /etc/apt/sources.list.d/; then
-            echo -e "\nSury's nginx Repo Exists"
-        else
-            # Adding sury's nginx repo for Debian
-            echo -e "\nInstalling sury's nginx repo for Debian"
-            curl -sSL https://packages.sury.org/nginx/README.txt | bash -x
-            echo
-            # Create the pinning configuration file
-            #         local PIN_FILE="/etc/apt/preferences.d/sury-repo-pin"
-            #         tee "$PIN_FILE" >/dev/null <<EOLX
-            # Package: *
-            # Pin: origin packages.sury.org
-            # Pin-Priority: 1000
-            # EOLX
-        fi
+		# Install Nginx and modules for Ubuntu
+		echo "Installing Nginx for Ubuntu..."
+		case "$OS_Codename" in
+		"noble")
+			echo "Installing brotli for Ubuntu 24 (Noble)..."
+			sudo apt-get install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install nginx on Ubuntu" && return 1; }
+			;;
+		*)
+			echo "Unsupported Ubuntu version: $OS_Codename"
+			return 1
+			;;
+		esac
 
-        # Install Nginx and modules for Debian
-        echo "Installing Nginx for Debian..."
-        case "$OS_Codename" in
-            "bookworm")
-                echo "Installing brotli for Debian 12 (Bookworm)..."
-                sudo apt-get install -y nginx-full libnginx-mod-brotli || { echo "Failed to install nginx on Debian" && return 1; }
-                ;;
-            "trixie")
-                echo "Installing brotli for Debian 13 (Trixie)..."
-                sudo apt-get install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install nginx on Debian" && return 1; }
-                ;;
-            *)
-                echo "Unsupported Debian version: $OS_Codename"
-                return 1
-                ;;
-        esac
+	elif [ "$OS" = "Debian" ]; then
+		# This is Debian, use the packages.sury.org repository
+		if grep -qR "packages.sury.org/nginx" /etc/apt/sources.list.d/; then
+			echo -e "\nSury's nginx Repo Exists"
+		else
+			# Adding sury's nginx repo for Debian
+			echo -e "\nInstalling sury's nginx repo for Debian"
+			curl -sSL https://packages.sury.org/nginx/README.txt | bash -x
+			echo
+			# Create the pinning configuration file
+			#         local PIN_FILE="/etc/apt/preferences.d/sury-repo-pin"
+			#         tee "$PIN_FILE" >/dev/null <<EOLX
+			# Package: *
+			# Pin: origin packages.sury.org
+			# Pin-Priority: 1000
+			# EOLX
+		fi
 
-    else
-        echo "Unsupported operating system: $OS"
-        return 1
-    fi
+		# Install Nginx and modules for Debian
+		echo "Installing Nginx for Debian..."
+		case "$OS_Codename" in
+		"bookworm")
+			echo "Installing brotli for Debian 12 (Bookworm)..."
+			sudo apt-get install -y nginx-full libnginx-mod-brotli || { echo "Failed to install nginx on Debian" && return 1; }
+			;;
+		"trixie")
+			echo "Installing brotli for Debian 13 (Trixie)..."
+			sudo apt-get install -y nginx-full libnginx-mod-http-brotli-static libnginx-mod-http-brotli-filter || { echo "Failed to install nginx on Debian" && return 1; }
+			;;
+		*)
+			echo "Unsupported Debian version: $OS_Codename"
+			return 1
+			;;
+		esac
 
-    systemctl enable nginx
-    # Create log folder for the main profile
-    rm -rf /var/www/html
+	else
+		echo "Unsupported operating system: $OS"
+		return 1
+	fi
 
-    # Add log rotation for nginx
-    # sed -i "s/^\/var\/log\/nginx\/\*\.log/\/var\/www\/*\/logs\/*\/*.log/" /etc/logrotate.d/nginx
+	systemctl enable nginx
+	# Create log folder for the main profile
+	rm -rf /var/www/html
 
-    cat >"/etc/logrotate.d/nginx" <<'EOFX'
+	# Add log rotation for nginx
+	# sed -i "s/^\/var\/log\/nginx\/\*\.log/\/var\/www\/*\/logs\/*\/*.log/" /etc/logrotate.d/nginx
+
+	cat >"/etc/logrotate.d/nginx" <<'EOFX'
 /var/www/*/logs/*/*.log {
 	size 50M
 	missingok
@@ -950,37 +950,37 @@ nginx_install() {
 }
 EOFX
 
-    # Generate self-signed SSL certificate
-    local nginx_key="/etc/ssl/private/nginx.key"
-    local nginx_cert="/etc/ssl/certs/nginx.crt"
-    # nginx_dhparams2048="/etc/ssl/dhparams2048.pem"
-    # openssl dhparam -out ${nginx_dhparams2048} 2048
+	# Generate self-signed SSL certificate
+	local nginx_key="/etc/ssl/private/nginx.key"
+	local nginx_cert="/etc/ssl/certs/nginx.crt"
+	# nginx_dhparams2048="/etc/ssl/dhparams2048.pem"
+	# openssl dhparam -out ${nginx_dhparams2048} 2048
 
-    if [ ! -f "$nginx_cert" ] || [ ! -f "$nginx_key" ]; then
-        echo -e "\nGenerating new self-signed cert for nginx.."
-        # rsa:2048
-        # ec:<(openssl ecparam -name prime256v1)
-        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-            -keyout "$nginx_key" \
-            -out "$nginx_cert" \
-            -subj "/CN=$COMMON_NAME"
-        # -subj "/C=$COUNTRY/ST=$STATE/L=$LOCALITY/O=$ORGANIZATION/OU=$ORG_UNIT/CN=$COMMON_NAME/emailAddress=$EMAIL"
-    fi
+	if [ ! -f "$nginx_cert" ] || [ ! -f "$nginx_key" ]; then
+		echo -e "\nGenerating new self-signed cert for nginx.."
+		# rsa:2048
+		# ec:<(openssl ecparam -name prime256v1)
+		openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+			-keyout "$nginx_key" \
+			-out "$nginx_cert" \
+			-subj "/CN=$COMMON_NAME"
+		# -subj "/C=$COUNTRY/ST=$STATE/L=$LOCALITY/O=$ORGANIZATION/OU=$ORG_UNIT/CN=$COMMON_NAME/emailAddress=$EMAIL"
+	fi
 
-    # Backup nginx configs if not already backed up
-    if [ ! -f "/etc/nginx/nginx.conf.backup" ]; then
-        mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup
-    fi
+	# Backup nginx configs if not already backed up
+	if [ ! -f "/etc/nginx/nginx.conf.backup" ]; then
+		mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup
+	fi
 
-    if [ -f "$ssl_nginx_snippet" ]; then
-        echo "SSL snippet file already exist at $ssl_nginx_snippet"
-    else
-        echo "ssl_certificate ${nginx_cert};" >"$ssl_nginx_snippet"
-        echo "ssl_certificate_key ${nginx_key};" >>"$ssl_nginx_snippet"
-        echo "SSL snippet file generated at $ssl_nginx_snippet"
-    fi
+	if [ -f "$ssl_nginx_snippet" ]; then
+		echo "SSL snippet file already exist at $ssl_nginx_snippet"
+	else
+		echo "ssl_certificate ${nginx_cert};" >"$ssl_nginx_snippet"
+		echo "ssl_certificate_key ${nginx_key};" >>"$ssl_nginx_snippet"
+		echo "SSL snippet file generated at $ssl_nginx_snippet"
+	fi
 
-    cat >"${caching_nginx_snippet}" <<'EOFX'
+	cat >"${caching_nginx_snippet}" <<'EOFX'
 location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)$ {
     # expires 30d;
     add_header Cache-Control "max-age=2592000, public";
@@ -991,7 +991,7 @@ location ~* \.(?:ico|gif|jpe?g|png|htc|otf|ttf|eot|woff|woff2|svg|css|js)$ {
 }
 EOFX
 
-    cat >"${common_nginx_snippet}" <<'EOFX'
+	cat >"${common_nginx_snippet}" <<'EOFX'
 index index.html index.htm index.php;
 # index "index.html" "index.cgi" "index.pl" "index.php" "index.xhtml" "index.htm" "index.shtml";
 
@@ -1024,7 +1024,7 @@ location = /xmlrpc.php {
     return 444;
 }
 EOFX
-    cat >/etc/nginx/nginx.conf <<'EOTX'
+	cat >/etc/nginx/nginx.conf <<'EOTX'
 user www-data;
 worker_processes auto;
 worker_rlimit_nofile 20960;
@@ -1078,7 +1078,7 @@ http {
 }
 EOTX
 
-    local compression_types='application/atom+xml
+	local compression_types='application/atom+xml
 application/javascript
 application/json
 application/rss+xml
@@ -1103,7 +1103,7 @@ text/plain
 text/xml
 text/x-component;'
 
-    cat >/etc/nginx/conf.d/gzip.conf <<EOFX
+	cat >/etc/nginx/conf.d/gzip.conf <<EOFX
 gzip on;
 gzip_static on;
 gzip_comp_level 5;
@@ -1114,7 +1114,7 @@ gzip_vary on;
 gzip_types
 $compression_types
 EOFX
-    cat >/etc/nginx/conf.d/brotli.conf <<EOFX
+	cat >/etc/nginx/conf.d/brotli.conf <<EOFX
 brotli on;
 brotli_comp_level 6;
 brotli_static on;
@@ -1124,67 +1124,67 @@ brotli_types
 $compression_types
 EOFX
 
-    if [ ! -f "/etc/nginx/sites-available/default.disabled" ]; then
-        mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default.disabled
-        rm /etc/nginx/sites-enabled/default
-    fi
+	if [ ! -f "/etc/nginx/sites-available/default.disabled" ]; then
+		mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default.disabled
+		rm /etc/nginx/sites-enabled/default
+	fi
 
-    # Restart nginx for changes to take effect
-    nginx -t && systemctl restart nginx
+	# Restart nginx for changes to take effect
+	nginx -t && systemctl restart nginx
 
-    echo "Nginx setup completed!"
+	echo "Nginx setup completed!"
 
 }
 
 # Function to remove Nginx
 nginx_remove() {
-    local confirmation
-    # Ask for confirmation
-    read -rp "This will purge Nginx and its configuration.. Are you sure? (y/n): " confirmation
+	local confirmation
+	# Ask for confirmation
+	read -rp "This will purge Nginx and its configuration.. Are you sure? (y/n): " confirmation
 
-    if [[ $confirmation != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
+	if [[ $confirmation != "y" ]]; then
+		echo "Aborting."
+		return 0
+	fi
 
-    # Stop Nginx if it's running
-    systemctl stop nginx
+	# Stop Nginx if it's running
+	systemctl stop nginx
 
-    # Purge Nginx and its configuration
-    apt-get remove --purge nginx* libnginx* -y && apt-get autoremove -y
+	# Purge Nginx and its configuration
+	apt-get remove --purge nginx* libnginx* -y && apt-get autoremove -y
 
-    # Remove configuration files
-    rm -rf /etc/nginx
+	# Remove configuration files
+	rm -rf /etc/nginx
 
-    dpkg --audit
-    dpkg --configure --pending
+	dpkg --audit
+	dpkg --configure --pending
 
-    echo "Nginx and its configuration have been purged."
+	echo "Nginx and its configuration have been purged."
 }
 
 nginx_backup_config() {
-    tar -czf nginx_config_backup.tar.gz /etc/nginx/snippets/ssl-*.conf "/etc/nginx/sites-available" "/etc/nginx/sites-enabled" || echo "Success: nginx_config_backup.tar.gz" || echo "Backup Failed."
+	tar -czf nginx_config_backup.tar.gz /etc/nginx/snippets/ssl-*.conf "/etc/nginx/sites-available" "/etc/nginx/sites-enabled" || echo "Success: nginx_config_backup.tar.gz" || echo "Backup Failed."
 }
 
 nginx_restore_config() {
-    local path="$1"
-    read -rp "Enter path to file/directory: " path
-    # Remove quotes if present in the input path
-    path=${path//\"/}
-    # Remove trailing slash if present in the input path
-    path=${path%/}
+	local path="$1"
+	read -rp "Enter path to file/directory: " path
+	# Remove quotes if present in the input path
+	path=${path//\"/}
+	# Remove trailing slash if present in the input path
+	path=${path%/}
 
-    if ! path_exists "$path"; then
-        echo "Path doesn't exist"
-        return 1
-    fi
+	if ! path_exists "$path"; then
+		echo "Path doesn't exist"
+		return 1
+	fi
 
-    tar -xzvf "${path}" -C /
+	tar -xzvf "${path}" -C /
 }
 
 nginx_cloudflare_add() {
-    local cloudflare_script="/usr/local/bin/cloudflare_sync"
-    cat >"$cloudflare_script" <<'EOFX'
+	local cloudflare_script="/usr/local/bin/cloudflare_sync"
+	cat >"$cloudflare_script" <<'EOFX'
 #!/bin/bash
 
 CLOUDFLARE_FILE_PATH=/etc/nginx/conf.d/cloudflare.conf
@@ -1250,221 +1250,221 @@ else
 fi
 EOFX
 
-    chmod 700 "$cloudflare_script"
+	chmod 700 "$cloudflare_script"
 
-    echo "Fetching IPs from cloudflare.."
-    cloudflare_sync
-    # Add daily cron job
-    echo "Adding cron job.."
+	echo "Fetching IPs from cloudflare.."
+	cloudflare_sync
+	# Add daily cron job
+	echo "Adding cron job.."
 
-    if [[ ! -d "/var/log/nginx/" ]]; then
-        mkdir -p /var/log/nginx/
-    fi
+	if [[ ! -d "/var/log/nginx/" ]]; then
+		mkdir -p /var/log/nginx/
+	fi
 
-    echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >"${cron_dir}/cloudflare"
-    echo "30 1 * * * root ${cloudflare_script} >> /var/log/nginx/cloudflare.log 2>&1" >>"${cron_dir}/cloudflare"
-    chmod 644 "${cron_dir}/cloudflare"
-    # cat "${cron_dir}"/* | crontab -
-    echo -e "cat ${cron_dir}/cloudflare\n"
-    cat "${cron_dir}/cloudflare"
-    # crontab -l
-    # Jobs inside "/etc/cron.d/" directory are monitored for changes
-    # /etc/init.d/cron reload
-    # systemctl restart cron
-    # /var/spool/cron/crontabs
+	echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >"${cron_dir}/cloudflare"
+	echo "30 1 * * * root ${cloudflare_script} >> /var/log/nginx/cloudflare.log 2>&1" >>"${cron_dir}/cloudflare"
+	chmod 644 "${cron_dir}/cloudflare"
+	# cat "${cron_dir}"/* | crontab -
+	echo -e "cat ${cron_dir}/cloudflare\n"
+	cat "${cron_dir}/cloudflare"
+	# crontab -l
+	# Jobs inside "/etc/cron.d/" directory are monitored for changes
+	# /etc/init.d/cron reload
+	# systemctl restart cron
+	# /var/spool/cron/crontabs
 }
 
 nginx_cert_install() {
-    local nginx_conf_dir="/etc/nginx/sites-available"
-    local ssl_dir="/etc/ssl"
-    local ssl_cert
+	local nginx_conf_dir="/etc/nginx/sites-available"
+	local ssl_dir="/etc/ssl"
+	local ssl_cert
 
-    nginx_config=$(select_from_dir "$nginx_conf_dir")
-    echo "Selected config: $nginx_config"
+	nginx_config=$(select_from_dir "$nginx_conf_dir")
+	echo "Selected config: $nginx_config"
 
-    local domain_name
-    domain_name=$(nginx_conf_domain_get "${nginx_config}")
-    [[ -n $domain_name ]] || {
-        echo "Error: domain_name is empty"
-        echo "$domain_name"
-        return 1
-    }
+	local domain_name
+	domain_name=$(nginx_conf_domain_get "${nginx_config}")
+	[[ -n $domain_name ]] || {
+		echo "Error: domain_name is empty"
+		echo "$domain_name"
+		return 1
+	}
 
-    echo -e "\n Domain: ${domain_name}\n"
-    sleep 2
+	echo -e "\n Domain: ${domain_name}\n"
+	sleep 2
 
-    ssl_cert=$(select_from_dir "$ssl_dir")
-    echo "Selected cert: $ssl_cert"
+	ssl_cert=$(select_from_dir "$ssl_dir")
+	echo "Selected cert: $ssl_cert"
 
-    # Get Base Name
-    local ssl_cert_name="${ssl_cert##*/}"
+	# Get Base Name
+	local ssl_cert_name="${ssl_cert##*/}"
 
-    if ! [ -f "${ssl_cert}/fullchain.cer" ]; then
-        echo "File does not exist: ${ssl_cert}/fullchain.cer"
-        return 1
-    fi
-    if ! [ -f "${ssl_cert}/privkey.pem" ]; then
-        echo "File does not exist: ${ssl_cert}/fullchain.cer"
-        return 1
-    fi
+	if ! [ -f "${ssl_cert}/fullchain.cer" ]; then
+		echo "File does not exist: ${ssl_cert}/fullchain.cer"
+		return 1
+	fi
+	if ! [ -f "${ssl_cert}/privkey.pem" ]; then
+		echo "File does not exist: ${ssl_cert}/fullchain.cer"
+		return 1
+	fi
 
-    mkdir -p "/etc/nginx/snippets/"
-    snippet_path="/etc/nginx/snippets/ssl-$ssl_cert_name.conf"
+	mkdir -p "/etc/nginx/snippets/"
+	snippet_path="/etc/nginx/snippets/ssl-$ssl_cert_name.conf"
 
-    cat >"$snippet_path" <<EOFX
+	cat >"$snippet_path" <<EOFX
 ssl_certificate "$ssl_cert/fullchain.cer";
 ssl_certificate_key "$ssl_cert/privkey.pem";
 EOFX
 
-    # Add or update the include line in the nginx configuration
-    if grep -q "include $snippet_path;" "$nginx_config"; then
-        comment_uncomment "include $snippet_path;" "$nginx_config" uncomment
-    else
-        add_line_under_pattern "include ${ssl_nginx_snippet};" "$nginx_config" "include $snippet_path;"
-    fi
-    comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" comment
-    nginx -t && systemctl reload nginx
+	# Add or update the include line in the nginx configuration
+	if grep -q "include $snippet_path;" "$nginx_config"; then
+		comment_uncomment "include $snippet_path;" "$nginx_config" uncomment
+	else
+		add_line_under_pattern "include ${ssl_nginx_snippet};" "$nginx_config" "include $snippet_path;"
+	fi
+	comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" comment
+	nginx -t && systemctl reload nginx
 }
 
 # Function to revert to self-signed certificate
 nginx_cert_uninstall() {
-    # read -rp "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
-    echo "Select nginx config"
-    local nginx_config
-    nginx_config=$(select_from_dir "/etc/nginx/sites-available/")
-    echo "Selected config: $nginx_config"
+	# read -rp "Enter the domain name to revert to a self-signed certificate (e.g., example.com): " domain_name
+	echo "Select nginx config"
+	local nginx_config
+	nginx_config=$(select_from_dir "/etc/nginx/sites-available/")
+	echo "Selected config: $nginx_config"
 
-    local domain_name
-    domain_name=$(nginx_conf_domain_get "${nginx_config}")
-    [[ -n $domain_name ]] || {
-        echo "Error: domain_name is empty"
-        echo "$domain_name"
-        return 1
-    }
+	local domain_name
+	domain_name=$(nginx_conf_domain_get "${nginx_config}")
+	[[ -n $domain_name ]] || {
+		echo "Error: domain_name is empty"
+		echo "$domain_name"
+		return 1
+	}
 
-    # nginx_config="/etc/nginx/sites-available/$domain_name"
+	# nginx_config="/etc/nginx/sites-available/$domain_name"
 
-    if [ -f "$nginx_config" ]; then
-        local snippet_path="/etc/nginx/snippets/ssl-$domain_name.conf"
+	if [ -f "$nginx_config" ]; then
+		local snippet_path="/etc/nginx/snippets/ssl-$domain_name.conf"
 
-        # echo "Commenting: include $snippet_path;"
-        comment_uncomment "include $snippet_path;" "$nginx_config" comment
+		# echo "Commenting: include $snippet_path;"
+		comment_uncomment "include $snippet_path;" "$nginx_config" comment
 
-        comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" uncomment
-        nginx -t && systemctl reload nginx
+		comment_uncomment "include ${ssl_nginx_snippet};" "$nginx_config" uncomment
+		nginx -t && systemctl reload nginx
 
-        # echo "Reverted $domain_name to use the self-signed certificate."
-    else
-        echo "Nginx configuration file not found."
-    fi
+		# echo "Reverted $domain_name to use the self-signed certificate."
+	else
+		echo "Nginx configuration file not found."
+	fi
 }
 
 nginx_vhost_create() {
-    local domain
-    local vuser
-    local REPLY
-    local PS3
+	local domain
+	local vuser
+	local REPLY
+	local PS3
 
-    while true; do
-        # Prompt for the domain name
-        read -rp "Enter the domain name (e.g., example.com): " domain
+	while true; do
+		# Prompt for the domain name
+		read -rp "Enter the domain name (e.g., example.com): " domain
 
-        # Check if the domain name follows common rules
-        if [[ "$domain" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-            break
-        else
-            echo "Invalid domain name format. Please enter a valid domain name (e.g., example.com)."
-        fi
-    done
+		# Check if the domain name follows common rules
+		if [[ "$domain" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+			break
+		else
+			echo "Invalid domain name format. Please enter a valid domain name (e.g., example.com)."
+		fi
+	done
 
-    while true; do
-        # Prompt for the username
-        read -rp "Enter new username: " vuser
-        # Check if the username contains only alphanumeric characters
-        if [[ "$vuser" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-            break
-        else
-            echo "Username should only contain letters (uppercase and lowercase), numbers, underscores, and hyphens. Please try again."
-        fi
-    done
+	while true; do
+		# Prompt for the username
+		read -rp "Enter new username: " vuser
+		# Check if the username contains only alphanumeric characters
+		if [[ "$vuser" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+			break
+		else
+			echo "Username should only contain letters (uppercase and lowercase), numbers, underscores, and hyphens. Please try again."
+		fi
+	done
 
-    if id "${vuser}" &>/dev/null; then
-        echo "User ${vuser} exists."
-    else
-        echo "Creating new user: ${vuser}"
-        useradd -N -m -s "$(which bash)" -d "/var/www/${vuser}" "${vuser}"
-        rm -rf /var/www/"${vuser}"/{.bashrc,.profile,.bash_logout}
-        passwd -l "$vuser"
-    fi
+	if id "${vuser}" &>/dev/null; then
+		echo "User ${vuser} exists."
+	else
+		echo "Creating new user: ${vuser}"
+		useradd -N -m -s "$(which bash)" -d "/var/www/${vuser}" "${vuser}"
+		rm -rf /var/www/"${vuser}"/{.bashrc,.profile,.bash_logout}
+		passwd -l "$vuser"
+	fi
 
-    # Prompt the user to choose between two options
-    PS3="Please select PHP version: "
+	# Prompt the user to choose between two options
+	PS3="Please select PHP version: "
 
-    # Define the options
-    options=("PHP 7.4" "PHP 8.2" "Quit")
+	# Define the options
+	options=("PHP 7.4" "PHP 8.2" "Quit")
 
-    # Display the options and prompt for a choice
-    select choice in "${options[@]}"; do
-        case $REPLY in
-        1)
-            phpVer=7.4
-            break
-            ;;
-        2)
-            phpVer=8.2
-            break
-            ;;
-        3)
-            echo "Exiting the script."
-            return 0
-            ;;
-        *) echo "Invalid choice. Please choose 1 or 2." ;;
-        esac
-    done
+	# Display the options and prompt for a choice
+	select choice in "${options[@]}"; do
+		case $REPLY in
+		1)
+			phpVer=7.4
+			break
+			;;
+		2)
+			phpVer=8.2
+			break
+			;;
+		3)
+			echo "Exiting the script."
+			return 0
+			;;
+		*) echo "Invalid choice. Please choose 1 or 2." ;;
+		esac
+	done
 
-    # Create vhost directories
-    basedir="/var/www/${vuser}/"
-    mkdir -p "${basedir}/logs/${domain}"
-    mkdir -p "${basedir}/${domain}/public/"
-    chmod 710 "${basedir}"
-    chown "${vuser}:www-data" "${basedir}"
-    chown -R "${vuser}:users" "${basedir}"*
+	# Create vhost directories
+	basedir="/var/www/${vuser}/"
+	mkdir -p "${basedir}/logs/${domain}"
+	mkdir -p "${basedir}/${domain}/public/"
+	chmod 710 "${basedir}"
+	chown "${vuser}:www-data" "${basedir}"
+	chown -R "${vuser}:users" "${basedir}"*
 
-    # Generate php config
-    php_conf_generate "${vuser}" "${domain}" "${phpVer}"
+	# Generate php config
+	php_conf_generate "${vuser}" "${domain}" "${phpVer}"
 
-    # Generate nginx config
-    nginx_conf_generate "${vuser}" "${domain}" "${phpVer}"
+	# Generate nginx config
+	nginx_conf_generate "${vuser}" "${domain}" "${phpVer}"
 
-    # Enable nginx site
-    if [ -L "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
-        echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists."
-    else
-        if [ -e "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
-            echo -e "\nqFile or directory with the name '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists. Cannot create the symbolic link."
-        else
-            ln -s "/etc/nginx/sites-available/${vuser}-${domain}.conf" /etc/nginx/sites-enabled/
-            echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' created to '/etc/nginx/sites-available/${vuser}-${domain}.conf'"
-        fi
-    fi
-    nginx -t && systemctl reload nginx
+	# Enable nginx site
+	if [ -L "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
+		echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists."
+	else
+		if [ -e "/etc/nginx/sites-enabled/${vuser}-${domain}.conf" ]; then
+			echo -e "\nqFile or directory with the name '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' already exists. Cannot create the symbolic link."
+		else
+			ln -s "/etc/nginx/sites-available/${vuser}-${domain}.conf" /etc/nginx/sites-enabled/
+			echo -e "\nSymbolic link '/etc/nginx/sites-enabled/${vuser}-${domain}.conf' created to '/etc/nginx/sites-available/${vuser}-${domain}.conf'"
+		fi
+	fi
+	nginx -t && systemctl reload nginx
 }
 
 nginx_conf_generate() {
-    local vuser="$1"
-    local domain="$2"
-    local phpVer="$3"
-    local server_name
-    local is_default
+	local vuser="$1"
+	local domain="$2"
+	local phpVer="$3"
+	local server_name
+	local is_default
 
-    read -rp "Is this default domain? (y/n) " is_default
-    if [[ "$is_default" == "y" ]]; then
-        server_name="server_name _"
-    else
-        server_name="server_name $domain www.${domain}"
-    fi
+	read -rp "Is this default domain? (y/n) " is_default
+	if [[ "$is_default" == "y" ]]; then
+		server_name="server_name _"
+	else
+		server_name="server_name $domain www.${domain}"
+	fi
 
-    cat >"/etc/nginx/sites-available/${vuser}-${domain}.conf" <<EOTX
+	cat >"/etc/nginx/sites-available/${vuser}-${domain}.conf" <<EOTX
 server {
     listen 80;
     ${server_name};
@@ -1536,334 +1536,334 @@ EOTX
 }
 
 mariadb_manage() {
-    local choice
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install mariadb server"
-        echo "2. Install mariadb client"
-        echo "3. Remove (purge) mariadb"
-        echo "4. Backup Database (Dump)"
-        echo "5. Restore Database (Dump)"
-        echo "6. Create db and its user"
-        echo "7. Read mysql/MariaDB config"
-        echo "0. Quit"
+	local choice
+	while true; do
+		echo "Choose an option:"
+		echo "1. Install mariadb server"
+		echo "2. Install mariadb client"
+		echo "3. Remove (purge) mariadb"
+		echo "4. Backup Database (Dump)"
+		echo "5. Restore Database (Dump)"
+		echo "6. Create db and its user"
+		echo "7. Read mysql/MariaDB config"
+		echo "0. Quit"
 
-        read -rp "Enter your choice: " choice
-        case $choice in
-        1) mariadb_server_install ;;
-        2) mariadb_client_install ;;
-        3) mariadb_remove ;;
-        4) db_backup ;;
-        5) db_restore ;;
-        6) db_create ;;
-        7) db_config_read ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
-    # Backup:
-    # mysqldump database_name > backup.sql
-    # To back up all the databases:
-    # mysqldump -A > backup.sql
+		read -rp "Enter your choice: " choice
+		case $choice in
+		1) mariadb_server_install ;;
+		2) mariadb_client_install ;;
+		3) mariadb_remove ;;
+		4) db_backup ;;
+		5) db_restore ;;
+		6) db_create ;;
+		7) db_config_read ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
+	# Backup:
+	# mysqldump database_name > backup.sql
+	# To back up all the databases:
+	# mysqldump -A > backup.sql
 
-    # restore:
-    # mysql < backup.sql
-    # To restore the data to a specific database, include the database name in the command
-    # mysql -D bitnami_app < backup.sql
+	# restore:
+	# mysql < backup.sql
+	# To restore the data to a specific database, include the database name in the command
+	# mysql -D bitnami_app < backup.sql
 }
 
 # Function to install MariaDB Server
 mariadb_server_install() {
-    local install_from
-    local PACKAGE_NAME
-    local grants_commands
-    local confirmation
-    local install_repo
+	local install_from
+	local PACKAGE_NAME
+	local grants_commands
+	local confirmation
+	local install_repo
 
-    read -rp $'Install from:\n 1. Mariadb repo\n 2. Debian repo\n Choice: ' install_from
-    if [[ $install_from == "1" ]]; then
-        if [ -f "/etc/apt/sources.list.d/mariadb.list" ]; then
-            echo "mariadb Repo Exists"
-            read -rp $'Reinstall repo? (y/n): ' confirmation
-            if [[ $confirmation != "y" ]]; then
-                echo "Skipping adding repo."
-            else
-                install_repo=1
-            fi
-        else
-            install_repo=1
-        fi
+	read -rp $'Install from:\n 1. Mariadb repo\n 2. Debian repo\n Choice: ' install_from
+	if [[ $install_from == "1" ]]; then
+		if [ -f "/etc/apt/sources.list.d/mariadb.list" ]; then
+			echo "mariadb Repo Exists"
+			read -rp $'Reinstall repo? (y/n): ' confirmation
+			if [[ $confirmation != "y" ]]; then
+				echo "Skipping adding repo."
+			else
+				install_repo=1
+			fi
+		else
+			install_repo=1
+		fi
 
-        if [[ $install_repo == "1" ]]; then
-            # Add MariaDB Repository
-            echo "Adding mariadb repo.."
-            curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {
-                echo "Failed adding Mariadb repo"
-                return 1
-            }
-            if [ -f "/etc/apt/sources.list.d/mariadb.list.old_1" ]; then
-                rm mariadb.list.old_1
-            fi
-        fi
-    fi
+		if [[ $install_repo == "1" ]]; then
+			# Add MariaDB Repository
+			echo "Adding mariadb repo.."
+			curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {
+				echo "Failed adding Mariadb repo"
+				return 1
+			}
+			if [ -f "/etc/apt/sources.list.d/mariadb.list.old_1" ]; then
+				rm mariadb.list.old_1
+			fi
+		fi
+	fi
 
-    PACKAGE_NAME="mariadb-server mariadb-backup"
-    # Check if the package is installed
-    if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
-        echo "$PACKAGE_NAME is already installed."
-        return
-    else
-        echo "$PACKAGE_NAME is not installed. Installing..."
-        apt-get update && apt-get install -y $PACKAGE_NAME || { echo "Failed to install $PACKAGE_NAME" && return 1; }
-        echo "$PACKAGE_NAME has been installed."
-    fi
-    # Prompt for variable values
-    # read -rp "Enter the InnoDB buffer pool size (e.g., 512M): " INNODB_BUFFER_POOL_SIZE
-    # read -rp "Enter the root password for MariaDB: " DB_ROOT_PASS
+	PACKAGE_NAME="mariadb-server mariadb-backup"
+	# Check if the package is installed
+	if dpkg -l | grep -q "^ii  $PACKAGE_NAME "; then
+		echo "$PACKAGE_NAME is already installed."
+		return
+	else
+		echo "$PACKAGE_NAME is not installed. Installing..."
+		apt-get update && apt-get install -y $PACKAGE_NAME || { echo "Failed to install $PACKAGE_NAME" && return 1; }
+		echo "$PACKAGE_NAME has been installed."
+	fi
+	# Prompt for variable values
+	# read -rp "Enter the InnoDB buffer pool size (e.g., 512M): " INNODB_BUFFER_POOL_SIZE
+	# read -rp "Enter the root password for MariaDB: " DB_ROOT_PASS
 
-    # mysql_secure_installation
-    # Secure MariaDB installation
-    # mariadb -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED VIA unix_socket WITH GRANT OPTION;FLUSH PRIVILEGES;"
-    # mariadb -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASS';"
-    # mariadb -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket;";
-    # mariadb -e "SHOW GRANTS FOR 'root'@'localhost';"
+	# mysql_secure_installation
+	# Secure MariaDB installation
+	# mariadb -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED VIA unix_socket WITH GRANT OPTION;FLUSH PRIVILEGES;"
+	# mariadb -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASS';"
+	# mariadb -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket;";
+	# mariadb -e "SHOW GRANTS FOR 'root'@'localhost';"
 
-    # Remove anonymous users
-    mariadb -e "DELETE FROM mysql.user WHERE User='';"
-    # Disallow root login remotely
-    mariadb -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
-    # Remove the test database
-    mariadb -e "DROP DATABASE IF EXISTS test;"
-    # Reload privilege tables
-    mariadb -e "FLUSH PRIVILEGES;"
+	# Remove anonymous users
+	mariadb -e "DELETE FROM mysql.user WHERE User='';"
+	# Disallow root login remotely
+	mariadb -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+	# Remove the test database
+	mariadb -e "DROP DATABASE IF EXISTS test;"
+	# Reload privilege tables
+	mariadb -e "FLUSH PRIVILEGES;"
 
-    echo -e "\nMySQL secure installation completed.\n"
+	echo -e "\nMySQL secure installation completed.\n"
 
-    mariadb -e "SELECT @@character_set_server AS character_set, @@collation_server AS collation;"
+	mariadb -e "SELECT @@character_set_server AS character_set, @@collation_server AS collation;"
 
-    # Show users and their permissions
-    mariadb -e "SELECT user, host, plugin, password FROM mysql.user;"
-    grants_commands=$(mariadb -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
-    mariadb -e "$grants_commands"
+	# Show users and their permissions
+	mariadb -e "SELECT user, host, plugin, password FROM mysql.user;"
+	grants_commands=$(mariadb -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
+	mariadb -e "$grants_commands"
 
-    # Update MariaDB configuration for production use
-    #     cat <<EOT >>/etc/mysql/mariadb.conf.d/50-server.cnf
-    # # Custom configuration for production use
-    # # You can add more configurations here
+	# Update MariaDB configuration for production use
+	#     cat <<EOT >>/etc/mysql/mariadb.conf.d/50-server.cnf
+	# # Custom configuration for production use
+	# # You can add more configurations here
 
-    # # InnoDB settings
-    # innodb_buffer_pool_size = $INNODB_BUFFER_POOL_SIZE
-    # innodb_flush_log_at_trx_commit = 2
-    # innodb_file_per_table = 1
-    # innodb_open_files = 400
-    # EOT
+	# # InnoDB settings
+	# innodb_buffer_pool_size = $INNODB_BUFFER_POOL_SIZE
+	# innodb_flush_log_at_trx_commit = 2
+	# innodb_file_per_table = 1
+	# innodb_open_files = 400
+	# EOT
 
-    # Restart MariaDB
-    systemctl restart mariadb
+	# Restart MariaDB
+	systemctl restart mariadb
 
-    # Enable and start MariaDB on boot
-    systemctl enable mariadb
+	# Enable and start MariaDB on boot
+	systemctl enable mariadb
 
-    echo "MariaDB setup and configuration completed!"
+	echo "MariaDB setup and configuration completed!"
 }
 
 # Function to install MariaDB Client
 mariadb_client_install() {
-    local db_host
-    local db_user
-    local db_pass
+	local db_host
+	local db_user
+	local db_pass
 
-    # Install the MariaDB client
-    echo "Installing MariaDB client..."
-    apt-get update && apt-get install -y mariadb-client || { echo "Failed to install mariadb-client" && return 1; }
+	# Install the MariaDB client
+	echo "Installing MariaDB client..."
+	apt-get update && apt-get install -y mariadb-client || { echo "Failed to install mariadb-client" && return 1; }
 
-    read -rp "Enter the MariaDB server hostname or IP (without port): " db_host
-    read -rp "Enter the database username: " db_user
-    read -rsp "Enter the password for the database user: " db_pass
-    echo
+	read -rp "Enter the MariaDB server hostname or IP (without port): " db_host
+	read -rp "Enter the database username: " db_user
+	read -rsp "Enter the password for the database user: " db_pass
+	echo
 
-    # Create a configuration file for the MariaDB client
-    cat >~/.my.cnf <<EOF
+	# Create a configuration file for the MariaDB client
+	cat >~/.my.cnf <<EOF
 [client]
 host=$db_host
 user=$db_user
 password=$db_pass
 EOF
-    # Secure the configuration file
-    chmod 600 ~/.my.cnf
-    echo
-    cat ~/.my.cnf
-    echo
-    echo "MariaDB client has been installed and configured in ~/.my.cnf."
+	# Secure the configuration file
+	chmod 600 ~/.my.cnf
+	echo
+	cat ~/.my.cnf
+	echo
+	echo "MariaDB client has been installed and configured in ~/.my.cnf."
 	mysql -e "\s"
 }
 
 # Function to remove MariaDB
 mariadb_remove() {
-    local confirmation
-    local confirmation2
-    # Ask for confirmation
-    read -rp "This will uninstall MariaDB. Are you sure? (y/n): " confirmation
+	local confirmation
+	local confirmation2
+	# Ask for confirmation
+	read -rp "This will uninstall MariaDB. Are you sure? (y/n): " confirmation
 
-    if [[ $confirmation != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
+	if [[ $confirmation != "y" ]]; then
+		echo "Aborting."
+		return 0
+	fi
 
-    # Uninstall MariaDB
-    apt remove -y --purge mariadb-server mariadb-client
-    # apt remove -y --purge mariadb* mysql*
-    echo -e "\nRunning dpkg -l | grep -e mysql -e mariadb "
-    dpkg -l | grep -e mysql -e mariadb
+	# Uninstall MariaDB
+	apt remove -y --purge mariadb-server mariadb-client
+	# apt remove -y --purge mariadb* mysql*
+	echo -e "\nRunning dpkg -l | grep -e mysql -e mariadb "
+	dpkg -l | grep -e mysql -e mariadb
 
-    read -rp "Do you want to remove configurations by running apt-get autoremove? (y/n): " confirmation2
+	read -rp "Do you want to remove configurations by running apt-get autoremove? (y/n): " confirmation2
 
-    if [[ $confirmation2 != "y" ]]; then
-        apt-get autoremove -y
-    fi
+	if [[ $confirmation2 != "y" ]]; then
+		apt-get autoremove -y
+	fi
 
-    # Delete configuration and database files
-    # rm -rf /etc/mysql /var/lib/mysql /var/log/mysql
+	# Delete configuration and database files
+	# rm -rf /etc/mysql /var/lib/mysql /var/log/mysql
 
-    # Remove MariaDB user and group
-    # deluser mysql
-    # delgroup mysql
+	# Remove MariaDB user and group
+	# deluser mysql
+	# delgroup mysql
 
-    echo -e "\nMariaDB has been purged from the system. All databases and configuration files have been deleted."
+	echo -e "\nMariaDB has been purged from the system. All databases and configuration files have been deleted."
 }
 
 # Function to restore a database from a dump
 db_restore() {
-    local db_name="$1"
-    local dump_file="$2"
-    # Check if both arguments are provided
-    if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
-        db_show_databases
-        read -rp "Enter the database name to restore to: " db_name
-        read -rp "Enter the path to the database dump file (supported: gz,xz,zip, or raw): " dump_file
+	local db_name="$1"
+	local dump_file="$2"
+	# Check if both arguments are provided
+	if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
+		db_show_databases
+		read -rp "Enter the database name to restore to: " db_name
+		read -rp "Enter the path to the database dump file (supported: gz,xz,zip, or raw): " dump_file
 
-        # Check again if they are empty
-        if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
-            echo "Both database name and dump file path are required."
-            return 1
-        fi
-    fi
+		# Check again if they are empty
+		if [ -z "$db_name" ] || [ -z "$dump_file" ]; then
+			echo "Both database name and dump file path are required."
+			return 1
+		fi
+	fi
 
-    # Check if the dump file exists
-    if [ ! -f "$dump_file" ]; then
-        echo "Dump file '$dump_file' does not exist."
-        return 1
-    fi
+	# Check if the dump file exists
+	if [ ! -f "$dump_file" ]; then
+		echo "Dump file '$dump_file' does not exist."
+		return 1
+	fi
 
-    # Determine the compression format based on file extension
-    local ext="${dump_file##*.}"
-    local decompress_command="cat" # Default to no decompression
+	# Determine the compression format based on file extension
+	local ext="${dump_file##*.}"
+	local decompress_command="cat" # Default to no decompression
 
-    case "$ext" in
-    gz) decompress_command="gzip -dc" ;;
-    xz) decompress_command="xz -dc" ;;
-    zip) decompress_command="unzip -p" ;;
-    esac
+	case "$ext" in
+	gz) decompress_command="gzip -dc" ;;
+	xz) decompress_command="xz -dc" ;;
+	zip) decompress_command="unzip -p" ;;
+	esac
 
-    # Restore the database dump
-    $decompress_command "$dump_file" | $DB_CMD "$db_name"
+	# Restore the database dump
+	$decompress_command "$dump_file" | $DB_CMD "$db_name"
 
-    echo "Database '$db_name' restored from '$dump_file'."
+	echo "Database '$db_name' restored from '$dump_file'."
 }
 
 # Function to create a database dump with a timestamped filename
 db_backup() {
-    local db_name="$1"
-    local save_location="$2"
-    local timestamp
-    local dump_file
-    # Check if both arguments are provided
-    if [ -z "$db_name" ] || [ -z "$save_location" ]; then
-        db_show_databases
-        read -rp "Enter the database name: " db_name
-        read -rp "Enter the save Folder (e.g., /path/to/save/): " save_location
+	local db_name="$1"
+	local save_location="$2"
+	local timestamp
+	local dump_file
+	# Check if both arguments are provided
+	if [ -z "$db_name" ] || [ -z "$save_location" ]; then
+		db_show_databases
+		read -rp "Enter the database name: " db_name
+		read -rp "Enter the save Folder (e.g., /path/to/save/): " save_location
 
-        # Check again if they are empty
-        if [ -z "$db_name" ] || [ -z "$save_location" ]; then
-            echo "Both database name and save folder are required."
-            return 1
-        fi
-    fi
+		# Check again if they are empty
+		if [ -z "$db_name" ] || [ -z "$save_location" ]; then
+			echo "Both database name and save folder are required."
+			return 1
+		fi
+	fi
 
-    # Generate a timestamp with underscores
-    timestamp=$(date +"%Y_%m_%d_%H_%M_%S")
+	# Generate a timestamp with underscores
+	timestamp=$(date +"%Y_%m_%d_%H_%M_%S")
 
-    # Define the dump file name
-    dump_file="${db_name}_${timestamp}.sql.xz"
+	# Define the dump file name
+	dump_file="${db_name}_${timestamp}.sql.xz"
 
-    # Create the database dump and compress it
-    $DUMP_CMD "$db_name" | xz -9 >"$save_location/$dump_file"
+	# Create the database dump and compress it
+	$DUMP_CMD "$db_name" | xz -9 >"$save_location/$dump_file"
 
-    echo "Database dump saved as: $save_location/$dump_file"
+	echo "Database dump saved as: $save_location/$dump_file"
 
-    # Call the function with command-line arguments if provided
-    # Backup_Database "$1" "$2"
+	# Call the function with command-line arguments if provided
+	# Backup_Database "$1" "$2"
 }
 
 db_show_databases() {
-    # $DB_CMD -e "SHOW DATABASES" | grep -Ev "(Database|information_schema|mysql|performance_schema|phpmyadmin|sys)"
-    $DB_CMD -e "SELECT SCHEMA_NAME AS 'DATABASES' FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'phpmyadmin', 'sys');"
+	# $DB_CMD -e "SHOW DATABASES" | grep -Ev "(Database|information_schema|mysql|performance_schema|phpmyadmin|sys)"
+	$DB_CMD -e "SELECT SCHEMA_NAME AS 'DATABASES' FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'phpmyadmin', 'sys');"
 }
 
 db_create() {
 	# db_create <db_name> <db_user> <db_password> [host]
-    local DB_NAME DB_USER DB_USER_PASS DB_HOST host_choice
+	local DB_NAME DB_USER DB_USER_PASS DB_HOST host_choice
 
-    # Positional arguments
-    DB_NAME="$1"
-    DB_USER="$2"
-    DB_USER_PASS="$3"
-    DB_HOST="$4"
+	# Positional arguments
+	DB_NAME="$1"
+	DB_USER="$2"
+	DB_USER_PASS="$3"
+	DB_HOST="$4"
 
-    # Interactive fallback
-    if [[ -z "$DB_NAME" ]]; then
-        db_show_databases
-        read -rp "Enter a name for the database: " DB_NAME
-    fi
+	# Interactive fallback
+	if [[ -z "$DB_NAME" ]]; then
+		db_show_databases
+		read -rp "Enter a name for the database: " DB_NAME
+	fi
 
-    if [[ -z "$DB_USER" ]]; then
-        read -rp "Enter a db username: " DB_USER
-    fi
+	if [[ -z "$DB_USER" ]]; then
+		read -rp "Enter a db username: " DB_USER
+	fi
 
-    if [[ -z "$DB_USER_PASS" ]]; then
-        read -srp "Enter a password for the db user: " DB_USER_PASS
-        echo
-    fi
+	if [[ -z "$DB_USER_PASS" ]]; then
+		read -srp "Enter a password for the db user: " DB_USER_PASS
+		echo
+	fi
 
-    # Host handling
-    if [[ -z "$DB_HOST" ]]; then
-        echo "User host:"
-        echo "  1) localhost (recommended)"
-        echo "  2) Any host (%)"
-        read -rp "Choose [1-2]: " host_choice
+	# Host handling
+	if [[ -z "$DB_HOST" ]]; then
+		echo "User host:"
+		echo "  1) localhost (recommended)"
+		echo "  2) Any host (%)"
+		read -rp "Choose [1-2]: " host_choice
 
-        case "$host_choice" in
-            2) DB_HOST="%" ;;
-            *) DB_HOST="localhost" ;;
-        esac
-    else
-        case "$DB_HOST" in
-            any|% ) DB_HOST="%" ;;
-            * ) DB_HOST="localhost" ;;
-        esac
-    fi
+		case "$host_choice" in
+		2) DB_HOST="%" ;;
+		*) DB_HOST="localhost" ;;
+		esac
+	else
+		case "$DB_HOST" in
+		any | %) DB_HOST="%" ;;
+		*) DB_HOST="localhost" ;;
+		esac
+	fi
 
-    # Validation
-    [[ -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_USER_PASS" ]] && {
-        echo "Error: missing required values"
-        return 1
-    }
+	# Validation
+	[[ -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_USER_PASS" ]] && {
+		echo "Error: missing required values"
+		return 1
+	}
 
-    # Escape single quotes in password
-    DB_USER_PASS_ESCAPED=${DB_USER_PASS//\'/\'\'}
+	# Escape single quotes in password
+	DB_USER_PASS_ESCAPED=${DB_USER_PASS//\'/\'\'}
 
-    # Execute
-    $DB_CMD -e "
+	# Execute
+	$DB_CMD -e "
         CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;
         CREATE USER IF NOT EXISTS '$DB_USER'@'$DB_HOST' IDENTIFIED BY '$DB_USER_PASS_ESCAPED';
         GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'$DB_HOST';
@@ -1872,273 +1872,273 @@ db_create() {
 }
 
 db_config_read() {
-    # Array of configuration parameters to check
-    local CONFIG_PARAMS=(
-        "bind_address"
-        "character_set_server"
-        "collation_server"
-        "innodb_adaptive_flushing"
-        "innodb_buffer_pool_size"
-        "innodb_doublewrite"
-        "innodb_file_per_table"
-        "innodb_flush_log_at_timeout"
-        "innodb_flush_log_at_trx_commit"
-        "innodb_flush_method"
-        "innodb_flush_neighbors"
-        "innodb_io_capacity"
-        "innodb_log_file_size"
-        "innodb_open_files"
-        "innodb_read_io_threads"
-        "innodb_thread_concurrency"
-        "innodb_write_io_threads"
-        "key_buffer_size"
-        "log_error"
-        "long_query_time"
-        "max_allowed_packet"
-        "max_connections"
-        "min_examined_row_limit"
-        "performance_schema"
-        "query_cache_limit"
-        "query_cache_size"
-        "query_cache_type"
-        "skip_name_resolve"
-        "skip_secure_auth"
-        "slow_query_log"
-        "slow_query_log_file"
-        "table_definition_cache"
-        "table_open_cache"
-        "thread_cache_size"
-    )
-    local param
-    # Loop through each configuration parameter and retrieve its value
-    for param in "${CONFIG_PARAMS[@]}"; do
-        local value
-        value=$($DB_CMD -BNe "SHOW VARIABLES LIKE '$param';" | awk '{print $2}')
-        echo -e "\e[91m${param}=\e[0m $value"
-    done
+	# Array of configuration parameters to check
+	local CONFIG_PARAMS=(
+		"bind_address"
+		"character_set_server"
+		"collation_server"
+		"innodb_adaptive_flushing"
+		"innodb_buffer_pool_size"
+		"innodb_doublewrite"
+		"innodb_file_per_table"
+		"innodb_flush_log_at_timeout"
+		"innodb_flush_log_at_trx_commit"
+		"innodb_flush_method"
+		"innodb_flush_neighbors"
+		"innodb_io_capacity"
+		"innodb_log_file_size"
+		"innodb_open_files"
+		"innodb_read_io_threads"
+		"innodb_thread_concurrency"
+		"innodb_write_io_threads"
+		"key_buffer_size"
+		"log_error"
+		"long_query_time"
+		"max_allowed_packet"
+		"max_connections"
+		"min_examined_row_limit"
+		"performance_schema"
+		"query_cache_limit"
+		"query_cache_size"
+		"query_cache_type"
+		"skip_name_resolve"
+		"skip_secure_auth"
+		"slow_query_log"
+		"slow_query_log_file"
+		"table_definition_cache"
+		"table_open_cache"
+		"thread_cache_size"
+	)
+	local param
+	# Loop through each configuration parameter and retrieve its value
+	for param in "${CONFIG_PARAMS[@]}"; do
+		local value
+		value=$($DB_CMD -BNe "SHOW VARIABLES LIKE '$param';" | awk '{print $2}')
+		echo -e "\e[91m${param}=\e[0m $value"
+	done
 
-    $DB_CMD -e "SELECT user, host, plugin, password FROM mysql.user;"
+	$DB_CMD -e "SELECT user, host, plugin, password FROM mysql.user;"
 
-    grants_commands=$($DB_CMD -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
+	grants_commands=$($DB_CMD -e "SELECT GROUP_CONCAT('SHOW GRANTS FOR \'', user, '\'@\'', host, '\';' SEPARATOR ' ') AS query FROM mysql.user;" | grep -v "query")
 
-    if command -v lynx &>/dev/null; then
-        $DB_CMD -e "$grants_commands" --html --silent | lynx -stdin -dump
-    else
-        $DB_CMD -e "$grants_commands"
-    fi
+	if command -v lynx &>/dev/null; then
+		$DB_CMD -e "$grants_commands" --html --silent | lynx -stdin -dump
+	else
+		$DB_CMD -e "$grants_commands"
+	fi
 
-    # List databases
-    db_show_databases
+	# List databases
+	db_show_databases
 }
 
 memcached_manage() {
-    local choice
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install memcached"
-        echo "2. Remove (purge) memcached"
-        echo "0. Quit"
+	local choice
+	while true; do
+		echo "Choose an option:"
+		echo "1. Install memcached"
+		echo "2. Remove (purge) memcached"
+		echo "0. Quit"
 
-        read -rp "Enter your choice: " choice
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) memcached_install ;;
-        2) memcached_remove ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) memcached_install ;;
+		2) memcached_remove ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 # Function to install Memcached
 memcached_install() {
-    # Install Memcached and required dependencies
-    apt-get update && apt-get install -y memcached libmemcached-tools || { echo "Failed" && return 1; }
+	# Install Memcached and required dependencies
+	apt-get update && apt-get install -y memcached libmemcached-tools || { echo "Failed" && return 1; }
 
-    # Configure Memcached
-    # echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
-    # echo "-l 127.0.0.1" >>/etc/memcached.conf # Bind to localhost
-    # echo "-p 11211" >>/etc/memcached.conf     # Use port 11211
-    # echo "-U 0" >>/etc/memcached.conf         # Run as the root user
-    # echo "-t 4" >>/etc/memcached.conf         # Use 4 threads
+	# Configure Memcached
+	# echo "-m 256" >>/etc/memcached.conf       # Set memory limit to 256MB
+	# echo "-l 127.0.0.1" >>/etc/memcached.conf # Bind to localhost
+	# echo "-p 11211" >>/etc/memcached.conf     # Use port 11211
+	# echo "-U 0" >>/etc/memcached.conf         # Run as the root user
+	# echo "-t 4" >>/etc/memcached.conf         # Use 4 threads
 
-    # Restart Memcached
-    systemctl restart memcached
+	# Restart Memcached
+	systemctl restart memcached
 
-    # Enable Memcached to start on system boot
-    systemctl enable memcached
+	# Enable Memcached to start on system boot
+	systemctl enable memcached
 
-    echo "Memcached installation and configuration complete"
+	echo "Memcached installation and configuration complete"
 }
 
 # Function to remove Memcached
 memcached_remove() {
-    local confirmation
+	local confirmation
 
-    # Ask for confirmation
-    read -rp "This will purge Memcached and its configuration.. Are you sure? (y/n): " confirmation
+	# Ask for confirmation
+	read -rp "This will purge Memcached and its configuration.. Are you sure? (y/n): " confirmation
 
-    if [[ $confirmation != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
-    # Stop Memcached service
-    systemctl stop memcached
+	if [[ $confirmation != "y" ]]; then
+		echo "Aborting."
+		return 0
+	fi
+	# Stop Memcached service
+	systemctl stop memcached
 
-    # Purge Memcached data
-    rm -rf /var/lib/memcached/*
+	# Purge Memcached data
+	rm -rf /var/lib/memcached/*
 
-    # Remove Memcached configuration files
-    apt remove -y --purge memcached
+	# Remove Memcached configuration files
+	apt remove -y --purge memcached
 
-    # Also remove configuration files
-    rm -rf /etc/memcached.conf
+	# Also remove configuration files
+	rm -rf /etc/memcached.conf
 
-    echo "Memcached purged and configuration files removed."
+	echo "Memcached purged and configuration files removed."
 }
 
 docker_install() {
 	curl -fsSL https://get.docker.com | sh
-    # Add Docker's official GPG key:
-    # apt-get update && apt-get install -y ca-certificates curl gnupg
-    # install -m 0755 -d /etc/apt/keyrings
-    # curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    # chmod a+r /etc/apt/keyrings/docker.gpg
+	# Add Docker's official GPG key:
+	# apt-get update && apt-get install -y ca-certificates curl gnupg
+	# install -m 0755 -d /etc/apt/keyrings
+	# curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+	# chmod a+r /etc/apt/keyrings/docker.gpg
 
-    # # Add the repository to Apt sources:
-    # local architecture
-    # architecture=$(dpkg --print-architecture)
-    # local codename
-    # codename=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)
+	# # Add the repository to Apt sources:
+	# local architecture
+	# architecture=$(dpkg --print-architecture)
+	# local codename
+	# codename=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)
 
-    # echo "deb [arch=$architecture signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $codename stable" |
-    #     tee /etc/apt/sources.list.d/docker.list >/dev/null
-    # apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    # apt-mark unhold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	# echo "deb [arch=$architecture signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $codename stable" |
+	#     tee /etc/apt/sources.list.d/docker.list >/dev/null
+	# apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	# apt-mark unhold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 }
 
 docker_remove() {
-    # Remove the official docker
-    apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras docker-model-plugin
-    # for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do apt-get -y remove $pkg; done
-    # Remove debian's docker
-    # for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get -y remove $pkg; done
-    apt purge -y docker.io docker-doc docker-compose podman-docker containerd runc
+	# Remove the official docker
+	apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras docker-model-plugin
+	# for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do apt-get -y remove $pkg; done
+	# Remove debian's docker
+	# for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get -y remove $pkg; done
+	apt purge -y docker.io docker-doc docker-compose podman-docker containerd runc
 
 }
 
 docker_manage() {
-    local choice
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install docker"
-        echo "2. Remove (purge) docker"
-        echo "0. Quit"
+	local choice
+	while true; do
+		echo "Choose an option:"
+		echo "1. Install docker"
+		echo "2. Remove (purge) docker"
+		echo "0. Quit"
 
-        read -rp "Enter your choice: " choice
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) docker_install ;;
-        2) docker_remove ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) docker_install ;;
+		2) docker_remove ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 wordpress_manage() {
-    local choice
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install Wordpress"
-        echo "0. Quit"
+	local choice
+	while true; do
+		echo "Choose an option:"
+		echo "1. Install Wordpress"
+		echo "0. Quit"
 
-        read -rp "Enter your choice: " choice
-        case $choice in
-        1) wordpress_install ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		read -rp "Enter your choice: " choice
+		case $choice in
+		1) wordpress_install ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 wordpress_install() {
-    local install_dir
-    local local_user
-    local wpURL
-    # Prompt for the installation directory
-    read -rp "Enter the full path where you want to install WordPress (e.g., /var/www/html/myblog): " install_dir
-    read -rp "Enter the user that will run wp: " local_user
-    read -rp "Enter the URL to access Wordpres: (e.g., https://example.com) " wpURL
+	local install_dir
+	local local_user
+	local wpURL
+	# Prompt for the installation directory
+	read -rp "Enter the full path where you want to install WordPress (e.g., /var/www/html/myblog): " install_dir
+	read -rp "Enter the user that will run wp: " local_user
+	read -rp "Enter the URL to access Wordpres: (e.g., https://example.com) " wpURL
 
-    # Verify the installation directory
-    if [ ! -d "$install_dir" ]; then
-        echo "The specified directory does not exist."
-        exit 1
-    fi
+	# Verify the installation directory
+	if [ ! -d "$install_dir" ]; then
+		echo "The specified directory does not exist."
+		exit 1
+	fi
 
-    if [ -f "/usr/local/bin/wp" ]; then
-        echo " Notice: wp-cli already installed"
-    else
-        curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-        chmod +x wp-cli.phar
-        mv wp-cli.phar /usr/local/bin/wp
-    fi
+	if [ -f "/usr/local/bin/wp" ]; then
+		echo " Notice: wp-cli already installed"
+	else
+		curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+		chmod +x wp-cli.phar
+		mv wp-cli.phar /usr/local/bin/wp
+	fi
 
-    # Database name, user, and admin user
-    local hex
-    hex=$(openssl rand -hex 3)
-    local DB_NAME="wp_${hex}"
-    local DB_USER="wp_${hex}"
-    local DB_PASS
-    DB_PASS=$(openssl rand -base64 12)
-    local WP_ADMIN_USER="admin"
-    local WP_ADMIN_PASS
-    WP_ADMIN_PASS=$(openssl rand -base64 12)
+	# Database name, user, and admin user
+	local hex
+	hex=$(openssl rand -hex 3)
+	local DB_NAME="wp_${hex}"
+	local DB_USER="wp_${hex}"
+	local DB_PASS
+	DB_PASS=$(openssl rand -base64 12)
+	local WP_ADMIN_USER="admin"
+	local WP_ADMIN_PASS
+	WP_ADMIN_PASS=$(openssl rand -base64 12)
 
-    local WP_ADMIN_EMAIL="user@example.com"
-    local WP_URL="${wpURL}"
-    local WP_TITLE="Your Site Title"
+	local WP_ADMIN_EMAIL="user@example.com"
+	local WP_URL="${wpURL}"
+	local WP_TITLE="Your Site Title"
 
-    # Create MySQL database and user
-    $DB_CMD <<MYSQL_SCRIPT
+	# Create MySQL database and user
+	$DB_CMD <<MYSQL_SCRIPT
 CREATE DATABASE $DB_NAME DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
 GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 
-    # Download WordPress using WP-CLI
-    echo -e "\n Downloading WordPress using WP-CLI"
-    sudo -u "${local_user}" -s wp core download --path="${install_dir}" --locale=en_US
+	# Download WordPress using WP-CLI
+	echo -e "\n Downloading WordPress using WP-CLI"
+	sudo -u "${local_user}" -s wp core download --path="${install_dir}" --locale=en_US
 
-    # Create wp-config.php file
-    echo -e "\n Creating wp-config.php file"
-    sudo -u "${local_user}" -s wp config create \
-        --path="${install_dir}" \
-        --dbname="$DB_NAME" \
-        --dbuser="$DB_USER" \
-        --dbpass="$DB_PASS" \
-        --locale=en_US
+	# Create wp-config.php file
+	echo -e "\n Creating wp-config.php file"
+	sudo -u "${local_user}" -s wp config create \
+		--path="${install_dir}" \
+		--dbname="$DB_NAME" \
+		--dbuser="$DB_USER" \
+		--dbpass="$DB_PASS" \
+		--locale=en_US
 
-    # Install WordPress
-    echo -e "\n Installing WordPress"
-    sudo -u "${local_user}" -s wp core install \
-        --path="${install_dir}" \
-        --url="$WP_URL" \
-        --title="$WP_TITLE" \
-        --admin_user="$WP_ADMIN_USER" \
-        --admin_password="$WP_ADMIN_PASS" \
-        --admin_email="$WP_ADMIN_EMAIL"
+	# Install WordPress
+	echo -e "\n Installing WordPress"
+	sudo -u "${local_user}" -s wp core install \
+		--path="${install_dir}" \
+		--url="$WP_URL" \
+		--title="$WP_TITLE" \
+		--admin_user="$WP_ADMIN_USER" \
+		--admin_password="$WP_ADMIN_PASS" \
+		--admin_email="$WP_ADMIN_EMAIL"
 
-    echo -e "\n Installing Plugins"
-    # sudo -u "${local_user}" -s wp plugin install all-in-one-seo-pack all-in-one-wp-migration amp google-analytics-for-wordpress jetpack w3-total-cache wp-mail-smtp --path="$install_dir"
-    sudo -u "${local_user}" -s wp plugin install amp google-analytics-for-wordpress wp-mail-smtp wordfence --path="$install_dir"
-    echo -e "\n Activating Plugins"
-    # sudo -u "${local_user}" -s wp plugin activate jetpack --path="$install_dir"
+	echo -e "\n Installing Plugins"
+	# sudo -u "${local_user}" -s wp plugin install all-in-one-seo-pack all-in-one-wp-migration amp google-analytics-for-wordpress jetpack w3-total-cache wp-mail-smtp --path="$install_dir"
+	sudo -u "${local_user}" -s wp plugin install amp google-analytics-for-wordpress wp-mail-smtp wordfence --path="$install_dir"
+	echo -e "\n Activating Plugins"
+	# sudo -u "${local_user}" -s wp plugin activate jetpack --path="$install_dir"
 
-    cat >>"${install_dir}/wp-config.php" <<'EOFX'
+	cat >>"${install_dir}/wp-config.php" <<'EOFX'
 /**
  * Disable pingback.ping xmlrpc method to prevent WordPress from participating in DDoS attacks
  * More info at: https://docs.bitnami.com/general/apps/wordpress/troubleshooting/xmlrpc-and-pingback/
@@ -2157,181 +2157,181 @@ if ( !defined( 'WP_CLI' ) ) {
 }
 EOFX
 
-    # wp_user_create=$(wp user create "$admin_user" admin@example.com --user_pass="$admin_password" --path="$install_dir")
-    echo "#############################################################"
+	# wp_user_create=$(wp user create "$admin_user" admin@example.com --user_pass="$admin_password" --path="$install_dir")
+	echo "#############################################################"
 
-    # if [[ $wp_user_create == *"Success"* ]]; then
-    echo "WordPress is now installed and configured in $install_dir."
-    echo "username: $WP_ADMIN_USER | password: $WP_ADMIN_PASS"
-    echo "You can access it in your web browser to complete the setup."
-    # else
-    # echo "Error creating the WordPress admin user."
-    # exit 1
-    # fi
-    echo "#############################################################"
+	# if [[ $wp_user_create == *"Success"* ]]; then
+	echo "WordPress is now installed and configured in $install_dir."
+	echo "username: $WP_ADMIN_USER | password: $WP_ADMIN_PASS"
+	echo "You can access it in your web browser to complete the setup."
+	# else
+	# echo "Error creating the WordPress admin user."
+	# exit 1
+	# fi
+	echo "#############################################################"
 
 }
 
 certbot_manage() {
-    local choice
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. Install Certbot"
-        echo "2. Get/Renew Certificate"
-        echo "5. List cloudflare configs"
-        echo "6. Create cloudflare config"
-        echo "0. Quit"
-        echo -e "\033[0m"
+	local choice
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. Install Certbot"
+		echo "2. Get/Renew Certificate"
+		echo "5. List cloudflare configs"
+		echo "6. Create cloudflare config"
+		echo "0. Quit"
+		echo -e "\033[0m"
 
-        read -rp "Enter your choice: " choice
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) certbot_install ;;
-        2) certbot_certificate_get ;;
-        5) certbot_list_cloudflare_config ;;
-        6) certbot_create_cloudflare_config ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) certbot_install ;;
+		2) certbot_certificate_get ;;
+		5) certbot_list_cloudflare_config ;;
+		6) certbot_create_cloudflare_config ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 certbot_install() {
-    # Check if Certbot is installed
-    if ! command -v certbot &>/dev/null; then
-        echo "Certbot is not installed. Installing Certbot..."
-        # apt-get update && apt-get -y install certbot python3-certbot-dns-cloudflare
-        apt-get update && apt-get -y install snapd
-        snap install --classic certbot
-        ln -s /snap/bin/certbot /usr/bin/certbot
-        snap set certbot trust-plugin-with-root=ok
-        snap install certbot-dns-cloudflare
-    fi
+	# Check if Certbot is installed
+	if ! command -v certbot &>/dev/null; then
+		echo "Certbot is not installed. Installing Certbot..."
+		# apt-get update && apt-get -y install certbot python3-certbot-dns-cloudflare
+		apt-get update && apt-get -y install snapd
+		snap install --classic certbot
+		ln -s /snap/bin/certbot /usr/bin/certbot
+		snap set certbot trust-plugin-with-root=ok
+		snap install certbot-dns-cloudflare
+	fi
 }
 
 # Function to configure Cloudflare
 certbot_create_cloudflare_config() {
-    local cloudflare_email
-    local cloudflare_api_key
-    read -rp "Enter your Cloudflare email: " cloudflare_email
-    read -rp "Enter your Cloudflare API Token: " cloudflare_api_key
+	local cloudflare_email
+	local cloudflare_api_key
+	read -rp "Enter your Cloudflare email: " cloudflare_email
+	read -rp "Enter your Cloudflare API Token: " cloudflare_api_key
 
-    config_name="$cloudflare_email"
+	config_name="$cloudflare_email"
 
-    # Create the Cloudflare configuration
-    mkdir -p "${cloudflare_config_dir}/$config_name"
-    cat >"${cloudflare_config_dir}/${config_name}.ini" <<EOF
+	# Create the Cloudflare configuration
+	mkdir -p "${cloudflare_config_dir}/$config_name"
+	cat >"${cloudflare_config_dir}/${config_name}.ini" <<EOF
 dns_cloudflare_api_token = $cloudflare_api_key
 EOF
-    chmod 600 "${cloudflare_config_dir}/${config_name}.ini"
+	chmod 600 "${cloudflare_config_dir}/${config_name}.ini"
 }
 
 # Function to list existing Cloudflare configurations and return the selected name
 certbot_list_cloudflare_config() {
-    local config_names=()
-    echo "Existing Cloudflare configurations:"
-    i=1
-    for config in "${cloudflare_config_dir}"/*; do
-        if [ -f "$config" ]; then
-            local config_name
-            config_name=$(basename "$config")
-            config_names+=("$config_name")
-            echo -e "\n \033[32m$i. $config_name\033[0m"
-            cat "$config"
-            ((i++))
-        fi
-    done
+	local config_names=()
+	echo "Existing Cloudflare configurations:"
+	i=1
+	for config in "${cloudflare_config_dir}"/*; do
+		if [ -f "$config" ]; then
+			local config_name
+			config_name=$(basename "$config")
+			config_names+=("$config_name")
+			echo -e "\n \033[32m$i. $config_name\033[0m"
+			cat "$config"
+			((i++))
+		fi
+	done
 }
 
 # Function to get a new or renew a certificate
 certbot_certificate_get() {
-    local domain_name
-    local account_list
-    local index
-    local chosen_number
-    local account
-    read -rp "Enter your domain name (e.g., example.com): " domain_name
+	local domain_name
+	local account_list
+	local index
+	local chosen_number
+	local account
+	read -rp "Enter your domain name (e.g., example.com): " domain_name
 
-    # Check if any Cloudflare configurations exist
-    local selected_config
-    selected_config=$(select_from_dir "${cloudflare_config_dir}")
-    echo "Selected file: $selected_config"
+	# Check if any Cloudflare configurations exist
+	local selected_config
+	selected_config=$(select_from_dir "${cloudflare_config_dir}")
+	echo "Selected file: $selected_config"
 
-    # Get a list of Certbot accounts
-    account_list=$(ls -1 /etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory)
+	# Get a list of Certbot accounts
+	account_list=$(ls -1 /etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory)
 
-    if [ -z "$account_list" ]; then
-        echo "No Certbot accounts found."
-    else
-        # Display the list of accounts with numbers
-        echo "Available Certbot Accounts:"
-        index=1
-        for account in $account_list; do
-            echo "$index. $account"
-            ((index++))
-        done
-        while true; do
-            # Prompt user to choose an account
-            read -rp "Enter the number of the account to use: " chosen_number
-            # Validate user input
-            if ! [[ "$chosen_number" =~ ^[0-9]+$ ]] || [ "$chosen_number" -le 0 ] || [ "$chosen_number" -gt "$index" ]; then
-                echo "Invalid input. Please enter a valid account number."
-            else
-                break
-            fi
-        done
-        # Get the chosen account
-        chosen_account=$(echo "$account_list" | awk "NR==$chosen_number")
-        echo "Selected Account: $chosen_account"
-    fi
-    if [ -n "$chosen_account" ]; then
-        account="--account ${chosen_account}"
-    fi
+	if [ -z "$account_list" ]; then
+		echo "No Certbot accounts found."
+	else
+		# Display the list of accounts with numbers
+		echo "Available Certbot Accounts:"
+		index=1
+		for account in $account_list; do
+			echo "$index. $account"
+			((index++))
+		done
+		while true; do
+			# Prompt user to choose an account
+			read -rp "Enter the number of the account to use: " chosen_number
+			# Validate user input
+			if ! [[ "$chosen_number" =~ ^[0-9]+$ ]] || [ "$chosen_number" -le 0 ] || [ "$chosen_number" -gt "$index" ]; then
+				echo "Invalid input. Please enter a valid account number."
+			else
+				break
+			fi
+		done
+		# Get the chosen account
+		chosen_account=$(echo "$account_list" | awk "NR==$chosen_number")
+		echo "Selected Account: $chosen_account"
+	fi
+	if [ -n "$chosen_account" ]; then
+		account="--account ${chosen_account}"
+	fi
 
-    read -rp "Press Enter to start..."
+	read -rp "Press Enter to start..."
 
-    # Request the certificate (For debugging add: --dry-run -vvv)
-    if certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 20 --dns-cloudflare-credentials "${selected_config}" ${account}; then
-        mkdir -p /etc/ssl
-        ln -s "/etc/letsencrypt/live/${domain_name}" /etc/ssl/
-    fi
+	# Request the certificate (For debugging add: --dry-run -vvv)
+	if certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 20 --dns-cloudflare-credentials "${selected_config}" ${account}; then
+		mkdir -p /etc/ssl
+		ln -s "/etc/letsencrypt/live/${domain_name}" /etc/ssl/
+	fi
 
-    # --account <account-id or URI>
+	# --account <account-id or URI>
 
-    # For CURL
-    # zid 1c2a1aaa99b81e8ecfae3d1e81e52e60
-    # curl -X GET "https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?type=TXT&name=_acme-challenge.domain.com" \
-    #   -H "Authorization: Bearer {api_token}" \
-    #   -H "Content-Type:application/json" | jq .
+	# For CURL
+	# zid 1c2a1aaa99b81e8ecfae3d1e81e52e60
+	# curl -X GET "https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?type=TXT&name=_acme-challenge.domain.com" \
+	#   -H "Authorization: Bearer {api_token}" \
+	#   -H "Content-Type:application/json" | jq .
 
 }
 
 rsync_manage() {
-    local choice
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. Install rsync & add log rotation"
-        echo "2. Rsync push letsencrypt"
-        echo "3. rsync_push_ssl (guided)"
-        echo "4. Install rsync daemon"
-        echo "5. Install rclone"
-        echo "0. Quit"
-        echo -e "\033[0m"
+	local choice
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. Install rsync & add log rotation"
+		echo "2. Rsync push letsencrypt"
+		echo "3. rsync_push_ssl (guided)"
+		echo "4. Install rsync daemon"
+		echo "5. Install rclone"
+		echo "0. Quit"
+		echo -e "\033[0m"
 
-        read -rp "Enter your choice: " choice
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) rsync_install ;;
-        2) rsync_push_letsencrypt ;;
-        3) rsync_push_ssl ;;
-        4) install_rsync_daemon ;;
-        5) install_rclone ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) rsync_install ;;
+		2) rsync_push_letsencrypt ;;
+		3) rsync_push_ssl ;;
+		4) install_rsync_daemon ;;
+		5) install_rclone ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 install_rclone() {
@@ -2339,16 +2339,16 @@ install_rclone() {
 }
 
 rsync_install() {
-    # Check if the 'rsync' command is available
-    if ! command -v rsync >/dev/null 2>&1; then
-        echo "The 'rsync' command is not installed. Installing..."
-        apt-get update && apt-get install -y rsync
-    fi
+	# Check if the 'rsync' command is available
+	if ! command -v rsync >/dev/null 2>&1; then
+		echo "The 'rsync' command is not installed. Installing..."
+		apt-get update && apt-get install -y rsync
+	fi
 
-    mkdir -p /var/log/rsync
+	mkdir -p /var/log/rsync
 
-    echo -e "\nAdding log rotation.."
-    cat >/etc/logrotate.d/rsync <<EOFX
+	echo -e "\nAdding log rotation.."
+	cat >/etc/logrotate.d/rsync <<EOFX
 /var/log/rsync/*.log {
     size 20M
     missingok
@@ -2359,43 +2359,43 @@ rsync_install() {
     create 640 root root
 }
 EOFX
-    mkdir -p /var/log/rsync
-    chown root:root /var/log/rsync
-    chmod 640 /var/log/rsync
+	mkdir -p /var/log/rsync
+	chown root:root /var/log/rsync
+	chmod 640 /var/log/rsync
 }
 
 install_rsync_daemon() {
-    # Check if running as root
-    if [ "$(id -u)" -ne 0 ]; then
-        echo "This script must be run as root"
-        return 1
-    fi
+	# Check if running as root
+	if [ "$(id -u)" -ne 0 ]; then
+		echo "This script must be run as root"
+		return 1
+	fi
 
-    # Install rsync if not already installed
-    if ! command -v rsync &> /dev/null; then
-        echo "Installing rsync..."
-        rsync_install
-    fi
+	# Install rsync if not already installed
+	if ! command -v rsync &>/dev/null; then
+		echo "Installing rsync..."
+		rsync_install
+	fi
 
-    # Prompt for module details
-    read -rp "Enter the module name (e.g., downloads): " module_name
-    read -rp "Enter the full path for the module (e.g., /root/Downloads): " module_path
+	# Prompt for module details
+	read -rp "Enter the module name (e.g., downloads): " module_name
+	read -rp "Enter the full path for the module (e.g., /root/Downloads): " module_path
 
-    # Check if module path exists
-    if [ ! -d "$module_path" ]; then
-        echo "Directory $module_path does not exist. Creating it..."
-        mkdir -p "$module_path" || {
-            echo "Failed to create directory $module_path"
-            return 1
-        }
-        echo "Directory created successfully"
-        chmod 777 "$module_path" && echo "Permissions set to 777 for $module_path" || echo "Failed to set permissions for $module_path"
-    else
-        echo "Directory $module_path already exists"
-    fi
+	# Check if module path exists
+	if [ ! -d "$module_path" ]; then
+		echo "Directory $module_path does not exist. Creating it..."
+		mkdir -p "$module_path" || {
+			echo "Failed to create directory $module_path"
+			return 1
+		}
+		echo "Directory created successfully"
+		chmod 777 "$module_path" && echo "Permissions set to 777 for $module_path" || echo "Failed to set permissions for $module_path"
+	else
+		echo "Directory $module_path already exists"
+	fi
 
-    # Create rsync config file
-    cat > /etc/rsyncd.conf <<EOF
+	# Create rsync config file
+	cat >/etc/rsyncd.conf <<EOF
 # Global Settings
 uid = nobody
 gid = nogroup
@@ -2426,415 +2426,418 @@ reverse lookup = no
     #.zip *.gz *.tgz *.bz2 *.xz *.7z *.rar *.mp3 *.mp4 *.avi *.mkv *.jpg *.jpeg *.png *.gif # Files that are already compressed.
 EOF
 
-    # Create systemd service file if systemd is available
-    # cat > /etc/systemd/system/rsync.service <<EOF
-# [Unit]
-# Description=fast remote file copy program daemon
-# ConditionPathExists=/etc/rsyncd.conf
-# After=network.target
-# Documentation=man:rsync(1) man:rsyncd.conf(5)
+	# Create systemd service file if systemd is available
+	# cat > /etc/systemd/system/rsync.service <<EOF
+	# [Unit]
+	# Description=fast remote file copy program daemon
+	# ConditionPathExists=/etc/rsyncd.conf
+	# After=network.target
+	# Documentation=man:rsync(1) man:rsyncd.conf(5)
 
-# [Service]
-# ExecStart=/usr/bin/rsync --daemon --no-detach
-# RestartSec=1
-# Restart=on-failure
-# ProtectSystem=full
-# #ProtectHome=on|off|read-only
-# PrivateDevices=on
-# NoNewPrivileges=on
+	# [Service]
+	# ExecStart=/usr/bin/rsync --daemon --no-detach
+	# RestartSec=1
+	# Restart=on-failure
+	# ProtectSystem=full
+	# #ProtectHome=on|off|read-only
+	# PrivateDevices=on
+	# NoNewPrivileges=on
 
-# [Install]
-# WantedBy=multi-user.target
-# EOF
+	# [Install]
+	# WantedBy=multi-user.target
+	# EOF
 
-    # systemctl daemon-reload
-    systemctl enable rsync
-    systemctl start rsync
-    echo "Rsync daemon enabled and started as a systemd service."
-    echo "You can edit the configuration at /etc/rsyncd.conf"
+	# systemctl daemon-reload
+	systemctl enable rsync
+	systemctl start rsync
+	echo "Rsync daemon enabled and started as a systemd service."
+	echo "You can edit the configuration at /etc/rsyncd.conf"
 }
 
 rsync_push_letsencrypt() {
-    local path="$1"
-    if [[ -z "$path" ]]; then
-        path=$(select_from_dir "/etc/letsencrypt/live/")
-    fi
-    local domain="${path##*/}"
-    local host="$2"
-    local port="$3"
-    local user="$4"
-    if [[ -z "$host" ]]; then
-        read -rp "Enter host or IP: " host
-    fi
-    if [[ -z "$port" ]]; then
-        read -rp "Enter port: " port
-    fi
-    if [[ -z "$user" ]]; then
-        read -rp "Enter user (default root): " user
-        if [[ -z "$user" ]]; then
-            user=root
-        fi
-    fi
-    rsync --log-file="/var/log/rsync/letsencrypt.log" -uahzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
-    echo "Log written to '/var/log/rsync/letsencrypt.log'"
+	local path="$1"
+	if [[ -z "$path" ]]; then
+		path=$(select_from_dir "/etc/letsencrypt/live/")
+	fi
+	local domain="${path##*/}"
+	local host="$2"
+	local port="$3"
+	local user="$4"
+	if [[ -z "$host" ]]; then
+		read -rp "Enter host or IP: " host
+	fi
+	if [[ -z "$port" ]]; then
+		read -rp "Enter port: " port
+	fi
+	if [[ -z "$user" ]]; then
+		read -rp "Enter user (default root): " user
+		if [[ -z "$user" ]]; then
+			user=root
+		fi
+	fi
+	rsync --log-file="/var/log/rsync/letsencrypt.log" -uahzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
+	echo "Log written to '/var/log/rsync/letsencrypt.log'"
 }
 
 rsync_push_ssl() {
-    local path="$1"
-    
-    # 1. Check if path selection fails
-    if [[ -z "$path" ]]; then
-        path=$(select_from_dir "/etc/ssl/")
-        [[ -z "$path" ]] && return 1 
-    fi
+	local path="$1"
 
-    path="${path%%+(/)}"
-    local domain="${path##*/}"
-    local host="$2"
-    local port="$3"
-    local user="$4"
+	# 1. Check if path selection fails
+	if [[ -z "$path" ]]; then
+		path=$(select_from_dir "/etc/ssl/")
+		[[ -z "$path" ]] && return 1
+	fi
 
-    # 2. Handle interactive inputs
-    if [[ -z "$host" ]]; then
-        read -rp "Enter host or IP: " host
-        [[ -z "$host" ]] && return 1
-    fi
-    if [[ -z "$port" ]]; then
-        read -rp "Enter port: " port
-        [[ -z "$port" ]] && return 1
-    fi
-    if [[ -z "$user" ]]; then
-        read -rp "Enter user (default root): " user
-        user="${user:-root}"
-    fi
+	path="${path%%+(/)}"
+	local domain="${path##*/}"
+	local host="$2"
+	local port="$3"
+	local user="$4"
 
-    # 3. Execute rsync and capture result
-    rsync --log-file="/var/log/rsync/push_ssl.log" -uahzPL "${path}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
-    local exit_code=$?
+	# 2. Handle interactive inputs
+	if [[ -z "$host" ]]; then
+		read -rp "Enter host or IP: " host
+		[[ -z "$host" ]] && return 1
+	fi
+	if [[ -z "$port" ]]; then
+		read -rp "Enter port: " port
+		[[ -z "$port" ]] && return 1
+	fi
+	if [[ -z "$user" ]]; then
+		read -rp "Enter user (default root): " user
+		user="${user:-root}"
+	fi
 
-    if [[ $exit_code -eq 0 ]]; then
-        echo "Success: Log written to '/var/log/rsync/push_ssl.log'"
-    else
-        echo "Error: rsync failed with exit code $exit_code" >&2
-    fi
+	# 3. Execute rsync and capture result
+	rsync --log-file="/var/log/rsync/push_ssl.log" -uahzPL "${path}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
+	local exit_code=$?
 
-    return $exit_code
+	if [[ $exit_code -eq 0 ]]; then
+		echo "Success: Log written to '/var/log/rsync/push_ssl.log'"
+	else
+		echo "Error: rsync failed with exit code $exit_code" >&2
+	fi
+
+	return $exit_code
 }
 
 compress() {
-    # Validate the availability of compression methods
-    local commands=("zip" "tar" "gzip" "bzip2" "xz" "7z")
-    for cmd in "${commands[@]}"; do
-        validate_command "$cmd" || return 1
-    done
+	# Validate the availability of compression methods
+	local commands=("zip" "tar" "gzip" "bzip2" "xz" "7z")
+	for cmd in "${commands[@]}"; do
+		validate_command "$cmd" || return 1
+	done
 
-    if [ "$#" -ne 2 ]; then
-        echo "Insufficient number of arguments. Usage: $0 compress [format] [path]"
-        exit 1
-    fi
-    local format=$1
-    local path=$2
-    local level
+	if [ "$#" -ne 2 ]; then
+		echo "Insufficient number of arguments. Usage: $0 compress [format] [path]"
+		exit 1
+	fi
+	local format=$1
+	local path=$2
+	local level
 
-    # Remove quotes if present in the input path
-    path=${path//\"/}
-    # Remove trailing slash if present in the input path
-    path=${path%/}
+	# Remove quotes if present in the input path
+	path=${path//\"/}
+	# Remove trailing slash if present in the input path
+	path=${path%/}
 
-    # local base_name=$(basename "$path")
-    # local dir_name=$(dirname "$path")
+	# local base_name=$(basename "$path")
+	# local dir_name=$(dirname "$path")
 
-    if ! path_exists "$path"; then
-        echo "Path doesn't exist"
-        return 1
-    fi
+	if ! path_exists "$path"; then
+		echo "Path doesn't exist"
+		return 1
+	fi
 
-    # "$base_name.tar" -C "$dir_name" "$base_name"
+	# "$base_name.tar" -C "$dir_name" "$base_name"
 
-    # - to backup a directory : tar cf - directory | 7za a -si directory.tar.7z
-    # - to restore your backup : 7za x -so directory.tar.7z | tar xf -
+	# - to backup a directory : tar cf - directory | 7za a -si directory.tar.7z
+	# - to restore your backup : 7za x -so directory.tar.7z | tar xf -
 
-    case $format in
-    "zip")
-        # if [ -d "$path" ]; then
-        #     zip -r "$path.zip" "$path"
-        # else
-        #     zip "$path.zip" "$path"
-        # fi
-        7z a -tzip -mx=5 "$path.zip" "$path" # mx5 still better and faster than zip -9
-        ;;
-    "tar") tar -cvf "$path.tar" "$path" ;;
-    "gz")
-        if [ -d "$path" ]; then
-            tar -czvf "$path.tar.gz" "$path"
-        else
-            gzip -c "$path" >"$path.gz"
-        fi
-        ;;
-    "bz2")
-        if [ -d "$path" ]; then
-            tar -cjvf "$path.tar.bz2" "$path"
-        else
-            bzip2 -c "$path" >"$path.bz2"
-        fi
-        ;;
-    "xz")
-        if [ -d "$path" ]; then
-            tar -cJvf "$path.tar.xz" "$path"
-        else
-            xz -c "$path" >"$path.xz"
-        fi
-        ;;
-    "7z")
-        while true; do
-            read -rp "Enter compression level for 7z: [0|1|3|5|7|9]: " level
-            case $level in
-            0) break ;;
-            1) break ;;
-            3) break ;;
-            5) break ;;
-            7) break ;;
-            9) break ;;
-            *) echo "Invalid choice." ;;
-            esac
-        done
+	case $format in
+	"zip")
+		# if [ -d "$path" ]; then
+		#     zip -r "$path.zip" "$path"
+		# else
+		#     zip "$path.zip" "$path"
+		# fi
+		7z a -tzip -mx=5 "$path.zip" "$path" # mx5 still better and faster than zip -9
+		;;
+	"tar") tar -cvf "$path.tar" "$path" ;;
+	"gz")
+		if [ -d "$path" ]; then
+			tar -czvf "$path.tar.gz" "$path"
+		else
+			gzip -c "$path" >"$path.gz"
+		fi
+		;;
+	"bz2")
+		if [ -d "$path" ]; then
+			tar -cjvf "$path.tar.bz2" "$path"
+		else
+			bzip2 -c "$path" >"$path.bz2"
+		fi
+		;;
+	"xz")
+		if [ -d "$path" ]; then
+			tar -cJvf "$path.tar.xz" "$path"
+		else
+			xz -c "$path" >"$path.xz"
+		fi
+		;;
+	"7z")
+		while true; do
+			read -rp "Enter compression level for 7z: [0|1|3|5|7|9]: " level
+			case $level in
+			0) break ;;
+			1) break ;;
+			3) break ;;
+			5) break ;;
+			7) break ;;
+			9) break ;;
+			*) echo "Invalid choice." ;;
+			esac
+		done
 
-        7z -mx=$level a "$path.7z" "$path"
-        ;;
-    *) echo "Invalid compression format." ;;
-    esac
+		7z -mx=$level a "$path.7z" "$path"
+		;;
+	*) echo "Invalid compression format." ;;
+	esac
 }
 
 decompress() {
-    # Validate the availability of compression methods
-    # Validate the availability of compression methods
-    local commands=("unzip" "tar" "gzip" "bzip2" "xz" "7z")
-    for cmd in "${commands[@]}"; do
-        validate_command "$cmd" || return 1
-    done
+	# Validate the availability of compression methods
+	# Validate the availability of compression methods
+	local commands=("unzip" "tar" "gzip" "bzip2" "xz" "7z")
+	for cmd in "${commands[@]}"; do
+		validate_command "$cmd" || return 1
+	done
 
-    if [ "$#" -ne 1 ]; then
-        echo "Insufficient number of arguments. Usage: $0 decompress [path]"
-        exit 1
-    fi
-    detect_format() {
-        local file_path=$1
-        local extension="${file_path##*.}"
+	if [ "$#" -ne 1 ]; then
+		echo "Insufficient number of arguments. Usage: $0 decompress [path]"
+		exit 1
+	fi
+	detect_format() {
+		local file_path=$1
+		local extension="${file_path##*.}"
 
-        case $extension in
-        "zip") echo "zip" ;;
-        "tar") echo "tar" ;;
-        "gz") echo "gz" ;;
-        "bz2") echo "bz2" ;;
-        "xz") echo "xz" ;;
-        "7z") echo "7z" ;;
-        *)
-            local file_type=$(file -b "$file_path" | awk '{print $1}')
+		case $extension in
+		"zip") echo "zip" ;;
+		"tar") echo "tar" ;;
+		"gz") echo "gz" ;;
+		"bz2") echo "bz2" ;;
+		"xz") echo "xz" ;;
+		"7z") echo "7z" ;;
+		*)
+			local file_type=$(file -b "$file_path" | awk '{print $1}')
 
-            case $file_type in
-            "Zip") echo "zip" ;;
-            "POSIX") echo "tar" ;;
-            "gzip") echo "gz" ;;
-            "bzip2") echo "bz2" ;;
-            "XZ") echo "xz" ;;
-            "7-zip") echo "7z" ;;
-            *) echo "Unknown" ;;
-            esac
-            ;;
-        esac
-    }
-    local format path=$1
+			case $file_type in
+			"Zip") echo "zip" ;;
+			"POSIX") echo "tar" ;;
+			"gzip") echo "gz" ;;
+			"bzip2") echo "bz2" ;;
+			"XZ") echo "xz" ;;
+			"7-zip") echo "7z" ;;
+			*) echo "Unknown" ;;
+			esac
+			;;
+		esac
+	}
+	local format path=$1
 
-    if ! file_exists "$path"; then
-        echo "File doesn't exist"
-        return 1
-    fi
+	if ! file_exists "$path"; then
+		echo "File doesn't exist"
+		return 1
+	fi
 
-    format=$(detect_format "$path")
-    if [ "$format" == "Unknown" ]; then
-        echo "Unknown compression format. Decompression aborted."
-        return 1
-    fi
+	format=$(detect_format "$path")
+	if [ "$format" == "Unknown" ]; then
+		echo "Unknown compression format. Decompression aborted."
+		return 1
+	fi
 
-    case $format in
-    "zip") unzip "$path" ;;
-    "tar") tar -xvf "$path" ;;
-    "gz") tar -xzvf "$path" ;;
-    "bz2") tar -xjvf "$path" ;;
-    "xz") tar -xJvf "$path" ;;
-    "7z") 7z x "$path" ;;
-    *) echo "Invalid compression format." ;;
-    esac
+	case $format in
+	"zip") unzip "$path" ;;
+	"tar") tar -xvf "$path" ;;
+	"gz") tar -xzvf "$path" ;;
+	"bz2") tar -xjvf "$path" ;;
+	"xz") tar -xJvf "$path" ;;
+	"7z") 7z x "$path" ;;
+	*) echo "Invalid compression format." ;;
+	esac
 }
 
 comp_manage() {
 
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. Compress"
-        echo "2. Decompress"
-        echo "0. Exit"
-        echo -e "\033[0m"
-        read -rp "Enter your choice: " choice
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. Compress"
+		echo "2. Decompress"
+		echo "0. Exit"
+		echo -e "\033[0m"
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        0) return 0 ;;
-        1)
-            while true; do
-                read -rp "Enter compression format (zip, tar, gz, bz2, xz, 7z): " format
-                case $format in
-                "zip" | "tar" | "gz" | "bz2" | "xz" | "7z") break ;;
-                *)
-                    echo "Invalid compression format."
-                    ;;
-                esac
-            done
-            read -rp "Enter path to file/directory: " path
-            compress "$format" "$path"
-            ;;
-        2)
-            read -rp "Enter path to compressed file: " path
-            decompress "$path"
-            ;;
-        *)
-            echo "Invalid choice."
-            ;;
-        esac
-    done
+		case $choice in
+		0) return 0 ;;
+		1)
+			while true; do
+				read -rp "Enter compression format (zip, tar, gz, bz2, xz, 7z): " format
+				case $format in
+				"zip" | "tar" | "gz" | "bz2" | "xz" | "7z") break ;;
+				*)
+					echo "Invalid compression format."
+					;;
+				esac
+			done
+			read -rp "Enter path to file/directory: " path
+			compress "$format" "$path"
+			;;
+		2)
+			read -rp "Enter path to compressed file: " path
+			decompress "$path"
+			;;
+		*)
+			echo "Invalid choice."
+			;;
+		esac
+	done
 }
 
 net_manage() {
-    local choice
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. Enable IP Forward & MASQUERADE"
-        echo "2. Tune Kernel"
-        echo "3. tailscale_manage"
-        echo "4. cloudflared_manage"
-        echo "5. Install SoftEther VPN"
-        echo "6. Install OpenConnect VPN Client"
-        echo "7. Add OpenConnect Client Configs"
-        echo "8. Install and configure Squid as HTTP/S proxy"
-        echo "9. Install UDP-GRO Service"
-        echo "10. Install TinyProxy"
-        echo "11. Flush iptables"
+	local choice
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. Enable IP Forward & MASQUERADE"
+		echo "2. Tune Kernel"
+		echo "3. tailscale_manage"
+		echo "4. cloudflared_manage"
+		echo "5. Install SoftEther VPN"
+		echo "6. Install OpenConnect VPN Client"
+		echo "7. Add OpenConnect Client Configs"
+		echo "8. Install and configure Squid as HTTP/S proxy"
+		echo "9. Install UDP-GRO Service"
+		echo "10. Install TinyProxy"
+		echo "11. Flush iptables"
 
-        echo "0. Quit"
-        echo -e "\033[0m"
-        read -rp "Enter your choice: " choice
+		echo "0. Quit"
+		echo -e "\033[0m"
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) net_enable_ip_forward ;;
-        2) net_tune_kernel ;;
-        3) tailscale_manage ;;
-        4) cloudflared_manage ;;
-        5) net_softether_install ;;
-        6) net_install_openconnect ;;
-        7) net_addConfig_openconnect ;;
-        8) setup_squid_https_proxy ;;
-        9) setup_gro_service ;;
-        10) setup_tinyproxy ;;
-        11) net_flush_iptables ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) net_enable_ip_forward ;;
+		2) net_tune_kernel ;;
+		3) tailscale_manage ;;
+		4) cloudflared_manage ;;
+		5) net_softether_install ;;
+		6) net_install_openconnect ;;
+		7) net_addConfig_openconnect ;;
+		8) setup_squid_https_proxy ;;
+		9) setup_gro_service ;;
+		10) setup_tinyproxy ;;
+		11) net_flush_iptables ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
-net_flush_iptables(){
+net_flush_iptables() {
 	local _ans
 	# confirmation prompt
 	echo 'About to flush iptables/nftables Continue? [y/N]: '
 	read -r _ans
 	case "${_ans,,}" in
-		y|yes) ;;
-		*) echo 'Aborted by user.'; return 4;;
+	y | yes) ;;
+	*)
+		echo 'Aborted by user.'
+		return 4
+		;;
 	esac
 	local TABLES=(filter nat mangle raw security)
 	local tbl
-  # Flush IPv4 iptables (iptables command)
-  if command -v iptables >/dev/null 2>&1; then
-    printf 'Flushing IPv4 iptables...\n'
-    for tbl in "${TABLES[@]}"; do
-      # flush, delete user chains, zero counters
-      iptables -t $tbl -F 2>/dev/null || true
-      iptables -t $tbl -X 2>/dev/null || true
-      iptables -t $tbl -Z 2>/dev/null || true
-    done
-    # reset builtin policies (best-effort)
-    for chain in INPUT FORWARD OUTPUT; do
-      iptables -P $chain ACCEPT 2>/dev/null || true
-    done
-  else
-    printf 'Note: iptables not found; skipping IPv4 iptables flush.\n'
-  fi
+	# Flush IPv4 iptables (iptables command)
+	if command -v iptables >/dev/null 2>&1; then
+		printf 'Flushing IPv4 iptables...\n'
+		for tbl in "${TABLES[@]}"; do
+			# flush, delete user chains, zero counters
+			iptables -t $tbl -F 2>/dev/null || true
+			iptables -t $tbl -X 2>/dev/null || true
+			iptables -t $tbl -Z 2>/dev/null || true
+		done
+		# reset builtin policies (best-effort)
+		for chain in INPUT FORWARD OUTPUT; do
+			iptables -P $chain ACCEPT 2>/dev/null || true
+		done
+	else
+		printf 'Note: iptables not found; skipping IPv4 iptables flush.\n'
+	fi
 
-  # Flush IPv6 iptables (ip6tables)
-  if command -v ip6tables >/dev/null 2>&1; then
-    printf 'Flushing IPv6 ip6tables...\n'
-    for tbl in "${TABLES[@]}"; do
-      ip6tables -t $tbl -F 2>/dev/null || true
-      ip6tables -t $tbl -X 2>/dev/null || true
-      ip6tables -t $tbl -Z 2>/dev/null || true
-    done
-    for chain in INPUT FORWARD OUTPUT; do
-      ip6tables -P $chain ACCEPT 2>/dev/null || true
-    done
-  else
-      printf 'Note: ip6tables not found; skipping IPv6 iptables flush.\n'
-  fi
+	# Flush IPv6 iptables (ip6tables)
+	if command -v ip6tables >/dev/null 2>&1; then
+		printf 'Flushing IPv6 ip6tables...\n'
+		for tbl in "${TABLES[@]}"; do
+			ip6tables -t $tbl -F 2>/dev/null || true
+			ip6tables -t $tbl -X 2>/dev/null || true
+			ip6tables -t $tbl -Z 2>/dev/null || true
+		done
+		for chain in INPUT FORWARD OUTPUT; do
+			ip6tables -P $chain ACCEPT 2>/dev/null || true
+		done
+	else
+		printf 'Note: ip6tables not found; skipping IPv6 iptables flush.\n'
+	fi
 }
 
-setup_tinyproxy(){
-    local configFile="/etc/tinyproxy/tinyproxy.conf"
-    apt update && apt install tinyproxy
+setup_tinyproxy() {
+	local configFile="/etc/tinyproxy/tinyproxy.conf"
+	apt update && apt install tinyproxy
 
-    if [ ! -f "${configFile}" ]; then
-        echo "Error: Config File was not found"
-        return 1
-    fi
+	if [ ! -f "${configFile}" ]; then
+		echo "Error: Config File was not found"
+		return 1
+	fi
 
-    config_set 
+	config_set
 }
 # Function to install and configure GRO settings as a systemd service
 setup_gro_service() {
-    local service_name="udp-gro"
-    local service_file="/etc/systemd/system/${service_name}.service"
+	local service_name="udp-gro"
+	local service_file="/etc/systemd/system/${service_name}.service"
 
-    KERNEL_VERSION=$(uname -r | cut -d '-' -f1)
-    REQUIRED_VERSION="6.2"
-    # Compare versions using sort -V
-    if printf "%s\n%s" "$REQUIRED_VERSION" "$KERNEL_VERSION" | sort -V | tail -n1 | grep -q "$KERNEL_VERSION"; then
-        echo "Kernel version is $KERNEL_VERSION ."
-    else
-        echo "Kernel version $KERNEL_VERSION is lower than $REQUIRED_VERSION."
-        echo "Abort!"
-        return 1
-    fi
+	KERNEL_VERSION=$(uname -r | cut -d '-' -f1)
+	REQUIRED_VERSION="6.2"
+	# Compare versions using sort -V
+	if printf "%s\n%s" "$REQUIRED_VERSION" "$KERNEL_VERSION" | sort -V | tail -n1 | grep -q "$KERNEL_VERSION"; then
+		echo "Kernel version is $KERNEL_VERSION ."
+	else
+		echo "Kernel version $KERNEL_VERSION is lower than $REQUIRED_VERSION."
+		echo "Abort!"
+		return 1
+	fi
 
-    # Check if ethtool is installed
-    if ! command -v ethtool &>/dev/null; then
-        echo "ethtool is not installed. Installing..."
-        if command -v apt &>/dev/null; then
-            apt update && apt install -y ethtool
-        else
-            echo "Error: Package manager not supported. Install ethtool manually."
-            exit 1
-        fi
-    else
-        echo "ethtool is already installed."
-    fi
+	# Check if ethtool is installed
+	if ! command -v ethtool &>/dev/null; then
+		echo "ethtool is not installed. Installing..."
+		if command -v apt &>/dev/null; then
+			apt update && apt install -y ethtool
+		else
+			echo "Error: Package manager not supported. Install ethtool manually."
+			exit 1
+		fi
+	else
+		echo "ethtool is already installed."
+	fi
 
-    if ! command -v ethtool &>/dev/null; then
-        echo "ethtool was not installed."
-        exit 1
-    fi
+	if ! command -v ethtool &>/dev/null; then
+		echo "ethtool was not installed."
+		exit 1
+	fi
 
-    # Create the systemd service file
-    echo "Creating systemd service file..."
-    cat >"${service_file}" <<EOL
+	# Create the systemd service file
+	echo "Creating systemd service file..."
+	cat >"${service_file}" <<EOL
 [Unit]
 Description=Enable rx-udp-gro-forwarding and disable rx-gro-list for primary network interface
 Wants=network-online.target
@@ -2858,69 +2861,69 @@ RemainAfterExit=true
 WantedBy=multi-user.target
 EOL
 
-    echo "Systemd service file created at ${service_file}."
+	echo "Systemd service file created at ${service_file}."
 
-    # Reload systemd, enable, and start the service
-    echo "Reloading systemd and enabling the service..."
-    systemctl daemon-reload
-    systemctl enable "${service_name}"
-    systemctl start "${service_name}"
-    echo "Service enabled and started."
+	# Reload systemd, enable, and start the service
+	echo "Reloading systemd and enabling the service..."
+	systemctl daemon-reload
+	systemctl enable "${service_name}"
+	systemctl start "${service_name}"
+	echo "Service enabled and started."
 
-    # Verify the settings
-    echo "Verifying GRO settings..."
-    local netdev=$(ip -o route get 8.8.8.8 | cut -f 5 -d " ")
-    if [ -n "${netdev}" ]; then
-        ethtool -k "${netdev}" | grep -E "rx-udp-gro-forwarding|rx-gro-list"
-    else
-        echo "Warning: Unable to determine the primary network interface for verification."
-    fi
+	# Verify the settings
+	echo "Verifying GRO settings..."
+	local netdev=$(ip -o route get 8.8.8.8 | cut -f 5 -d " ")
+	if [ -n "${netdev}" ]; then
+		ethtool -k "${netdev}" | grep -E "rx-udp-gro-forwarding|rx-gro-list"
+	else
+		echo "Warning: Unable to determine the primary network interface for verification."
+	fi
 
-    echo "Setup complete. The GRO settings will be applied automatically on boot."
+	echo "Setup complete. The GRO settings will be applied automatically on boot."
 }
 
 # Function to install and configure Squid as HTTP/S proxy
 setup_squid_https_proxy() {
-    # Local variables
-    local squid_conf="/etc/squid/squid.conf"
-    local squid_service="squid"
-    local http_port=3128
-    local https_port=3129
+	# Local variables
+	local squid_conf="/etc/squid/squid.conf"
+	local squid_service="squid"
+	local http_port=3128
+	local https_port=3129
 
-    # Check if user is root
-    if [ "$(id -u)" -ne 0 ]; then
-        echo "Error: This script must be run as root." >&2
-        return 1
-    fi
+	# Check if user is root
+	if [ "$(id -u)" -ne 0 ]; then
+		echo "Error: This script must be run as root." >&2
+		return 1
+	fi
 
-    # Update package list
-    echo "Updating package list..."
-    if ! apt-get update -qq; then
-        echo "Error: Failed to update package list." >&2
-        return 1
-    fi
+	# Update package list
+	echo "Updating package list..."
+	if ! apt-get update -qq; then
+		echo "Error: Failed to update package list." >&2
+		return 1
+	fi
 
-    # Install Squid if not already installed
-    echo "Installing Squid..."
-    if ! apt-get install -y squid; then
-        echo "Error: Failed to install Squid." >&2
-        return 1
-    fi
+	# Install Squid if not already installed
+	echo "Installing Squid..."
+	if ! apt-get install -y squid; then
+		echo "Error: Failed to install Squid." >&2
+		return 1
+	fi
 
-    # Backup the default squid configuration
-    if [ ! -f "${squid_conf}.bak" ]; then
-        echo "Backing up default Squid configuration..."
-        if ! cp "${squid_conf}" "${squid_conf}.bak"; then
-            echo "Error: Failed to backup Squid configuration." >&2
-            return 1
-        fi
-    fi
+	# Backup the default squid configuration
+	if [ ! -f "${squid_conf}.bak" ]; then
+		echo "Backing up default Squid configuration..."
+		if ! cp "${squid_conf}" "${squid_conf}.bak"; then
+			echo "Error: Failed to backup Squid configuration." >&2
+			return 1
+		fi
+	fi
 
-    # Configure Squid
-    echo "Configuring Squid as HTTP/S proxy..."
+	# Configure Squid
+	echo "Configuring Squid as HTTP/S proxy..."
 
-    # Allow HTTP and HTTPS ports
-    cat >"${squid_conf}" <<EOF
+	# Allow HTTP and HTTPS ports
+	cat >"${squid_conf}" <<EOF
 # Squid proxy configuration
 http_port ${http_port}
 https_port ${https_port} cert=/etc/squid/ssl_cert/squid.pem key=/etc/squid/ssl_cert/squid.key
@@ -2931,145 +2934,144 @@ http_access allow localnet
 http_access deny all
 EOF
 
-    # Create SSL certificates if not present
-    if [ ! -d "/etc/squid/ssl_cert" ]; then
-        mkdir -p /etc/squid/ssl_cert
-    fi
+	# Create SSL certificates if not present
+	if [ ! -d "/etc/squid/ssl_cert" ]; then
+		mkdir -p /etc/squid/ssl_cert
+	fi
 
-    if [ ! -f "/etc/squid/ssl_cert/squid.pem" ] || [ ! -f "/etc/squid/ssl_cert/squid.key" ]; then
-        echo "Generating SSL certificates for HTTPS support..."
-        if ! openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/squid/ssl_cert/squid.key -out /etc/squid/ssl_cert/squid.pem -subj "/C=US/ST=State/L=City/O=Organization/OU=Department/CN=example.com"
-        then
-            echo "Error: Failed to generate SSL certificates." >&2
-            return 1
-        fi
-    fi
+	if [ ! -f "/etc/squid/ssl_cert/squid.pem" ] || [ ! -f "/etc/squid/ssl_cert/squid.key" ]; then
+		echo "Generating SSL certificates for HTTPS support..."
+		if ! openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout /etc/squid/ssl_cert/squid.key -out /etc/squid/ssl_cert/squid.pem -subj "/C=US/ST=State/L=City/O=Organization/OU=Department/CN=example.com"; then
+			echo "Error: Failed to generate SSL certificates." >&2
+			return 1
+		fi
+	fi
 
-    # Set proper permissions for the SSL certificates
-    chown -R proxy:proxy /etc/squid/ssl_cert
-    chmod -R 700 /etc/squid/ssl_cert
+	# Set proper permissions for the SSL certificates
+	chown -R proxy:proxy /etc/squid/ssl_cert
+	chmod -R 700 /etc/squid/ssl_cert
 
-    # Restart Squid to apply changes
-    echo "Restarting Squid service..."
-    if ! systemctl restart "${squid_service}"; then
-        echo "Error: Failed to restart Squid service." >&2
-        return 1
-    fi
+	# Restart Squid to apply changes
+	echo "Restarting Squid service..."
+	if ! systemctl restart "${squid_service}"; then
+		echo "Error: Failed to restart Squid service." >&2
+		return 1
+	fi
 
-    # Enable Squid to start on boot
-    if ! systemctl enable "${squid_service}"; then
-        echo "Error: Failed to enable Squid service on boot." >&2
-        return 1
-    fi
+	# Enable Squid to start on boot
+	if ! systemctl enable "${squid_service}"; then
+		echo "Error: Failed to enable Squid service on boot." >&2
+		return 1
+	fi
 
-    echo "Squid HTTP/S proxy setup completed successfully."
-    return 0
+	echo "Squid HTTP/S proxy setup completed successfully."
+	return 0
 }
 
 net_install_openconnect() {
-    # https://software.opensuse.org/download.html?project=home%3Abluca%3Aopenconnect%3Arelease&;package=openconnect
-    # Use local variables
-    local distro version repo_distro repo_url repo_key_url apt_list_path gpg_key_path temp_file
+	# https://software.opensuse.org/download.html?project=home%3Abluca%3Aopenconnect%3Arelease&;package=openconnect
+	# Use local variables
+	local distro version repo_distro repo_url repo_key_url apt_list_path gpg_key_path temp_file
 
-    # Get the distribution name and version number
-    distro=$(lsb_release -is)
-    version=$(lsb_release -rs | cut -d'.' -f1) # Get major version number
+	# Get the distribution name and version number
+	distro=$(lsb_release -is)
+	version=$(lsb_release -rs | cut -d'.' -f1) # Get major version number
 
-    # Adjust the repository format based on the distribution
-    if [[ "$distro" == "Debian" ]]; then
-        repo_distro="Debian_${version}"
-    elif [[ "$distro" == "Ubuntu" ]]; then
-        repo_distro="Ubuntu_${version}.04"
-    else
-        echo "Unsupported distribution: $distro"
-        return 1
-    fi
+	# Adjust the repository format based on the distribution
+	if [[ "$distro" == "Debian" ]]; then
+		repo_distro="Debian_${version}"
+	elif [[ "$distro" == "Ubuntu" ]]; then
+		repo_distro="Ubuntu_${version}.04"
+	else
+		echo "Unsupported distribution: $distro"
+		return 1
+	fi
 
-    # Set URLs for the repository and key
-    repo_url="http://download.opensuse.org/repositories/home:/bluca:/openconnect:/release/${repo_distro}/"
-    repo_key_url="https://download.opensuse.org/repositories/home:bluca:openconnect:release/${repo_distro}/Release.key"
-    apt_list_path="/etc/apt/sources.list.d/home:bluca:openconnect:release.list"
-    gpg_key_path="/etc/apt/trusted.gpg.d/home_bluca_openconnect_release.gpg"
+	# Set URLs for the repository and key
+	repo_url="http://download.opensuse.org/repositories/home:/bluca:/openconnect:/release/${repo_distro}/"
+	repo_key_url="https://download.opensuse.org/repositories/home:bluca:openconnect:release/${repo_distro}/Release.key"
+	apt_list_path="/etc/apt/sources.list.d/home:bluca:openconnect:release.list"
+	gpg_key_path="/etc/apt/trusted.gpg.d/home_bluca_openconnect_release.gpg"
 
-    # Check if the GPG key is valid
-    temp_file=$(mktemp)
-    if ! curl -fsSL "$repo_key_url" -o "$temp_file"; then
-        echo "Error: Failed to download GPG key from $repo_key_url."
-        rm -f "$temp_file"
-        return 1
-    fi
+	# Check if the GPG key is valid
+	temp_file=$(mktemp)
+	if ! curl -fsSL "$repo_key_url" -o "$temp_file"; then
+		echo "Error: Failed to download GPG key from $repo_key_url."
+		rm -f "$temp_file"
+		return 1
+	fi
 
-    if ! gpg --dearmor "$temp_file" >/dev/null; then
-        echo "Error: Failed to process GPG key."
-        rm -f "$temp_file"
-        return 1
-    fi
+	if ! gpg --dearmor "$temp_file" >/dev/null; then
+		echo "Error: Failed to process GPG key."
+		rm -f "$temp_file"
+		return 1
+	fi
 
-    rm -f "$temp_file"
+	rm -f "$temp_file"
 
-    # Add the OpenConnect repository
-    echo "deb $repo_url /" | tee "$apt_list_path" >/dev/null
+	# Add the OpenConnect repository
+	echo "deb $repo_url /" | tee "$apt_list_path" >/dev/null
 
-    # Add the repository key
-    if ! curl -fsSL "$repo_key_url" | gpg --dearmor | tee "$gpg_key_path" >/dev/null; then
-        echo "Error: Failed to add the GPG key."
-        return 1
-    fi
+	# Add the repository key
+	if ! curl -fsSL "$repo_key_url" | gpg --dearmor | tee "$gpg_key_path" >/dev/null; then
+		echo "Error: Failed to add the GPG key."
+		return 1
+	fi
 
-    # Update package list and install OpenConnect
-    if ! apt-get update && apt-get install -y openconnect; then
-        echo "Error: Failed to update and install openconnect."
-        return 1
-    fi
+	# Update package list and install OpenConnect
+	if ! apt-get update && apt-get install -y openconnect; then
+		echo "Error: Failed to update and install openconnect."
+		return 1
+	fi
 
-    echo "OpenConnect installed successfully."
-    return 0
+	echo "OpenConnect installed successfully."
+	return 0
 }
 
 net_addConfig_openconnect() {
-    # Local variables to avoid global scope issues
-    local VPN_SERVER CERT_PATH CERT_PASSWORD SERVICE_NAME SERVICE_FILE
+	# Local variables to avoid global scope issues
+	local VPN_SERVER CERT_PATH CERT_PASSWORD SERVICE_NAME SERVICE_FILE
 
-    echo "Please provide the following details for setting up the OpenConnect VPN:"
+	echo "Please provide the following details for setting up the OpenConnect VPN:"
 
-    read -rp "Service name (e.g., my-vpn): " SERVICE_NAME
-    if [[ -z "$SERVICE_NAME" ]]; then
-        echo "Error: Service name is required." >&2
-        return 1
-    fi
+	read -rp "Service name (e.g., my-vpn): " SERVICE_NAME
+	if [[ -z "$SERVICE_NAME" ]]; then
+		echo "Error: Service name is required." >&2
+		return 1
+	fi
 
-    # Service file location
-    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+	# Service file location
+	SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-    if [[ -f "$SERVICE_FILE" ]]; then
-        echo "Error: The SERVICE file already exists." >&2
-        return 1
-    fi
+	if [[ -f "$SERVICE_FILE" ]]; then
+		echo "Error: The SERVICE file already exists." >&2
+		return 1
+	fi
 
-    # Use -rp for concise input with prompt, validate immediately after
-    read -rp "VPN Server URL (e.g., https://Server:port): " VPN_SERVER
-    if [[ -z "$VPN_SERVER" ]]; then
-        echo "Error: VPN server URL is required." >&2
-        return 1
-    fi
+	# Use -rp for concise input with prompt, validate immediately after
+	read -rp "VPN Server URL (e.g., https://Server:port): " VPN_SERVER
+	if [[ -z "$VPN_SERVER" ]]; then
+		echo "Error: VPN server URL is required." >&2
+		return 1
+	fi
 
-    read -rp "Path to .p12 certificate file: " CERT_PATH
-    if [[ ! -f "$CERT_PATH" ]]; then
-        echo "Error: The .p12 certificate file does not exist at the specified path." >&2
-        return 1
-    fi
+	read -rp "Path to .p12 certificate file: " CERT_PATH
+	if [[ ! -f "$CERT_PATH" ]]; then
+		echo "Error: The .p12 certificate file does not exist at the specified path." >&2
+		return 1
+	fi
 
-    read -rsp "Password for the .p12 certificate: " CERT_PASSWORD
-    echo ""
-    if [[ -z "$CERT_PASSWORD" ]]; then
-        echo "Error: Certificate password is required." >&2
-        return 1
-    fi
+	read -rsp "Password for the .p12 certificate: " CERT_PASSWORD
+	echo ""
+	if [[ -z "$CERT_PASSWORD" ]]; then
+		echo "Error: Certificate password is required." >&2
+		return 1
+	fi
 
-    echo "Creating systemd service for OpenConnect VPN..."
+	echo "Creating systemd service for OpenConnect VPN..."
 
-    # Create systemd service file, handle error properly
-    cat >"${SERVICE_FILE}" <<EOL || {
+	# Create systemd service file, handle error properly
+	cat >"${SERVICE_FILE}" <<EOL || {
 [Unit]
 Description=OpenConnect VPN Service
 After=network-online.target
@@ -3084,51 +3086,51 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOL
-        echo "Error: Failed to create service file." >&2
-        return 1
-    }
+		echo "Error: Failed to create service file." >&2
+		return 1
+	}
 
-    # Validate that service file creation succeeded
-    if [[ ! -f "$SERVICE_FILE" ]]; then
-        echo "Error: Service file could not be created." >&2
-        return 1
-    fi
+	# Validate that service file creation succeeded
+	if [[ ! -f "$SERVICE_FILE" ]]; then
+		echo "Error: Service file could not be created." >&2
+		return 1
+	fi
 
-    echo "Systemd service created at: ${SERVICE_FILE}"
+	echo "Systemd service created at: ${SERVICE_FILE}"
 
-    # Reload systemd to recognize new service, error handling
-    systemctl daemon-reload || {
-        echo "Error: Failed to reload systemd." >&2
-        return 1
-    }
+	# Reload systemd to recognize new service, error handling
+	systemctl daemon-reload || {
+		echo "Error: Failed to reload systemd." >&2
+		return 1
+	}
 
-    # Enable the service to start on boot, with proper error handling
-    systemctl enable "${SERVICE_NAME}.service" || {
-        echo "Error: Failed to enable VPN service." >&2
-        return 1
-    }
+	# Enable the service to start on boot, with proper error handling
+	systemctl enable "${SERVICE_NAME}.service" || {
+		echo "Error: Failed to enable VPN service." >&2
+		return 1
+	}
 
-    # Start the VPN service immediately, with proper error handling
-    systemctl start "${SERVICE_NAME}.service" || {
-        echo "Error: Failed to start VPN service." >&2
-        return 1
-    }
+	# Start the VPN service immediately, with proper error handling
+	systemctl start "${SERVICE_NAME}.service" || {
+		echo "Error: Failed to start VPN service." >&2
+		return 1
+	}
 
-    echo "The service '${SERVICE_NAME}' will now automatically start at boot and reconnect on failure."
+	echo "The service '${SERVICE_NAME}' will now automatically start at boot and reconnect on failure."
 
-    # Bonus, monitor connection and restart service using cron
-    # * * * * * ping -c 10 10.10.10.1 > /dev/null || systemctl restart "${SERVICE_NAME}.service"
+	# Bonus, monitor connection and restart service using cron
+	# * * * * * ping -c 10 10.10.10.1 > /dev/null || systemctl restart "${SERVICE_NAME}.service"
 }
 
 # To be developed and tested (not working)
 softether_install() {
-    ip tuntap add mode tap name soft
-    ip link set dev soft up
-    ip link delete soft
-    ip addr add 192.168.30.1/24 brd + dev soft
-    ip addr add 192.168.30.1/24 brd + dev tap0
+	ip tuntap add mode tap name soft
+	ip link set dev soft up
+	ip link delete soft
+	ip addr add 192.168.30.1/24 brd + dev soft
+	ip addr add 192.168.30.1/24 brd + dev tap0
 
-    cat >'/etc/network/interfaces.d/softether' <<'EOFX'
+	cat >'/etc/network/interfaces.d/softether' <<'EOFX'
 auto soft0
 iface soft0 inet static
     address 192.168.30.1
@@ -3138,65 +3140,65 @@ iface soft0 inet static
     down ip link set soft0 down
     post-down ip tuntap del tap soft0
 EOFX
-    systemctl restart networking
+	systemctl restart networking
 }
 
 net_softether_install() {
-    local install_dir="/usr/local/softether"
-    local M1
-    local M2
-    local RTM
-    local IFS
-    local tmpDIR="/tmp/vpnserver"
-    local tmp="/tmp"
+	local install_dir="/usr/local/softether"
+	local M1
+	local M2
+	local RTM
+	local IFS
+	local tmpDIR="/tmp/vpnserver"
+	local tmp="/tmp"
 
-    case "$(uname -m)" in
-    aarch64)
-        M1="_ARM_64bit"
-        M2="arm64"
-        ;;
-    x86_64)
-        M1="_Intel_x64_or_AMD64"
-        M2="x64"
-        ;;
-    *)
-        echo "Unsupported CPU"
-        exit 1
-        ;;
-    esac
+	case "$(uname -m)" in
+	aarch64)
+		M1="_ARM_64bit"
+		M2="arm64"
+		;;
+	x86_64)
+		M1="_Intel_x64_or_AMD64"
+		M2="x64"
+		;;
+	*)
+		echo "Unsupported CPU"
+		exit 1
+		;;
+	esac
 
-    # Update system & Get build tools
-    apt-get update && apt-get -y install build-essential wget curl libreadline-dev libncurses-dev libssl-dev zlib1g-dev
+	# Update system & Get build tools
+	apt-get update && apt-get -y install build-essential wget curl libreadline-dev libncurses-dev libssl-dev zlib1g-dev
 
-    # Define softether version
-    RTM=$(curl http://www.softether-download.com/files/softether/ | grep -o 'v[^"]*e' | grep rtm | tail -1)
-    IFS='-' read -ra RTMS <<<"${RTM}"
+	# Define softether version
+	RTM=$(curl http://www.softether-download.com/files/softether/ | grep -o 'v[^"]*e' | grep rtm | tail -1)
+	IFS='-' read -ra RTMS <<<"${RTM}"
 
-    # Get softether source
-    wget "http://www.softether-download.com/files/softether/${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}/Linux/SoftEther_VPN_Server/64bit_-${M1}/softether-vpnserver-${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-linux-${M2}-64bit.tar.gz" -O ${tmp}/softether-vpnserver.tar.gz || exit 1
+	# Get softether source
+	wget "http://www.softether-download.com/files/softether/${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}/Linux/SoftEther_VPN_Server/64bit_-${M1}/softether-vpnserver-${RTMS[0]}-${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-linux-${M2}-64bit.tar.gz" -O ${tmp}/softether-vpnserver.tar.gz || exit 1
 
-    # Extract softether source & Remove unused file
-    tar -xzvf ${tmp}/softether-vpnserver.tar.gz -C ${tmp} && rm ${tmp}/softether-vpnserver.tar.gz
+	# Extract softether source & Remove unused file
+	tar -xzvf ${tmp}/softether-vpnserver.tar.gz -C ${tmp} && rm ${tmp}/softether-vpnserver.tar.gz
 
-    # Workaround for 18.04+
-    #sed -i 's|OPTIONS=-O2|OPTIONS=-no-pie -O2|' Makefile
+	# Workaround for 18.04+
+	#sed -i 's|OPTIONS=-O2|OPTIONS=-no-pie -O2|' Makefile
 
-    # Build softether (i_read_and_agree_the_license_agreement)
-    make -C ${tmpDIR} || {
-        echo "Error: failed to compile."
-        exit 1
-    }
+	# Build softether (i_read_and_agree_the_license_agreement)
+	make -C ${tmpDIR} || {
+		echo "Error: failed to compile."
+		exit 1
+	}
 
-    # Change file permission
-    chmod 600 ${tmpDIR}/* && chmod +x ${tmpDIR}/vpnserver && chmod +x ${tmpDIR}/vpncmd
-    echo "${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}" >${tmpDIR}/version.txt
+	# Change file permission
+	chmod 600 ${tmpDIR}/* && chmod +x ${tmpDIR}/vpnserver && chmod +x ${tmpDIR}/vpncmd
+	echo "${RTMS[1]}-${RTMS[2]}-${RTMS[3]}-${RTMS[4]}" >${tmpDIR}/version.txt
 
-    # Link binary files
-    # ln -sf /usr/local/softether/vpnserver /usr/local/bin/vpnserver
-    # ln -sf /usr/local/softether/vpncmd /usr/local/bin/vpncmd
+	# Link binary files
+	# ln -sf /usr/local/softether/vpnserver /usr/local/bin/vpnserver
+	# ln -sf /usr/local/softether/vpncmd /usr/local/bin/vpncmd
 
-    # Add systemd service
-    cat <<EOF >/usr/lib/systemd/system/vpnserver.service
+	# Add systemd service
+	cat <<EOF >/usr/lib/systemd/system/vpnserver.service
 [Unit]
 Description=SoftEther VPN Server
 After=network.target auditd.service
@@ -3225,13 +3227,13 @@ CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_BROADCAST CAP_N
 WantedBy=multi-user.target
 EOF
 
-    mkdir -p ${install_dir} && mv ${tmpDIR}/hamcore.se2 ${tmpDIR}/vpnserver ${tmpDIR}/vpncmd ${tmpDIR}/version.txt ${install_dir} && rm -rf ${tmpDIR:?}/
+	mkdir -p ${install_dir} && mv ${tmpDIR}/hamcore.se2 ${tmpDIR}/vpnserver ${tmpDIR}/vpncmd ${tmpDIR}/version.txt ${install_dir} && rm -rf ${tmpDIR:?}/
 
-    # ip tuntap add mode tap name softether
-    # ip addr add 192.168.30.1/24 dev softether
-    # ip link set dev softether up
+	# ip tuntap add mode tap name softether
+	# ip addr add 192.168.30.1/24 dev softether
+	# ip link set dev softether up
 
-    read -rp "Place your 'vpn_server.config' in ${install_dir} and press Enter"
+	read -rp "Place your 'vpn_server.config' in ${install_dir} and press Enter"
 
 	systemctl stop vpnserver
 	# make the directory immutable
@@ -3239,22 +3241,22 @@ EOF
 	# To remove the immutable flag:
 	# chattr -i ${install_dir}/server_log
 
-    systemctl daemon-reload && systemctl enable vpnserver && systemctl restart vpnserver
+	systemctl daemon-reload && systemctl enable vpnserver && systemctl restart vpnserver
 }
 
 net_enable_ip_forward() {
-    local NIC
-    # Get the "public" interface from the default route
-    NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
+	local NIC
+	# Get the "public" interface from the default route
+	NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 
-    echo "------------- Adding -------------"
-    echo "net.ipv4.ip_forward = 1" | tee /etc/sysctl.d/ip_forward.conf
-    echo "net.ipv6.conf.all.forwarding = 1" | tee -a /etc/sysctl.d/ip_forward.conf
-    echo "------------- Reloading -------------"
-    sysctl --system
-    echo "------------- Adding iptables rules -------------"
+	echo "------------- Adding -------------"
+	echo "net.ipv4.ip_forward = 1" | tee /etc/sysctl.d/ip_forward.conf
+	echo "net.ipv6.conf.all.forwarding = 1" | tee -a /etc/sysctl.d/ip_forward.conf
+	echo "------------- Reloading -------------"
+	sysctl --system
+	echo "------------- Adding iptables rules -------------"
 
-    cat >'/etc/iptables/rules.v4' <<EOFX
+	cat >'/etc/iptables/rules.v4' <<EOFX
 *filter
 :INPUT ACCEPT [0:0]
 :FORWARD ACCEPT [0:0]
@@ -3289,9 +3291,9 @@ COMMIT
 # iptables -t nat -I POSTROUTING -o ${NIC} -j MASQUERADE
 # iptables -t nat -D POSTROUTING -s 192.168.30.0/24 -o ${NIC} -j MASQUERADE
 EOFX
-    echo
-    echo "- Restarting netfilter-persistent..."
-    systemctl restart netfilter-persistent
+	echo
+	echo "- Restarting netfilter-persistent..."
+	systemctl restart netfilter-persistent
 }
 
 net_tune_kernel() {
@@ -3301,303 +3303,303 @@ net_tune_kernel() {
 		apt-get install irqbalance && systemctl enable --now irqbalance
 	fi
 
-    # Tune Kernel
-    echo "------------- Adding -------------"
-    # echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.ip_local_port_range = 16384 60999" | tee /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_congestion_control = bbr" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.core.default_qdisc = fq_codel" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_fastopen = 3" | tee -a /etc/sysctl.d/tune_kernel.conf
+	# Tune Kernel
+	echo "------------- Adding -------------"
+	# echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.ip_local_port_range = 16384 60999" | tee /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_congestion_control = bbr" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.default_qdisc = fq_codel" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_fastopen = 3" | tee -a /etc/sysctl.d/tune_kernel.conf
 
-    echo "net.core.rmem_default = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.core.rmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.core.wmem_default = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.core.wmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.core.optmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.rmem_default = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.rmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.wmem_default = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.wmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.optmem_max = 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
 
-    echo "net.ipv4.tcp_rmem = 4096 1048576 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_wmem = 4096 1048576 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.udp_mem = 8388608 12582912 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_rmem = 4096 1048576 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_wmem = 4096 1048576 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.udp_mem = 8388608 12582912 16777216" | tee -a /etc/sysctl.d/tune_kernel.conf
 
-    echo "net.ipv4.tcp_mtu_probing = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_no_metrics_save = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_mem = 3145728 4194304 6291456" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_rfc1337 = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.core.somaxconn = 16384" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.core.netdev_max_backlog = 16384" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.core.netdev_budget = 1000" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_slow_start_after_idle = 0" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_max_syn_backlog = 4096" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_max_tw_buckets = 1440000" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.netfilter.nf_conntrack_max = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.netfilter.nf_conntrack_buckets = 262144" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.tcp_fin_timeout = 30" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_mtu_probing = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_no_metrics_save = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_mem = 3145728 4194304 6291456" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_rfc1337 = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.somaxconn = 16384" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.netdev_max_backlog = 16384" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.core.netdev_budget = 1000" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_slow_start_after_idle = 0" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_max_syn_backlog = 4096" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_max_tw_buckets = 1440000" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.netfilter.nf_conntrack_max = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.netfilter.nf_conntrack_buckets = 262144" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_fin_timeout = 30" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30" | tee -a /etc/sysctl.d/tune_kernel.conf
 
 	# Increase ARP cache size
-    echo "net.ipv4.neigh.default.gc_thresh1 = 1024" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.neigh.default.gc_thresh2 = 4096" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "net.ipv4.neigh.default.gc_thresh3 = 8192" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.neigh.default.gc_thresh1 = 1024" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.neigh.default.gc_thresh2 = 4096" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.neigh.default.gc_thresh3 = 8192" | tee -a /etc/sysctl.d/tune_kernel.conf
 
-    echo "vm.dirty_ratio = 10   " | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "vm.dirty_background_ratio = 5" | tee -a /etc/sysctl.d/tune_kernel.conf
-    echo "vm.vfs_cache_pressure = 50" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "vm.dirty_ratio = 10   " | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "vm.dirty_background_ratio = 5" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "vm.vfs_cache_pressure = 50" | tee -a /etc/sysctl.d/tune_kernel.conf
 
-    echo "net.ipv4.tcp_tw_reuse = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
-    # echo "net.ipv4.tcp_adv_win_scale = 2" | tee -a /etc/sysctl.d/tune_kernel.conf
-    # echo "net.ipv4.tcp_timestamps = 0" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_tw_reuse = 1" | tee -a /etc/sysctl.d/tune_kernel.conf
+	# echo "net.ipv4.tcp_adv_win_scale = 2" | tee -a /etc/sysctl.d/tune_kernel.conf
+	# echo "net.ipv4.tcp_timestamps = 0" | tee -a /etc/sysctl.d/tune_kernel.conf
 
-    echo "------------- Reloading -------------"
-    sysctl --system
+	echo "------------- Reloading -------------"
+	sysctl --system
 
-    echo "------------- Checking settings -------------"
-    # sysctl net.core.default_qdisc
-    # sysctl net.ipv4.tcp_max_syn_backlog
-    # sysctl net.core.rmem_default
-    # sysctl net.core.rmem_max
-    # sysctl net.core.wmem_default
-    # sysctl net.core.wmem_max
-    # sysctl net.core.optmem_max
-    # sysctl net.ipv4.tcp_tw_reuse
-    # sysctl net.ipv4.tcp_rmem
-    # sysctl net.ipv4.tcp_wmem
-    # sysctl net.ipv4.tcp_timestamps
-    # sysctl net.ipv4.tcp_mtu_probing
-    # sysctl net.ipv4.tcp_mem
-    # sysctl net.ipv4.tcp_rfc1337
-    # sysctl net.ipv4.tcp_adv_win_scale
-    # sysctl vm.swappiness
-    # sysctl net.core.somaxconn
-    # sysctl net.core.netdev_max_backlog
-    # sysctl net.core.netdev_budget
-    # sysctl net.ipv4.tcp_slow_start_after_idle
-    # sysctl net.netfilter.nf_conntrack_max
-    # sysctl vm.dirty_ratio
-    # sysctl vm.dirty_background_ratio
-    # sysctl vm.vfs_cache_pressure
-    # sysctl net.ipv4.tcp_tw_recycle
-    # sysctl net.ipv4.tcp_window_scaling
-    # sysctl net.ipv4.ip_local_port_range
-    # sysctl net.ipv4.tcp_fin_timeout
+	echo "------------- Checking settings -------------"
+	# sysctl net.core.default_qdisc
+	# sysctl net.ipv4.tcp_max_syn_backlog
+	# sysctl net.core.rmem_default
+	# sysctl net.core.rmem_max
+	# sysctl net.core.wmem_default
+	# sysctl net.core.wmem_max
+	# sysctl net.core.optmem_max
+	# sysctl net.ipv4.tcp_tw_reuse
+	# sysctl net.ipv4.tcp_rmem
+	# sysctl net.ipv4.tcp_wmem
+	# sysctl net.ipv4.tcp_timestamps
+	# sysctl net.ipv4.tcp_mtu_probing
+	# sysctl net.ipv4.tcp_mem
+	# sysctl net.ipv4.tcp_rfc1337
+	# sysctl net.ipv4.tcp_adv_win_scale
+	# sysctl vm.swappiness
+	# sysctl net.core.somaxconn
+	# sysctl net.core.netdev_max_backlog
+	# sysctl net.core.netdev_budget
+	# sysctl net.ipv4.tcp_slow_start_after_idle
+	# sysctl net.netfilter.nf_conntrack_max
+	# sysctl vm.dirty_ratio
+	# sysctl vm.dirty_background_ratio
+	# sysctl vm.vfs_cache_pressure
+	# sysctl net.ipv4.tcp_tw_recycle
+	# sysctl net.ipv4.tcp_window_scaling
+	# sysctl net.ipv4.ip_local_port_range
+	# sysctl net.ipv4.tcp_fin_timeout
 }
 
 tailscale_manage() {
-    local choice
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. tailscale_install"
-        echo "2. tailscale_configure"
+	local choice
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. tailscale_install"
+		echo "2. tailscale_configure"
 
-        echo "0. Quit"
-        echo -e "\033[0m"
-        read -rp "Enter your choice: " choice
+		echo "0. Quit"
+		echo -e "\033[0m"
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) tailscale_install ;;
-        2) tailscale_configure ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) tailscale_install ;;
+		2) tailscale_configure ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 tailscale_install() {
-    curl -fsSL https://tailscale.com/install.sh | sh
+	curl -fsSL https://tailscale.com/install.sh | sh
 }
 
 # Function to prompt for yes/no question
 function prompt_yes_no() {
-    local answer
-    while true; do
-        read -rp "$1 (y/n): " yn
-        case $yn in
-        [Yy]*)
-            echo "yes"
-            break
-            ;;
-        [Nn]*)
-            echo "no"
-            break
-            ;;
-        *) echo "Please answer yes or no." ;;
-        esac
-    done
+	local answer
+	while true; do
+		read -rp "$1 (y/n): " yn
+		case $yn in
+		[Yy]*)
+			echo "yes"
+			break
+			;;
+		[Nn]*)
+			echo "no"
+			break
+			;;
+		*) echo "Please answer yes or no." ;;
+		esac
+	done
 }
 
 tailscale_configure() {
-    local advertise_exit_node
-    local advertise_routes_response
-    local advertise_routes
-    local accept_routes
-    # tailscale up --advertise-exit-node --advertise-routes=192.168.10.0/24,192.168.20.0/24 --accept-routes
+	local advertise_exit_node
+	local advertise_routes_response
+	local advertise_routes
+	local accept_routes
+	# tailscale up --advertise-exit-node --advertise-routes=192.168.10.0/24,192.168.20.0/24 --accept-routes
 
-    # Prompt for advertise-exit-node
-    advertise_exit_node=$(prompt_yes_no "Do you want to advertise as exit node?")
+	# Prompt for advertise-exit-node
+	advertise_exit_node=$(prompt_yes_no "Do you want to advertise as exit node?")
 
-    # Prompt for advertise-routes
-    advertise_routes_response=$(prompt_yes_no "Do you want to advertise specific routes?")
-    if [ "$advertise_routes_response" == "yes" ]; then
-        read -rp "Enter the routes to advertise (e.g., 192.168.10.0/24,192.168.20.0/24): " advertise_routes
-    else
-        advertise_routes=""
-    fi
+	# Prompt for advertise-routes
+	advertise_routes_response=$(prompt_yes_no "Do you want to advertise specific routes?")
+	if [ "$advertise_routes_response" == "yes" ]; then
+		read -rp "Enter the routes to advertise (e.g., 192.168.10.0/24,192.168.20.0/24): " advertise_routes
+	else
+		advertise_routes=""
+	fi
 
-    # Prompt for accept-routes
-    accept_routes=$(prompt_yes_no "Do you want to accept routes?")
+	# Prompt for accept-routes
+	accept_routes=$(prompt_yes_no "Do you want to accept routes?")
 
-    # Construct the tailscale command
-    local tailscale_cmd="tailscale up"
-    if [ "$advertise_exit_node" == "yes" ]; then
-        tailscale_cmd+=" --advertise-exit-node"
-    fi
-    if [ -n "$advertise_routes" ]; then
-        tailscale_cmd+=" --advertise-routes=$advertise_routes"
-    fi
-    if [ "$accept_routes" == "yes" ]; then
-        tailscale_cmd+=" --accept-routes"
-    fi
+	# Construct the tailscale command
+	local tailscale_cmd="tailscale up"
+	if [ "$advertise_exit_node" == "yes" ]; then
+		tailscale_cmd+=" --advertise-exit-node"
+	fi
+	if [ -n "$advertise_routes" ]; then
+		tailscale_cmd+=" --advertise-routes=$advertise_routes"
+	fi
+	if [ "$accept_routes" == "yes" ]; then
+		tailscale_cmd+=" --accept-routes"
+	fi
 
-    # Execute the tailscale command
-    echo "Executing Tailscale command: $tailscale_cmd"
-    eval $tailscale_cmd
+	# Execute the tailscale command
+	echo "Executing Tailscale command: $tailscale_cmd"
+	eval $tailscale_cmd
 }
 
 cloudflared_manage() {
-    local choice
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. cloudflared_install"
-        echo "2. cloudflared_update"
+	local choice
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. cloudflared_install"
+		echo "2. cloudflared_update"
 
-        echo "0. Quit"
-        echo -e "\033[0m"
-        read -rp "Enter your choice: " choice
+		echo "0. Quit"
+		echo -e "\033[0m"
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) cloudflared_install ;;
-        2) cloudflared_update ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) cloudflared_install ;;
+		2) cloudflared_update ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 get_cloudflared_arch() {
-    local arch
-    case "$(get_arch)" in
-    amd64) arch="amd64" ;;
-    i386) arch="386" ;;
-    arm64) arch="arm64" ;;
-    arm32) arch="arm" ;;
-    Unknown)
-        echo "Unsupported system architecture"
-        exit 1
-        ;;
-    esac
-    echo "$arch"
+	local arch
+	case "$(get_arch)" in
+	amd64) arch="amd64" ;;
+	i386) arch="386" ;;
+	arm64) arch="arm64" ;;
+	arm32) arch="arm" ;;
+	Unknown)
+		echo "Unsupported system architecture"
+		exit 1
+		;;
+	esac
+	echo "$arch"
 }
 
 cloudflared_install() {
-    local token
-    read -rp "Enter tunnel token: " token
-    local arch=$(get_cloudflared_arch)
-    curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb" &&
-        dpkg -i cloudflared.deb &&
-        cloudflared service install "${token}" &&
-        rm cloudflared.deb
+	local token
+	read -rp "Enter tunnel token: " token
+	local arch=$(get_cloudflared_arch)
+	curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb" &&
+		dpkg -i cloudflared.deb &&
+		cloudflared service install "${token}" &&
+		rm cloudflared.deb
 }
 
 cloudflared_update() {
-    local arch=$(get_cloudflared_arch)
-    curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb" &&
-        dpkg -i cloudflared.deb &&
-        systemctl restart cloudflared.service &&
-        rm cloudflared.deb
+	local arch=$(get_cloudflared_arch)
+	curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb" &&
+		dpkg -i cloudflared.deb &&
+		systemctl restart cloudflared.service &&
+		rm cloudflared.deb
 }
 
 get_arch() {
-    # Check the architecture
-    arch=$(uname -m)
-    case "$arch" in
-    x86_64) echo "amd64" ;;
-    i386 | i686) echo "i386" ;;
-    aarch64) echo "arm64" ;;
-    armv7l) echo "arm32" ;;
-    *) echo "Unknown" ;;
-    esac
-    # Check the system bitness
-    # if [ "$(getconf LONG_BIT)" == "64" ]; then
-    #     bitness="64-bit"
-    # else
-    #     bitness="32-bit"
-    # fi
-    # Return the values
-    # echo "$architecture"
+	# Check the architecture
+	arch=$(uname -m)
+	case "$arch" in
+	x86_64) echo "amd64" ;;
+	i386 | i686) echo "i386" ;;
+	aarch64) echo "arm64" ;;
+	armv7l) echo "arm32" ;;
+	*) echo "Unknown" ;;
+	esac
+	# Check the system bitness
+	# if [ "$(getconf LONG_BIT)" == "64" ]; then
+	#     bitness="64-bit"
+	# else
+	#     bitness="32-bit"
+	# fi
+	# Return the values
+	# echo "$architecture"
 }
 
 sys_manage() {
-    local choice
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. List Users"
-        echo "2. List Groups"
-        echo "3. Clean up (autoremove, autoclean, update)"
-        echo "4. Install Standard Packages"
-        echo "5. Install & configure SSH (port 4444, enable root)"
-        echo "6. Configure terminal and system banners"
-        echo "7. Install (build-essential software-properties-common python3)"
-        echo "8. Add SWAP memory"
-        echo "9. Read APT Config"
-        echo "10. Install rsnapshot"
-        echo "11. Reload Cron (root profile)"
-        echo "12. Install Auto Mount USB"
-        echo "13. Cleanup ubuntu bloat"
-        echo "14. Install tmux"
-        echo "15. Set Journal to use RAM (Use if you have 4GB+ RAM)"
-        echo "0. Quit"
-        echo -e "\033[0m"
-        read -rp "Enter your choice: " choice
+	local choice
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. List Users"
+		echo "2. List Groups"
+		echo "3. Clean up (autoremove, autoclean, update)"
+		echo "4. Install Standard Packages"
+		echo "5. Install & configure SSH (port 4444, enable root)"
+		echo "6. Configure terminal and system banners"
+		echo "7. Install (build-essential software-properties-common python3)"
+		echo "8. Add SWAP memory"
+		echo "9. Read APT Config"
+		echo "10. Install rsnapshot"
+		echo "11. Reload Cron (root profile)"
+		echo "12. Install Auto Mount USB"
+		echo "13. Cleanup ubuntu bloat"
+		echo "14. Install tmux"
+		echo "15. Set Journal to use RAM (Use if you have 4GB+ RAM)"
+		echo "0. Quit"
+		echo -e "\033[0m"
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1)
-            sys_list_users_new
-            read -rp "Press Enter to go back " choice
-            ;;
-        2) sys_list_groups ;;
-        3) sys_cleanUp ;;
-        4) sys_std_pkg_install ;;
-        5) sys_SSH_install ;;
-        6) sys_config_setup ;;
-        7) sys_more_pkg_install ;;
-        8) sys_swap_add ;;
-        9) sys_read_apt_config ;;
-        10) sys_rsnapshot_install ;;
-        11) sys_cron_reload ;;
-        12) mount_usb_install ;;
-        13) sys_cleanup-ubuntu;;
-        14) sys_tmux_install;;
-        15) sys_journal_conf;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1)
+			sys_list_users_new
+			read -rp "Press Enter to go back " choice
+			;;
+		2) sys_list_groups ;;
+		3) sys_cleanUp ;;
+		4) sys_std_pkg_install ;;
+		5) sys_SSH_install ;;
+		6) sys_config_setup ;;
+		7) sys_more_pkg_install ;;
+		8) sys_swap_add ;;
+		9) sys_read_apt_config ;;
+		10) sys_rsnapshot_install ;;
+		11) sys_cron_reload ;;
+		12) mount_usb_install ;;
+		13) sys_cleanup-ubuntu ;;
+		14) sys_tmux_install ;;
+		15) sys_journal_conf ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 sys_init() {
-    sys_std_pkg_install
-    sys_SSH_install
-    sys_config_setup
+	sys_std_pkg_install
+	sys_SSH_install
+	sys_config_setup
 	sys_tmux_install
 	rsync_install
 }
 
 sys_init_php_nginx() {
-    sys_std_pkg_install
-    sys_SSH_install
-    sys_config_setup
+	sys_std_pkg_install
+	sys_SSH_install
+	sys_config_setup
 	sys_tmux_install
 	php_install
 	nginx_install
@@ -3605,10 +3607,9 @@ sys_init_php_nginx() {
 	rsync_install
 }
 
-
 sys_journal_conf() {
 	# journal size
-	echo "SystemMaxUse=500M" | tee -a /etc/systemd/journald.conf # Persistent (Disk)
+	echo "SystemMaxUse=500M" | tee -a /etc/systemd/journald.conf  # Persistent (Disk)
 	echo "RuntimeMaxUse=200M" | tee -a /etc/systemd/journald.conf # Volatile (RAM)
 	# Make journald store logs only in RAM
 	echo "Storage=volatile" | tee -a /etc/systemd/journald.conf
@@ -3618,21 +3619,21 @@ sys_journal_conf() {
 sys_tmux_install() {
 	local tmux_conf="$HOME/.config/tmux/tmux.conf"
 	mkdir -p "$HOME/.config/tmux"
-	if ! command -v tmux &> /dev/null; then
+	if ! command -v tmux &>/dev/null; then
 		apt-get install -y tmux
 	fi
 
-    # Check if .tmux.conf already exists
-    if [[ -f "$tmux_conf" ]]; then
-        echo "Existing configuration file found at $tmux_conf."
-        echo "Appending MobaXterm/mouse settings to the file."
-    else
-        echo "Creating new tmux configuration file at $tmux_conf."
-        touch "$tmux_conf"
-    fi
+	# Check if .tmux.conf already exists
+	if [[ -f "$tmux_conf" ]]; then
+		echo "Existing configuration file found at $tmux_conf."
+		echo "Appending MobaXterm/mouse settings to the file."
+	else
+		echo "Creating new tmux configuration file at $tmux_conf."
+		touch "$tmux_conf"
+	fi
 
-    # Define the configuration settings to be added
-    cat << 'EOF' > "$tmux_conf"
+	# Define the configuration settings to be added
+	cat <<'EOF' >"$tmux_conf"
 unbind C-B
 set -g prefix `
 bind ` send-prefix
@@ -3655,31 +3656,31 @@ set -g history-limit 10000
 # set -g default-terminal "${TERM}"
 # set -sg terminal-overrides ",*:RGB"
 EOF
-    echo "To apply to an *existing* session, run: tmux source-file $tmux_conf"
+	echo "To apply to an *existing* session, run: tmux source-file $tmux_conf"
 }
 
 sys_cron_reload() {
-    if [ ! -d "$cron_dir_user" ]; then
-        echo "Error: Directory $cron_dir_user does not exist."
-        return
-    fi
-    cat "${cron_dir_user}"/* 2>/dev/null | crontab - || {
-        echo "Error loading cron jobs"
-        return
-    }
-    echo -e "Loaded cron jobs:\n"
-    crontab -l
+	if [ ! -d "$cron_dir_user" ]; then
+		echo "Error: Directory $cron_dir_user does not exist."
+		return
+	fi
+	cat "${cron_dir_user}"/* 2>/dev/null | crontab - || {
+		echo "Error loading cron jobs"
+		return
+	}
+	echo -e "Loaded cron jobs:\n"
+	crontab -l
 }
 
 sys_rsnapshot_install() {
-    # Check if rsnapshot is installed
-    if ! command -v rsnapshot &>/dev/null; then
-        echo "rsnapshot is not installed. Installing rsnapshot..."
-        apt-get update && apt-get -y install rsnapshot
-    fi
+	# Check if rsnapshot is installed
+	if ! command -v rsnapshot &>/dev/null; then
+		echo "rsnapshot is not installed. Installing rsnapshot..."
+		apt-get update && apt-get -y install rsnapshot
+	fi
 
-    echo -e "\nAdding log rotation.."
-    cat >/etc/logrotate.d/rsnapshot <<EOFX
+	echo -e "\nAdding log rotation.."
+	cat >/etc/logrotate.d/rsnapshot <<EOFX
 /opt/backup/*/*.log {
     size 20M
     missingok
@@ -3690,13 +3691,13 @@ sys_rsnapshot_install() {
     create 640 root root
 }
 EOFX
-    mkdir -p /opt/backup
-    chown root:root /opt/backup
-    chmod 640 /opt/backup
-    mkdir -p /root/.config/rsnapshot/
+	mkdir -p /opt/backup
+	chown root:root /opt/backup
+	chmod 640 /opt/backup
+	mkdir -p /root/.config/rsnapshot/
 
-    echo "Writing config into /root/.config/rsnapshot/sample.conf..."
-    cat >"/root/.config/rsnapshot/sample.conf" <<'EOFX'
+	echo "Writing config into /root/.config/rsnapshot/sample.conf..."
+	cat >"/root/.config/rsnapshot/sample.conf" <<'EOFX'
 # rsnapshot -c /root/.config/rsnapshot/test.conf sync && rsnapshot -c /root/.config/rsnapshot/test.conf hourly
 #################################################
 # This file requires tabs between elements      #
@@ -3749,9 +3750,9 @@ backup_exec	/bin/date "+ backup of test started at %c"
 backup_exec	/bin/date "+ backup of test ended at %c"
 EOFX
 
-    echo "Writing cron into ${cron_dir}/rsnapshot..."
+	echo "Writing cron into ${cron_dir}/rsnapshot..."
 
-    cat >"${cron_dir}/rsnapshot" <<'EOFX'
+	cat >"${cron_dir}/rsnapshot" <<'EOFX'
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Schedule backup every 6 hours
@@ -3777,457 +3778,460 @@ EOFX
 }
 
 sys_swap_add() {
-# Turn off swap: swapoff -a && rm /swapfile
-    # Ask user for swap size in MB (default: 2048MB)
-    read -rp "Enter swap size in MB [2048]: " swap_size
-    swap_size=${swap_size:-2048}
+	# Turn off swap: swapoff -a && rm /swapfile
+	# Ask user for swap size in MB (default: 2048MB)
+	read -rp "Enter swap size in MB [2048]: " swap_size
+	swap_size=${swap_size:-2048}
 
-    # Ask user for swap file location (default: /swapfile)
-    read -rp "Enter swap file location [/swapfile]: " swap_location
-    swap_location=${swap_location:-/swapfile}
+	# Ask user for swap file location (default: /swapfile)
+	read -rp "Enter swap file location [/swapfile]: " swap_location
+	swap_location=${swap_location:-/swapfile}
 
-    # Calculate buffer size for dd (in 2MB blocks)
-    buffer_size=$((swap_size / 10))
+	# Calculate buffer size for dd (in 2MB blocks)
+	buffer_size=$((swap_size / 10))
 
-    # Create swap file
-    echo "Creating ${swap_size}MB swap file at ${swap_location}..."
-    dd if=/dev/zero of=$swap_location bs=10M count=$buffer_size
-    # fallocate -l 1G "$swap_location"
+	# Create swap file
+	echo "Creating ${swap_size}MB swap file at ${swap_location}..."
+	dd if=/dev/zero of=$swap_location bs=10M count=$buffer_size
+	# fallocate -l 1G "$swap_location"
 
-    if [ -e "$swap_location" ]; then
-        # Set permissions
-        chmod 600 $swap_location
+	if [ -e "$swap_location" ]; then
+		# Set permissions
+		chmod 600 $swap_location
 
-        # Set up swap space
-        mkswap $swap_location
+		# Set up swap space
+		mkswap $swap_location
 
-        # Activate the swap file
-        swapon $swap_location
+		# Activate the swap file
+		swapon $swap_location
 
-        # Check if swap was successfully added
-        if grep -q "$swap_location" /proc/swaps; then
-            echo "Swap file has been created and activated."
+		# Check if swap was successfully added
+		if grep -q "$swap_location" /proc/swaps; then
+			echo "Swap file has been created and activated."
 
-            echo "Setting vm.swappiness=10 ..."
-            # Set swappiness to 10
-            sysctl vm.swappiness=10
-            # Make the swappiness setting persistent across reboots
-            echo "vm.swappiness = 10" | tee -a  /etc/sysctl.d/tune_kernel.conf
+			echo "Setting vm.swappiness=10 ..."
+			# Set swappiness to 10
+			sysctl vm.swappiness=10
+			# Make the swappiness setting persistent across reboots
+			echo "vm.swappiness = 10" | tee -a /etc/sysctl.d/tune_kernel.conf
 
-            # Ask user if they want to add entry to /etc/fstab for persistence
-            read -rp "Add entry to /etc/fstab for persistence? (Y/n): " add_to_fstab
-            add_to_fstab=${add_to_fstab:-Y}
-            if [ "$add_to_fstab" == "y" ] || [ "$add_to_fstab" == "Y" ]; then
-                # Add entry to /etc/fstab for persistence
-                echo "$swap_location none swap sw 0 0" | tee -a /etc/fstab
-                echo "Entry added to /etc/fstab for persistence."
-            else
-                echo "Entry not added to /etc/fstab. Swap file will not be persistent across reboots."
-            fi
-        else
-            echo "Failed to activate swap file. Please check the configuration."
-        fi
-    else
-        echo "Failed to create swap file. Please check if you have necessary permissions and free disk space."
-    fi
+			# Ask user if they want to add entry to /etc/fstab for persistence
+			read -rp "Add entry to /etc/fstab for persistence? (Y/n): " add_to_fstab
+			add_to_fstab=${add_to_fstab:-Y}
+			if [ "$add_to_fstab" == "y" ] || [ "$add_to_fstab" == "Y" ]; then
+				# Add entry to /etc/fstab for persistence
+				echo "$swap_location none swap sw 0 0" | tee -a /etc/fstab
+				echo "Entry added to /etc/fstab for persistence."
+			else
+				echo "Entry not added to /etc/fstab. Swap file will not be persistent across reboots."
+			fi
+		else
+			echo "Failed to activate swap file. Please check the configuration."
+		fi
+	else
+		echo "Failed to create swap file. Please check if you have necessary permissions and free disk space."
+	fi
 
 }
 
 sys_list_users_new() {
-    default_users=("root" "daemon" "bin" "sys" "sync" "games" "man" "lp" "mail" "news" "uucp" "proxy" "www-data" "backup" "list" "irc" "gnats" "nobody" "_apt" "systemd-network" "systemd-timesync" "systemd-resolve" "messagebus" "sshd")
-    local row_count=0
-    # Define colors
-    local BG_GRAY='\033[48;5;236m'
-    local RED='\033[1;31m'
-    local GREEN='\033[1;32m'
-    local YELLOW='\033[1;33m'
-    local BLUE='\033[1;34m'
-    local PURPLE='\033[1;35m'
-    local CYAN='\033[1;36m'
-    local RESET='\033[0m'
+	default_users=("root" "daemon" "bin" "sys" "sync" "games" "man" "lp" "mail" "news" "uucp" "proxy" "www-data" "backup" "list" "irc" "gnats" "nobody" "_apt" "systemd-network" "systemd-timesync" "systemd-resolve" "messagebus" "sshd")
+	local row_count=0
+	# Define colors
+	local BG_GRAY='\033[48;5;236m'
+	local RED='\033[1;31m'
+	local GREEN='\033[1;32m'
+	local YELLOW='\033[1;33m'
+	local BLUE='\033[1;34m'
+	local PURPLE='\033[1;35m'
+	local CYAN='\033[1;36m'
+	local RESET='\033[0m'
 
-    # Define column widths
-    local COL1=30 # Username (UID)
-    local COL2=6  # Locked
-    local COL3=6  # HasPass
-    local COL4=6  # System
-    local COL5=30 # Groups
-    local COL6=35 # Home
+	# Define column widths
+	local COL1=30 # Username (UID)
+	local COL2=6  # Locked
+	local COL3=6  # HasPass
+	local COL4=6  # System
+	local COL5=30 # Groups
+	local COL6=35 # Home
 
-    # Print header
-    printf "${CYAN}%-${COL1}s${RESET}" "Username (UID)"
-    printf "${CYAN}%-${COL2}s${RESET}" "Lock"
-    printf "${CYAN}%-${COL3}s${RESET}" "Pass"
-    printf "${CYAN}%-${COL4}s${RESET}" "Sys"
-    printf "${CYAN}%-${COL5}s${RESET}" "Groups"
-    printf "${CYAN}%-${COL6}s${RESET}\n" "Home"
+	# Print header
+	printf "${CYAN}%-${COL1}s${RESET}" "Username (UID)"
+	printf "${CYAN}%-${COL2}s${RESET}" "Lock"
+	printf "${CYAN}%-${COL3}s${RESET}" "Pass"
+	printf "${CYAN}%-${COL4}s${RESET}" "Sys"
+	printf "${CYAN}%-${COL5}s${RESET}" "Groups"
+	printf "${CYAN}%-${COL6}s${RESET}\n" "Home"
 
-    # Print separator line
-    printf "%.0s-" {1..105}
-    printf "\n"
+	# Print separator line
+	printf "%.0s-" {1..105}
+	printf "\n"
 
-    # Process each user
-    # while IFS=: read -r username password uid gid info home shell; do
-    while IFS=: read -r username password uid gid _ home _; do
-        # Skip if username is empty
-        [ -z "$username" ] && continue
-        if [[ " ${default_users[*]} " =~  ${username}  ]]; then continue; fi
+	# Process each user
+	# while IFS=: read -r username password uid gid info home shell; do
+	while IFS=: read -r username password uid gid _ home _; do
+		# Skip if username is empty
+		[ -z "$username" ] && continue
+		if [[ " ${default_users[*]} " =~ ${username} ]]; then continue; fi
 
-        # Check if system user (UID < 1000)
-        local is_system="NO"
-        if [ "$uid" -lt 1000 ]; then
-            is_system="YES"
-        fi
+		# Check if system user (UID < 1000)
+		local is_system="NO"
+		if [ "$uid" -lt 1000 ]; then
+			is_system="YES"
+		fi
 
-        # Check password status
-        local has_pass="NO"
-        local is_locked="NO"
-        if [ -f "/etc/shadow" ]; then
-            local shadow_line
-            shadow_line=$(sudo grep "^${username}:" /etc/shadow)
-            if [ -n "$shadow_line" ]; then
-                local pass_field
-                pass_field=$(echo "$shadow_line" | cut -d: -f2)
-                if [ "$pass_field" != "*" ] && [ "$pass_field" != "!" ]; then
-                    has_pass="YES"
-                fi
-                if [[ "$pass_field" == *'!'* ]]; then
-                    is_locked="YES"
-                fi
-            fi
-        fi
+		# Check password status
+		local has_pass="NO"
+		local is_locked="NO"
+		if [ -f "/etc/shadow" ]; then
+			local shadow_line
+			shadow_line=$(sudo grep "^${username}:" /etc/shadow)
+			if [ -n "$shadow_line" ]; then
+				local pass_field
+				pass_field=$(echo "$shadow_line" | cut -d: -f2)
+				if [ "$pass_field" != "*" ] && [ "$pass_field" != "!" ]; then
+					has_pass="YES"
+				fi
+				if [[ "$pass_field" == *'!'* ]]; then
+					is_locked="YES"
+				fi
+			fi
+		fi
 
-        # Get groups
-        local groups
-        groups=$(groups "$username" 2>/dev/null | cut -d: -f2 | sed 's/^ //')
-        if [ -z "$groups" ]; then
-            groups=$(id -Gn "$username" 2>/dev/null)
-        fi
-        groups="${groups// /, }"
+		# Get groups
+		local groups
+		groups=$(groups "$username" 2>/dev/null | cut -d: -f2 | sed 's/^ //')
+		if [ -z "$groups" ]; then
+			groups=$(id -Gn "$username" 2>/dev/null)
+		fi
+		groups="${groups// /, }"
 
-        # Format username with UID
-        local username_uid="${username} (${uid})"
+		# Format username with UID
+		local username_uid="${username} (${uid})"
 
-        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
+		if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
-        # Print user information with colors
-        printf "${YELLOW}%-${COL1}s${RESET}" "${username_uid}"
+		# Print user information with colors
+		printf "${YELLOW}%-${COL1}s${RESET}" "${username_uid}"
 
-        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
+		if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
-        if [ "$is_locked" = "YES" ]; then
-            printf "${RED}%-${COL4}s${RESET}" "Y"
-        else
-            printf "${GREEN}%-${COL4}s${RESET}" "N"
-        fi
+		if [ "$is_locked" = "YES" ]; then
+			printf "${RED}%-${COL4}s${RESET}" "Y"
+		else
+			printf "${GREEN}%-${COL4}s${RESET}" "N"
+		fi
 
-        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
+		if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
-        # Fixed color output for status fields
-        if [ "$has_pass" = "YES" ]; then
-            printf "${GREEN}%-${COL2}s${RESET}" "Y"
-        else
-            printf "${RED}%-${COL2}s${RESET}" "N"
-        fi
+		# Fixed color output for status fields
+		if [ "$has_pass" = "YES" ]; then
+			printf "${GREEN}%-${COL2}s${RESET}" "Y"
+		else
+			printf "${RED}%-${COL2}s${RESET}" "N"
+		fi
 
-        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
+		if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
-        if [ "$is_system" = "YES" ]; then
-            printf "${BLUE}%-${COL3}s${RESET}" "Y"
-        else
-            printf "${PURPLE}%-${COL3}s${RESET}" "N"
-        fi
+		if [ "$is_system" = "YES" ]; then
+			printf "${BLUE}%-${COL3}s${RESET}" "Y"
+		else
+			printf "${PURPLE}%-${COL3}s${RESET}" "N"
+		fi
 
-        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
+		if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
-        printf "${PURPLE}%-${COL5}s${RESET}" "${groups}"
+		printf "${PURPLE}%-${COL5}s${RESET}" "${groups}"
 
-        if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
+		if ((row_count % 2 == 1)); then printf "%b" "$BG_GRAY"; fi
 
-        printf "${CYAN}%-${COL6}s${RESET}\n" "${home}"
+		printf "${CYAN}%-${COL6}s${RESET}\n" "${home}"
 
-        row_count=$((row_count + 1))
-    done </etc/passwd
+		row_count=$((row_count + 1))
+	done </etc/passwd
 }
 
 sys_list_users() {
-    local RED='\033[1;31m'
-    local GREEN='\033[1;32m'
-    local YELLOW='\033[1;33m'
-    local RESET='\033[0m'
-    local login_status
-    local can_login
+	local RED='\033[1;31m'
+	local GREEN='\033[1;32m'
+	local YELLOW='\033[1;33m'
+	local RESET='\033[0m'
+	local login_status
+	local can_login
 
-    # Create a header for the table
-    printf "${GREEN}%-20s%-20s%-20s%-20s%-20s${RESET}\n" "Username" "User ID" "Group ID" "Home Directory" "Can Login"
+	# Create a header for the table
+	printf "${GREEN}%-20s%-20s%-20s%-20s%-20s${RESET}\n" "Username" "User ID" "Group ID" "Home Directory" "Can Login"
 
-    # Use the awk command to extract user information and format it
-    awk -F: 'BEGIN {OFS="\t"} {print $1, $3, $4, $6}' /etc/passwd |
-        while IFS=$'\t' read -r username uid gid home; do
-            can_login=$(awk -F: -v user="$username" '$1 == user {print $2}' /etc/shadow)
-            if [[ "$can_login" == *":"* || "$can_login" == "!"* ]]; then
-                login_status="${RED}No${RESET}"
-            else
-                login_status="${GREEN}Yes${RESET}"
-            fi
-            printf "${YELLOW}%-20s${RESET}%-20s%-20s%-20s${login_status}\n" "$username" "$uid" "$gid" "$home"
-        done
+	# Use the awk command to extract user information and format it
+	awk -F: 'BEGIN {OFS="\t"} {print $1, $3, $4, $6}' /etc/passwd |
+		while IFS=$'\t' read -r username uid gid home; do
+			can_login=$(awk -F: -v user="$username" '$1 == user {print $2}' /etc/shadow)
+			if [[ "$can_login" == *":"* || "$can_login" == "!"* ]]; then
+				login_status="${RED}No${RESET}"
+			else
+				login_status="${GREEN}Yes${RESET}"
+			fi
+			printf "${YELLOW}%-20s${RESET}%-20s%-20s%-20s${login_status}\n" "$username" "$uid" "$gid" "$home"
+		done
 
 }
 
 sys_list_groups() {
-    # Check if the 'members' command is available
-    validate_command "members" || return 1
+	# Check if the 'members' command is available
+	validate_command "members" || return 1
 
-    local GREEN='\033[1;32m'
-    local YELLOW='\033[1;33m'
-    local RESET='\033[0m'
-    local gid
-    local members
+	local GREEN='\033[1;32m'
+	local YELLOW='\033[1;33m'
+	local RESET='\033[0m'
+	local gid
+	local members
 
-    # Create a header for the table
-    printf "${GREEN}%-20s%-20s%-20s${RESET}\n" "Group Name" "Group ID" "Group Members"
+	# Create a header for the table
+	printf "${GREEN}%-20s%-20s%-20s${RESET}\n" "Group Name" "Group ID" "Group Members"
 
-    # Iterate through each group, list members, and sort by group name
-    for groupname in $(cut -d: -f1 /etc/group | sort); do
-        gid=$(getent group "$groupname" | cut -d: -f3)
-        members=$(members "$groupname" 2>/dev/null)
+	# Iterate through each group, list members, and sort by group name
+	for groupname in $(cut -d: -f1 /etc/group | sort); do
+		gid=$(getent group "$groupname" | cut -d: -f3)
+		members=$(members "$groupname" 2>/dev/null)
 
-        if [ -z "$members" ]; then
-            members="N/A"
-        fi
+		if [ -z "$members" ]; then
+			members="N/A"
+		fi
 
-        printf "${YELLOW}%-20s${RESET}%-20s${members}\n" "$groupname" "$gid"
-    done
+		printf "${YELLOW}%-20s${RESET}%-20s${members}\n" "$groupname" "$gid"
+	done
 
 }
 
 sys_cleanUp() {
-    apt-get autoremove -y
-    apt-get autoclean
-    apt-get update
-    apt-get clean
+	apt-get autoremove -y
+	apt-get autoclean
+	apt-get update
+	apt-get clean
 }
 
 sys_read_apt_config() {
-    apt-config dump | grep -we Recommends -e Suggests
+	apt-config dump | grep -we Recommends -e Suggests
 }
 
 sys_std_pkg_install() {
-    local confirmation
-    # Disable Install Recommends & Suggests
-    # apt-config dump | grep -we Recommends -e Suggests | sed s/1/0/ | tee /etc/apt/apt.conf.d/99no-recommends
+	local confirmation
+	# Disable Install Recommends & Suggests
+	# apt-config dump | grep -we Recommends -e Suggests | sed s/1/0/ | tee /etc/apt/apt.conf.d/99no-recommends
 
-    # Install the "standard" task automatically
-    # apt-get install -y tasksel
-    # echo "standard" | tasksel install
-    # Hetzner disables InstallRecommends using this:
-    # /etc/apt/apt.conf.d/00InstallRecommends
-    apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
-        iptables-persistent \
-        bash-completion \
-        curl \
-        wget \
-        git \
-        nano \
-        zip \
-        unzip \
-        p7zip-full \
-        bzip2 \
-        gzip \
-        htop \
-        nftables \
-        bind9-dnsutils \
-        cron \
-        logrotate \
-        ncurses-term \
-        mailcap \
-        iproute2 \
-        pciutils \
-        bc \
-        jq \
-        dmidecode \
-        members \
-        xz-utils \
-        ca-certificates \
-        lynx \
+	# Install the "standard" task automatically
+	# apt-get install -y tasksel
+	# echo "standard" | tasksel install
+	# Hetzner disables InstallRecommends using this:
+	# /etc/apt/apt.conf.d/00InstallRecommends
+	apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+		iptables-persistent \
+		bash-completion \
+		curl \
+		wget \
+		git \
+		nano \
+		zip \
+		unzip \
+		p7zip-full \
+		bzip2 \
+		gzip \
+		htop \
+		nftables \
+		bind9-dnsutils \
+		cron \
+		logrotate \
+		ncurses-term \
+		mailcap \
+		iproute2 \
+		pciutils \
+		bc \
+		jq \
+		dmidecode \
+		members \
+		xz-utils \
+		ca-certificates \
+		lynx \
 		whiptail \
 		iputils-ping \
 		apt-utils \
 		less
-        # net-tools \
+	# net-tools \
 
-    if dpkg -l | grep -q "exim4"; then
-        read -rp "Remove Exim4? (y/n) " confirmation
-        if [[ "$confirmation" == "y" ]]; then
-            echo -e "\nRunning apt purge exim4-*\n"
-            apt purge -y exim4-*
-        fi
-    fi
-    # Clean up
-    apt-get autoremove -y
-    apt-get clean
+	if dpkg -l | grep -q "exim4"; then
+		read -rp "Remove Exim4? (y/n) " confirmation
+		if [[ "$confirmation" == "y" ]]; then
+			echo -e "\nRunning apt purge exim4-*\n"
+			apt purge -y exim4-*
+		fi
+	fi
+	# Clean up
+	apt-get autoremove -y
+	apt-get clean
 
-    echo "Standard packages installation complete."
+	echo "Standard packages installation complete."
 }
 
 config_set() {
-    local key="$1"
-    local val="$2"
-    local file="$3"
-    awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]+.*", key " " val); print}' "$file" | awk '{if (NF > 0) {if (!seen[$0]++) print} else {print}}' >"${file}.tmp" && mv "${file}.tmp" "$file"
+	local key="$1"
+	local val="$2"
+	local file="$3"
+	awk -v key="$key" -v val="$val" '{gsub("^#*[[:space:]]*" key "[[:space:]]+.*", key " " val); print}' "$file" | awk '{if (NF > 0) {if (!seen[$0]++) print} else {print}}' >"${file}.tmp" && mv "${file}.tmp" "$file"
 }
 
 sys_SSH_install() {
-    local sshd_config="/etc/ssh/sshd_config"
-    local sshd_config_dir="/etc/ssh/sshd_config.d"
+	local sshd_config="/etc/ssh/sshd_config"
+	local sshd_config_dir="/etc/ssh/sshd_config.d"
 	local DIR="/root/.ssh"
 	local CONF="$DIR/config"
 
-    if ! dpkg -l | grep -q "^ii\s*openssh-server\s"; then
-        # Update package lists & Install SSH server
-        apt-get update && apt-get install -y openssh-server || return 1
-    fi
-	
+	if ! dpkg -l | grep -q "^ii\s*openssh-server\s"; then
+		# Update package lists & Install SSH server
+		apt-get update && apt-get install -y openssh-server || return 1
+	fi
+
 	# Create directory only if missing; warn if it fails
-	[[ ! -d "$DIR" ]] && { mkdir -m 700 "$DIR" || { echo "⚠️ Error: Root path blocked"; exit 1; }; }
+	[[ ! -d "$DIR" ]] && { mkdir -m 700 "$DIR" || {
+		echo "⚠️ Error: Root path blocked"
+		exit 1
+	}; }
 
 	# Smart check: If file exists AND contains the setting, warn. Else, append.
 	if [[ -f "$CONF" ]] && grep -q "StrictHostKeyChecking" "$CONF"; then
 		echo "⚠️ Warning: Setting for StrictHostKeyChecking already exists in $CONF"
 	else
-		printf "Host *\n    StrictHostKeyChecking accept-new\n" >> "$CONF" && chmod 600 "$CONF"
+		printf "Host *\n    StrictHostKeyChecking accept-new\n" >>"$CONF" && chmod 600 "$CONF"
 		echo "✅ Updated: $CONF"
 	fi
 
-    # Backup the original configuration
-    if [ -e "${sshd_config}_backup" ]; then
-        echo "Backup file '${sshd_config}_backup' already exists."
-    else
-        cp "$sshd_config" "${sshd_config}_backup"
-    fi
+	# Backup the original configuration
+	if [ -e "${sshd_config}_backup" ]; then
+		echo "Backup file '${sshd_config}_backup' already exists."
+	else
+		cp "$sshd_config" "${sshd_config}_backup"
+	fi
 
-    # Enable root login (not recommended for production)
-    # sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
-    # sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
-    config_set PermitRootLogin yes "$sshd_config"
+	# Enable root login (not recommended for production)
+	# sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
+	# sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' "$sshd_config"
+	config_set PermitRootLogin yes "$sshd_config"
 
-    # Enable ClientAliveInterval
-    config_set ClientAliveInterval 120 "$sshd_config"
+	# Enable ClientAliveInterval
+	config_set ClientAliveInterval 120 "$sshd_config"
 
-    # Disable root's ability to use password-based authentication
-    # sed -i 's/PermitRootLogin yes/PermitRootLogin without-password/' "$sshd_config"
+	# Disable root's ability to use password-based authentication
+	# sed -i 's/PermitRootLogin yes/PermitRootLogin without-password/' "$sshd_config"
 
-    # Set SSH port to 4444
-    config_set Port 4444 "$sshd_config"
-    # sed -i 's/#Port 22/Port 4444/' "$sshd_config"
+	# Set SSH port to 4444
+	config_set Port 4444 "$sshd_config"
+	# sed -i 's/#Port 22/Port 4444/' "$sshd_config"
 
-    # Disable password authentication (use key-based authentication)
-    # sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' "$sshd_config"
+	# Disable password authentication (use key-based authentication)
+	# sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' "$sshd_config"
 
-    # Enable PasswordAuthentication
-    # sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' "$sshd_config"
-    # sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
-    # sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
+	# Enable PasswordAuthentication
+	# sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' "$sshd_config"
+	# sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
+	# sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' "$sshd_config"
 
-    config_set PasswordAuthentication yes "$sshd_config"
+	config_set PasswordAuthentication yes "$sshd_config"
 
-    # Allow only specific users or groups to log in via SSH (replace with your username)
-    # echo "AllowUsers your_username" >> "$sshd_config"
+	# Allow only specific users or groups to log in via SSH (replace with your username)
+	# echo "AllowUsers your_username" >> "$sshd_config"
 
-    if [ -f "${sshd_config_dir}/50-cloud-init.conf" ]; then
-        mv "${sshd_config_dir}/50-cloud-init.conf" "${sshd_config_dir}/50-cloud-init.conf.disabled" >/dev/null
-    fi
+	if [ -f "${sshd_config_dir}/50-cloud-init.conf" ]; then
+		mv "${sshd_config_dir}/50-cloud-init.conf" "${sshd_config_dir}/50-cloud-init.conf.disabled" >/dev/null
+	fi
 
-    # Check if directory exists and is readable
-    if [ -d "$sshd_config_dir" ] && [ -r "$sshd_config_dir" ]; then
-        # Check if sshd_config_dir contains any files (excluding . and ..)
-        if find "$sshd_config_dir" -maxdepth 1 -type f | read -r; then
-            # Warning message in yellow color
-            echo -e "\033[1;33mWARNING: Files detected in $sshd_config_dir"
-            echo -e "These may override SSH configuration. Please review them.\033[0m"
-        fi
-    fi
+	# Check if directory exists and is readable
+	if [ -d "$sshd_config_dir" ] && [ -r "$sshd_config_dir" ]; then
+		# Check if sshd_config_dir contains any files (excluding . and ..)
+		if find "$sshd_config_dir" -maxdepth 1 -type f | read -r; then
+			# Warning message in yellow color
+			echo -e "\033[1;33mWARNING: Files detected in $sshd_config_dir"
+			echo -e "These may override SSH configuration. Please review them.\033[0m"
+		fi
+	fi
 
-    local AUTH_KEYS="/root/.ssh/authorized_keys"
-    local SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBZHBIqC2RMXrqf94kDvAzqLB0ymgPn4eU/VTSMgtTy"
-    local SSH_KEY2="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJA3sRPDekFDYji0tObnDQgteucMQbPr7EhtGvIYnGbG master"
+	local AUTH_KEYS="/root/.ssh/authorized_keys"
+	local SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBZHBIqC2RMXrqf94kDvAzqLB0ymgPn4eU/VTSMgtTy"
+	local SSH_KEY2="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJA3sRPDekFDYji0tObnDQgteucMQbPr7EhtGvIYnGbG master"
 
-    # Check if authorized_keys exists
-    if [ -f "$AUTH_KEYS" ]; then
-        # Create a temporary file
-        local TEMP_FILE=$(mktemp)
-        
-        # Remove lines containing "Please login as the user" and store other lines
-        grep -v "Please login as the user" "$AUTH_KEYS" > "$TEMP_FILE"
-        
-        # Add the new SSH key at the top of the file
-        echo "$SSH_KEY" > "$AUTH_KEYS"
-        echo "$SSH_KEY2" >> "$AUTH_KEYS"
-        cat "$TEMP_FILE" >> "$AUTH_KEYS"
-        
-        # Remove temporary file
-        rm "$TEMP_FILE"
-        
-        # Set proper permissions
-        chmod 600 "$AUTH_KEYS"
-        
-        echo -e "\033[32mSSH key has been updated in $AUTH_KEYS\033[0m"
-    else
-        # If file doesn't exist, create it with proper permissions
-        mkdir -p "$(dirname "$AUTH_KEYS")"
-        echo "$SSH_KEY" > "$AUTH_KEYS"
-        echo "$SSH_KEY2" >> "$AUTH_KEYS"
-        chmod 600 "$AUTH_KEYS"
-        echo "Created new $AUTH_KEYS file with SSH key"
-    fi
+	# Check if authorized_keys exists
+	if [ -f "$AUTH_KEYS" ]; then
+		# Create a temporary file
+		local TEMP_FILE=$(mktemp)
 
-    # Restart SSH service (for changes to take effect immediately)
+		# Remove lines containing "Please login as the user" and store other lines
+		grep -v "Please login as the user" "$AUTH_KEYS" >"$TEMP_FILE"
 
-    # Check if the ssh.socket unit is active and enabled.
-    if systemctl is-enabled --quiet ssh.socket; then
-        echo "ssh.socket is enabled. Disabling.."
-        systemctl disable ssh.socket || echo "Failed to disable ssh.socket"
+		# Add the new SSH key at the top of the file
+		echo "$SSH_KEY" >"$AUTH_KEYS"
+		echo "$SSH_KEY2" >>"$AUTH_KEYS"
+		cat "$TEMP_FILE" >>"$AUTH_KEYS"
+
+		# Remove temporary file
+		rm "$TEMP_FILE"
+
+		# Set proper permissions
+		chmod 600 "$AUTH_KEYS"
+
+		echo -e "\033[32mSSH key has been updated in $AUTH_KEYS\033[0m"
+	else
+		# If file doesn't exist, create it with proper permissions
+		mkdir -p "$(dirname "$AUTH_KEYS")"
+		echo "$SSH_KEY" >"$AUTH_KEYS"
+		echo "$SSH_KEY2" >>"$AUTH_KEYS"
+		chmod 600 "$AUTH_KEYS"
+		echo "Created new $AUTH_KEYS file with SSH key"
+	fi
+
+	# Restart SSH service (for changes to take effect immediately)
+
+	# Check if the ssh.socket unit is active and enabled.
+	if systemctl is-enabled --quiet ssh.socket; then
+		echo "ssh.socket is enabled. Disabling.."
+		systemctl disable ssh.socket || echo "Failed to disable ssh.socket"
 	fi
 	if systemctl is-active --quiet ssh.socket; then
 		echo "ssh.socket is running. Stopping.."
 		systemctl stop ssh.socket || echo "Failed to stop ssh.socket"
 	fi
-    if ! systemctl is-enabled --quiet ssh.service; then
-        echo "ssh.service is not enabled. Enabling...."
-        systemctl enable ssh.service || echo "Failed to enable ssh.service"
-    fi
-    systemctl restart ssh.service || echo "Failed to restart ssh.service"
+	if ! systemctl is-enabled --quiet ssh.service; then
+		echo "ssh.service is not enabled. Enabling...."
+		systemctl enable ssh.service || echo "Failed to enable ssh.service"
+	fi
+	systemctl restart ssh.service || echo "Failed to restart ssh.service"
 
-    # Verify the status after attempting a restart.
-    if ! systemctl is-active --quiet ssh; then
-        echo "Warning: SSH server does not appear to be active after restart attempt."
-    fi
+	# Verify the status after attempting a restart.
+	if ! systemctl is-active --quiet ssh; then
+		echo "Warning: SSH server does not appear to be active after restart attempt."
+	fi
 
 }
 
 sys_set_grub_timeout() {
 	# Add mitigations=off to GRUB_CMDLINE_LINUX_DEFAULT= to increase performance
-    local TIMEOUT=3
+	local TIMEOUT=3
 
-    [ ! -f "/etc/default/grub" ] && {
-        echo "Grub configuration file not found."
-        return 1
-    }
+	[ ! -f "/etc/default/grub" ] && {
+		echo "Grub configuration file not found."
+		return 1
+	}
 
-    sed -i "s/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=$TIMEOUT/" /etc/default/grub || {
-        echo "Error: Failed to set Grub timeout."
-        return 1
-    }
-    update-grub || {
-        echo "Error: Failed to update Grub."
-        return 1
-    }
+	sed -i "s/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=$TIMEOUT/" /etc/default/grub || {
+		echo "Error: Failed to set Grub timeout."
+		return 1
+	}
+	update-grub || {
+		echo "Error: Failed to update Grub."
+		return 1
+	}
 
-    echo "Grub timeout has been set to $TIMEOUT seconds."
+	echo "Grub timeout has been set to $TIMEOUT seconds."
 }
 
-sys_cleanup-ubuntu(){
+sys_cleanup-ubuntu() {
 	systemctl stop snapd && systemctl disable snapd && apt purge snapd
 	# apt-mark hold snapd
 	# apt show ubuntu-standard ubuntu-minimal
@@ -4237,8 +4241,8 @@ sys_cleanup-ubuntu(){
 }
 
 sys_config_setup() {
-    local restore_choice
-    local bashrc="/etc/bash.bashrc"
+	local restore_choice
+	local bashrc="/etc/bash.bashrc"
 	local f
 
 	for f in /etc/iptables/rules.{v4,v6}; do
@@ -4249,105 +4253,105 @@ sys_config_setup() {
 		[ -f "$f" ] && rm "$f"
 	done
 
-    echo "Updating Grub timeout.."
-    sys_set_grub_timeout
+	echo "Updating Grub timeout.."
+	sys_set_grub_timeout
 
-    echo "Setting server's timezone to Asia/Dubai"
-    timedatectl set-timezone Asia/Dubai || echo "Failed to set timezone"
-    echo ""
+	echo "Setting server's timezone to Asia/Dubai"
+	timedatectl set-timezone Asia/Dubai || echo "Failed to set timezone"
+	echo ""
 
-    # Check if Backup exist
-    if [ -e "${bashrc}.backup" ]; then
-        read -rp "Do you want to restore the original configuration from the backup? (y/n): " restore_choice
-        if [ "$restore_choice" == "y" ]; then
-            if cp ${bashrc}.backup ${bashrc}; then
-                echo "Original configuration has been restored."
-            else
-                echo "Failed to restore original configuration."
-            fi
-            return
-        fi
-    fi
+	# Check if Backup exist
+	if [ -e "${bashrc}.backup" ]; then
+		read -rp "Do you want to restore the original configuration from the backup? (y/n): " restore_choice
+		if [ "$restore_choice" == "y" ]; then
+			if cp ${bashrc}.backup ${bashrc}; then
+				echo "Original configuration has been restored."
+			else
+				echo "Failed to restore original configuration."
+			fi
+			return
+		fi
+	fi
 
-    # Backup the original configuration
-    if [ -e "${bashrc}.backup" ]; then
-        echo "Skipping Backup (already exists) '${bashrc}.backup'."
-    else
-        echo -e "Creating backup (bash.bashrc.backup)...\n"
-        cp ${bashrc} ${bashrc}.backup
-    fi
+	# Backup the original configuration
+	if [ -e "${bashrc}.backup" ]; then
+		echo "Skipping Backup (already exists) '${bashrc}.backup'."
+	else
+		echo -e "Creating backup (bash.bashrc.backup)...\n"
+		cp ${bashrc} ${bashrc}.backup
+	fi
 
-    # Define the new PS1 prompt with color codes
-    # hetzner uses red yeloow cyan yellow pink
-    # Define colors using ANSI escape codes
-    local RED="\[\033[01;31m\]"
-    local GREEN="\[\033[01;32m\]"
-    local YELLOW="\[\033[01;33m\]"
-    local PINK="\[\033[01;35m\]"
-    local CYAN="\[\033[01;36m\]"
-    local RESET="\[\033[0m\]"
+	# Define the new PS1 prompt with color codes
+	# hetzner uses red yeloow cyan yellow pink
+	# Define colors using ANSI escape codes
+	local RED="\[\033[01;31m\]"
+	local GREEN="\[\033[01;32m\]"
+	local YELLOW="\[\033[01;33m\]"
+	local PINK="\[\033[01;35m\]"
+	local CYAN="\[\033[01;36m\]"
+	local RESET="\[\033[0m\]"
 
-    # Set the customized PS1 variable
-    local CUSTOM_PS1="'\${debian_chroot:+(\$debian_chroot)}${RED}\\u${YELLOW}@${CYAN}\\h ${YELLOW}\\w${PINK}\\\$ ${RESET}'"
-    local escaped_PS1
-    escaped_PS1=$(echo "$CUSTOM_PS1" | sed 's/[\/&]/\\&/g')
+	# Set the customized PS1 variable
+	local CUSTOM_PS1="'\${debian_chroot:+(\$debian_chroot)}${RED}\\u${YELLOW}@${CYAN}\\h ${YELLOW}\\w${PINK}\\\$ ${RESET}'"
+	local escaped_PS1
+	escaped_PS1=$(echo "$CUSTOM_PS1" | sed 's/[\/&]/\\&/g')
 
-    # Replace the old PS1 line with the new one
-    sed -i "s/PS1=.*/PS1=${escaped_PS1}/" ${bashrc}
+	# Replace the old PS1 line with the new one
+	sed -i "s/PS1=.*/PS1=${escaped_PS1}/" ${bashrc}
 
-    # "echo \"IP: \$(hostname -I | awk '{print \$1}') \$(ip -o -4 route show to default | awk '{print $5}')\""
+	# "echo \"IP: \$(hostname -I | awk '{print \$1}') \$(ip -o -4 route show to default | awk '{print $5}')\""
 
-    local aliases=(
-        "alias ls='ls --color=auto'"
-        "alias ll='ls -lh'"
-        "alias la='ls -A'"
-        "alias l='ls -CF'"
-        "alias grep='grep --color=auto'"
-        "alias fgrep='fgrep --color=auto'"
-        "alias egrep='egrep --color=auto'"
-        "export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'"
-        "HISTSIZE=10000"
-        "HISTFILESIZE=20000"
-        "sinfo"
-    )
-    for value in "${aliases[@]}"; do
-        # local escaped_value=$(printf '%s\n' "$value" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
-        if ! grep -qF "$value" "${bashrc}"; then
-            echo "$value" >>"${bashrc}"
-        fi
-    done
+	local aliases=(
+		"alias ls='ls --color=auto'"
+		"alias ll='ls -lh'"
+		"alias la='ls -A'"
+		"alias l='ls -CF'"
+		"alias grep='grep --color=auto'"
+		"alias fgrep='fgrep --color=auto'"
+		"alias egrep='egrep --color=auto'"
+		"export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'"
+		"HISTSIZE=10000"
+		"HISTFILESIZE=20000"
+		"sinfo"
+	)
+	for value in "${aliases[@]}"; do
+		# local escaped_value=$(printf '%s\n' "$value" | sed -e 's/[\/&]/\\&/g' -e 's/["'\'']/\\&/g')
+		if ! grep -qF "$value" "${bashrc}"; then
+			echo "$value" >>"${bashrc}"
+		fi
+	done
 
-    # Notify user about the changes
-    echo "PS1 prompt, aliases, exports, and history settings have been updated for all users."
+	# Notify user about the changes
+	echo "PS1 prompt, aliases, exports, and history settings have been updated for all users."
 
-    if [ -e "/etc/issue.backup" ]; then
-        echo "Skipping Backup (already exists) '/etc/issue.backup'."
-    else
-        echo -e "Creating backup (/etc/issue.backup)...\n"
-        cp /etc/issue /etc/issue.backup
-    fi
-    cat >"/etc/issue" <<EOFX
+	if [ -e "/etc/issue.backup" ]; then
+		echo "Skipping Backup (already exists) '/etc/issue.backup'."
+	else
+		echo -e "Creating backup (/etc/issue.backup)...\n"
+		cp /etc/issue /etc/issue.backup
+	fi
+	cat >"/etc/issue" <<EOFX
 \e{lightblue}\s \m \r (Server Time: \t\e{reset})
 \e{lightblue}\S{PRETTY_NAME} \v\e{reset}
 \e{lightgreen}\n.\o : \4\e{reset}
 EOFX
 
-    # Backup the original configuration
-    if [ -e "/etc/motd.backup" ]; then
-        echo "Skipping Backup (already exists) '/etc/motd.backup'."
-    else
+	# Backup the original configuration
+	if [ -e "/etc/motd.backup" ]; then
+		echo "Skipping Backup (already exists) '/etc/motd.backup'."
+	else
 		if [ -e "/etc/motd" ]; then
 			echo -e "Creating backup (/etc/motd.backup)...\n"
 			cp /etc/motd /etc/motd.backup
 		fi
-    fi
-    echo -n "" >/etc/motd
+	fi
+	echo -n "" >/etc/motd
 
 	chmod -x /etc/update-motd.d/*
 
-    local sinfo_script="/usr/local/bin/sinfo"
-    # Use a here document to create the script content
-    cat >"$sinfo_script" <<'EOF'
+	local sinfo_script="/usr/local/bin/sinfo"
+	# Use a here document to create the script content
+	cat >"$sinfo_script" <<'EOF'
 #!/bin/bash
 
 # Get Script version
@@ -4413,192 +4417,193 @@ echo -e " \e[91mRAM:\e[0m $ram_info"
 echo -e " \e[91mMachine:\e[0m $machine_info"
 EOF
 
-    echo "Script generated and saved as $sinfo_script"
-    chmod +x "$sinfo_script"
+	echo "Script generated and saved as $sinfo_script"
+	chmod +x "$sinfo_script"
 
 }
 
 media_manage() {
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install FFMPEG"
-        echo "2. Install go-chromecast"
-        echo "3. Install catt (Cast All The Things) using pipx for the current user"
-        echo "4. Install mkvtoolnix"
-        echo "5. Install GG Bot Upload Assistant in the current dir"
-        echo "6. Install mediainfo"
-        echo "0. Quit"
+	while true; do
+		echo "Choose an option:"
+		echo "1. Install FFMPEG"
+		echo "2. Install go-chromecast"
+		echo "3. Install catt (Cast All The Things) using pipx for the current user"
+		echo "4. Install mkvtoolnix"
+		echo "5. Install GG Bot Upload Assistant in the current dir"
+		echo "6. Install mediainfo"
+		echo "0. Quit"
 
-        read -rp "Enter your choice: " choice
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) media_ffmpeg_install ;;
-        2) media_go_chromecast_install ;;
-        3) pipx install catt ;;
-        4) media_mkvtoolnix_install ;;
-        5) gg_bot_upload_assistant_setup ;;
-        6) media_mediainfo_install ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) media_ffmpeg_install ;;
+		2) media_go_chromecast_install ;;
+		3) pipx install catt ;;
+		4) media_mkvtoolnix_install ;;
+		5) gg_bot_upload_assistant_setup ;;
+		6) media_mediainfo_install ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 media_mediainfo_install() {
-    local repo_ver="1.0-26"
-    local repo_url="https://mediaarea.net/repo/deb/repo-mediaarea_${repo_ver}_all.deb"
-    local temp_deb="/tmp/repo-mediaarea.deb"
+	local repo_ver="1.0-26"
+	local repo_url="https://mediaarea.net/repo/deb/repo-mediaarea_${repo_ver}_all.deb"
+	local temp_deb="/tmp/repo-mediaarea.deb"
 
-    # Detect Architecture
-    local arch
-    arch=$(dpkg --print-architecture)
-    case "$arch" in
-        amd64|i386|arm64|armhf)
-            echo "Detected architecture: $arch"
-            ;;
-        *)
-            echo "Error: Architecture '$arch' is not explicitly supported by this function." >&2
-            return 1
-            ;;
-    esac
+	# Detect Architecture
+	local arch
+	arch=$(dpkg --print-architecture)
+	case "$arch" in
+	amd64 | i386 | arm64 | armhf)
+		echo "Detected architecture: $arch"
+		;;
+	*)
+		echo "Error: Architecture '$arch' is not explicitly supported by this function." >&2
+		return 1
+		;;
+	esac
 
-    # Detect Distribution and Codename
-    if ! command -v lsb_release >/dev/null; then
-        apt-get update && apt-get install -y lsb-release
-    fi
+	# Detect Distribution and Codename
+	if ! command -v lsb_release >/dev/null; then
+		apt-get update && apt-get install -y lsb-release
+	fi
 
-    local distro
-    distro=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
-    local codename
-    codename=$(lsb_release -sc)
+	local distro
+	distro=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
+	local codename
+	codename=$(lsb_release -sc)
 
-    # Normalize Raspbian to behave like Debian if needed, though MediaArea often detects it fine.
-    # The official repo deb handles the sources.list generation based on system detection.
-    
-    echo "Detected Distribution: $distro ($codename)"
+	# Normalize Raspbian to behave like Debian if needed, though MediaArea often detects it fine.
+	# The official repo deb handles the sources.list generation based on system detection.
 
-    # Install Dependencies
-    apt-get update && apt-get install -y wget apt-transport-https gnupg
+	echo "Detected Distribution: $distro ($codename)"
 
-    # Download and Install MediaArea Repository Configuration
-    if wget -q -O "$temp_deb" "$repo_url"; then
-        echo "Installing repository configuration..."
-        dpkg -i "$temp_deb"
-        rm -f "$temp_deb"
-    else
-        echo "Error: Failed to download repository package from $repo_url" >&2
-        return 1
-    fi
+	# Install Dependencies
+	apt-get update && apt-get install -y wget apt-transport-https gnupg
 
-    # Update and Install MediaInfo
-    echo "Updating package lists and installing MediaInfo..."
-    apt-get update
-    if apt-get install -y mediainfo; then
-        echo "------------------------------------------------"
-        echo "MediaInfo installed successfully!"
-        echo "Version: $(mediainfo --Version)"
-        echo "------------------------------------------------"
-    else
-        echo "Error: Failed to install mediainfo." >&2
-        return 1
-    fi
+	# Download and Install MediaArea Repository Configuration
+	if wget -q -O "$temp_deb" "$repo_url"; then
+		echo "Installing repository configuration..."
+		dpkg -i "$temp_deb"
+		rm -f "$temp_deb"
+	else
+		echo "Error: Failed to download repository package from $repo_url" >&2
+		return 1
+	fi
+
+	# Update and Install MediaInfo
+	echo "Updating package lists and installing MediaInfo..."
+	apt-get update
+	if apt-get install -y mediainfo; then
+		echo "------------------------------------------------"
+		echo "MediaInfo installed successfully!"
+		echo "Version: $(mediainfo --Version)"
+		echo "------------------------------------------------"
+	else
+		echo "Error: Failed to install mediainfo." >&2
+		return 1
+	fi
 }
 
 media_go_chromecast_install() {
-    local arch
-    case "$(get_arch)" in
-    amd64) arch="amd64" ;;
-    i386) arch="386" ;;
-    arm64) arch="arm64" ;;
-    arm32) arch="armv7" ;;
-    Unknown)
-        echo "Unsupported system architecture"
-        exit 1
-        ;;
-    esac
-    echo "$arch"
+	local arch
+	case "$(get_arch)" in
+	amd64) arch="amd64" ;;
+	i386) arch="386" ;;
+	arm64) arch="arm64" ;;
+	arm32) arch="armv7" ;;
+	Unknown)
+		echo "Unsupported system architecture"
+		exit 1
+		;;
+	esac
+	echo "$arch"
 
-    wget https://github.com/vishen/go-chromecast/releases/download/v0.3.1/go-chromecast_0.3.1_linux_${arch}.tar.gz
-    tar -xzf go-chromecast_0.3.1_linux_${arch}.tar.gz go-chromecast
-    install ./go-chromecast /usr/bin/
-    rm -f ./go-chromecast go-chromecast_0.3.1_linux_${arch}.tar.gz
+	wget https://github.com/vishen/go-chromecast/releases/download/v0.3.1/go-chromecast_0.3.1_linux_${arch}.tar.gz
+	tar -xzf go-chromecast_0.3.1_linux_${arch}.tar.gz go-chromecast
+	install ./go-chromecast /usr/bin/
+	rm -f ./go-chromecast go-chromecast_0.3.1_linux_${arch}.tar.gz
 
 }
 
 media_ffmpeg_install() {
-    # local confirm
-    # if command -v ffmpeg >/dev/null 2>&1; then
-    #     read -rp "FFMPEG is already installed, are you sure you want to continue? (y/n)" confirm
-    #     if [[ $confirm != "y" ]]; then
-    #         echo "Aborting."
-    #         return 0
-    #     fi
-    # fi
+	# local confirm
+	# if command -v ffmpeg >/dev/null 2>&1; then
+	#     read -rp "FFMPEG is already installed, are you sure you want to continue? (y/n)" confirm
+	#     if [[ $confirm != "y" ]]; then
+	#         echo "Aborting."
+	#         return 0
+	#     fi
+	# fi
 
-    # if [ ! -f "/etc/apt/sources.list.d/deb-multimedia.list" ]; then
-    #     # Add Deb Multimedia repository
-    #     echo "Adding Deb Multimedia repository..."
-    #     echo "deb http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee /etc/apt/sources.list.d/deb-multimedia.list >/dev/null
-    #     # echo "deb-src http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee -a /etc/apt/sources.list.d/deb-multimedia.list > /dev/null
-    # fi
-    # # Install Deb Multimedia keyring
-    # echo "Installing Deb Multimedia keyring..."
-    # apt-get update -oAcquire::AllowInsecureRepositories=true
-    # apt-get install -y deb-multimedia-keyring --allow-unauthenticated
+	# if [ ! -f "/etc/apt/sources.list.d/deb-multimedia.list" ]; then
+	#     # Add Deb Multimedia repository
+	#     echo "Adding Deb Multimedia repository..."
+	#     echo "deb http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee /etc/apt/sources.list.d/deb-multimedia.list >/dev/null
+	#     # echo "deb-src http://www.deb-multimedia.org $(lsb_release -sc) main non-free" | tee -a /etc/apt/sources.list.d/deb-multimedia.list > /dev/null
+	# fi
+	# # Install Deb Multimedia keyring
+	# echo "Installing Deb Multimedia keyring..."
+	# apt-get update -oAcquire::AllowInsecureRepositories=true
+	# apt-get install -y deb-multimedia-keyring --allow-unauthenticated
 
-    # # Install ffmpeg non-free
-    # echo "Installing ffmpeg..."
-    # apt-get install -y ffmpeg
-    local repo_url="https://github.com/fa1rid/FFmpeg-Builds/releases/download/latest"
-    local arch=$(uname -m)
-    local file=""
+	# # Install ffmpeg non-free
+	# echo "Installing ffmpeg..."
+	# apt-get install -y ffmpeg
+	local repo_url="https://github.com/fa1rid/FFmpeg-Builds/releases/download/latest"
+	local arch=$(uname -m)
+	local file=""
 
-    if [[ "$arch" == "x86_64" ]]; then
-        file="ffmpeg-master-latest-linux64-nonfree.tar.xz"
-    elif [[ "$arch" == "aarch64" ]]; then
-        file="ffmpeg-master-latest-linuxarm64-nonfree.tar.xz"
-    else
-        echo "Unsupported architecture: $arch"
-        return 1
-    fi
+	if [[ "$arch" == "x86_64" ]]; then
+		file="ffmpeg-master-latest-linux64-nonfree.tar.xz"
+	elif [[ "$arch" == "aarch64" ]]; then
+		file="ffmpeg-master-latest-linuxarm64-nonfree.tar.xz"
+	else
+		echo "Unsupported architecture: $arch"
+		return 1
+	fi
 
-    echo "Downloading $file..."
-    wget -q --show-progress "$repo_url/$file" -O "$file"
+	echo "Downloading $file..."
+	wget -q --show-progress "$repo_url/$file" -O "$file"
 
-    if [[ ! -f "$file" ]]; then
-        echo "Download failed!"
-        return 1
-    fi
+	if [[ ! -f "$file" ]]; then
+		echo "Download failed!"
+		return 1
+	fi
 
-    echo "Extracting $file..."
-    tar -xJf "$file" --strip-components=2 -C /usr/local/bin ${file%.tar.xz}/bin || echo "Failed to extract!" && ffmpeg -version | grep "ffmpeg version"; rm ${file}
+	echo "Extracting $file..."
+	tar -xJf "$file" --strip-components=2 -C /usr/local/bin ${file%.tar.xz}/bin || echo "Failed to extract!" && ffmpeg -version | grep "ffmpeg version"
+	rm ${file}
 }
 
 media_mkvtoolnix_install() {
-    local DISTRO_ID=$(lsb_release -is)
-    local CODENAME=$(lsb_release -sc)
-    local REPO_PATH=""
+	local DISTRO_ID=$(lsb_release -is)
+	local CODENAME=$(lsb_release -sc)
+	local REPO_PATH=""
 
-    # 1. Determine the repository path based on distribution ID
-    if [ "$DISTRO_ID" = "Debian" ]; then
-        REPO_PATH="debian"
-    elif [ "$DISTRO_ID" = "Ubuntu" ]; then
-        REPO_PATH="ubuntu"
-    else
-        echo "Unsupported distribution: $DISTRO_ID. This function is for Debian and Ubuntu only."
-        return 1
-    fi
+	# 1. Determine the repository path based on distribution ID
+	if [ "$DISTRO_ID" = "Debian" ]; then
+		REPO_PATH="debian"
+	elif [ "$DISTRO_ID" = "Ubuntu" ]; then
+		REPO_PATH="ubuntu"
+	else
+		echo "Unsupported distribution: $DISTRO_ID. This function is for Debian and Ubuntu only."
+		return 1
+	fi
 
-    # 2. Add GPG key (using recommended /etc/apt/keyrings path for modern systems)
-    wget -O /usr/share/keyrings/gpg-pub-moritzbunkus.gpg https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg || { echo "Failed to add GPG key" && return 1; }
+	# 2. Add GPG key (using recommended /etc/apt/keyrings path for modern systems)
+	wget -O /usr/share/keyrings/gpg-pub-moritzbunkus.gpg https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg || { echo "Failed to add GPG key" && return 1; }
 
-    # 3. Add repository to sources list using the determined path and codename
-    echo "deb [signed-by=/usr/share/keyrings/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/${REPO_PATH}/ ${CODENAME} main" | tee /etc/apt/sources.list.d/mkvtoolnix.list > /dev/null
+	# 3. Add repository to sources list using the determined path and codename
+	echo "deb [signed-by=/usr/share/keyrings/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/${REPO_PATH}/ ${CODENAME} main" | tee /etc/apt/sources.list.d/mkvtoolnix.list >/dev/null
 
-    echo "Updating package list and installing mkvtoolnix..."
+	echo "Updating package list and installing mkvtoolnix..."
 
-    # 4. Update and install packages
-    apt-get update && apt-get install -y mkvtoolnix
+	# 4. Update and install packages
+	apt-get update && apt-get install -y mkvtoolnix
 }
 # media_mkvtoolnix_install() {
 #     wget -O /usr/share/keyrings/gpg-pub-moritzbunkus.gpg https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg || { echo "Failed to add GPG key" && return 1; }
@@ -4607,145 +4612,145 @@ media_mkvtoolnix_install() {
 # }
 
 gg_bot_upload_assistant_setup() {
-    local REPO_URL="https://gitlab.com/NoobMaster669/gg-bot-upload-assistant.git"
-    local PROJECT_DIR="gg-bot-upload-assistant"
-    local TAG="3.2"
-    local VENV_DIR="venv"
-    local REQUIREMENTS_FILE="requirements/requirements.txt"
-    local CONFIG_SAMPLE="samples/assistant/config.env"
-    local CONFIG_FILE="config.env"
-    local LOG_FILE="install_log.txt"
+	local REPO_URL="https://gitlab.com/NoobMaster669/gg-bot-upload-assistant.git"
+	local PROJECT_DIR="gg-bot-upload-assistant"
+	local TAG="3.2"
+	local VENV_DIR="venv"
+	local REQUIREMENTS_FILE="requirements/requirements.txt"
+	local CONFIG_SAMPLE="samples/assistant/config.env"
+	local CONFIG_FILE="config.env"
+	local LOG_FILE="install_log.txt"
 
-    # Log function
-    log() {
-        echo "$(date +"%Y-%m-%d %T") - $1" | tee -a "$LOG_FILE"
-    }
+	# Log function
+	log() {
+		echo "$(date +"%Y-%m-%d %T") - $1" | tee -a "$LOG_FILE"
+	}
 
-    # Error handling function
-    handle_error() {
-        log "ERROR: $1"
-        exit 1
-    }
+	# Error handling function
+	handle_error() {
+		log "ERROR: $1"
+		exit 1
+	}
 
-    # Update and upgrade system silently and unattended
-    log "Updating system packages..."
-    apt-get update -y && apt-get upgrade -y || handle_error "Failed to update system."
+	# Update and upgrade system silently and unattended
+	log "Updating system packages..."
+	apt-get update -y && apt-get upgrade -y || handle_error "Failed to update system."
 
-    # Install necessary system packages for Python, Git, and dependencies
-    log "Installing required system packages..."
-    apt-get install -y python3 python3-pip python3-venv python3-dev build-essential git || handle_error "Failed to install required packages."
+	# Install necessary system packages for Python, Git, and dependencies
+	log "Installing required system packages..."
+	apt-get install -y python3 python3-pip python3-venv python3-dev build-essential git || handle_error "Failed to install required packages."
 
-    # Clone the repository if it doesn't exist
-    if [ -d "$PROJECT_DIR" ]; then
-        log "Project directory already exists. Skipping cloning."
-    else
-        log "Cloning repository..."
-        git clone "$REPO_URL" || handle_error "Failed to clone repository."
-    fi
+	# Clone the repository if it doesn't exist
+	if [ -d "$PROJECT_DIR" ]; then
+		log "Project directory already exists. Skipping cloning."
+	else
+		log "Cloning repository..."
+		git clone "$REPO_URL" || handle_error "Failed to clone repository."
+	fi
 
-    cd "$PROJECT_DIR" || handle_error "Failed to enter project directory."
+	cd "$PROJECT_DIR" || handle_error "Failed to enter project directory."
 
-    # Checkout the specific tag
-    log "Checking out tag $TAG..."
-    git checkout tags/"$TAG" || handle_error "Failed to checkout tag $TAG."
+	# Checkout the specific tag
+	log "Checking out tag $TAG..."
+	git checkout tags/"$TAG" || handle_error "Failed to checkout tag $TAG."
 
-    # Set up Python virtual environment
-    log "Setting up Python virtual environment..."
-    python3 -m venv "$VENV_DIR" || handle_error "Failed to create virtual environment."
+	# Set up Python virtual environment
+	log "Setting up Python virtual environment..."
+	python3 -m venv "$VENV_DIR" || handle_error "Failed to create virtual environment."
 
-    # Activate virtual environment
-    log "Activating virtual environment..."
+	# Activate virtual environment
+	log "Activating virtual environment..."
 
-    source "$VENV_DIR/bin/activate" || handle_error "Failed to activate virtual environment."
+	source "$VENV_DIR/bin/activate" || handle_error "Failed to activate virtual environment."
 
-    # Upgrade pip and install wheel for modern package installations
-    log "Upgrading pip and installing wheel..."
-    pip install --upgrade pip wheel || handle_error "Failed to upgrade pip or install wheel."
+	# Upgrade pip and install wheel for modern package installations
+	log "Upgrading pip and installing wheel..."
+	pip install --upgrade pip wheel || handle_error "Failed to upgrade pip or install wheel."
 
-    # Install Python dependencies
-    log "Installing Python dependencies from $REQUIREMENTS_FILE..."
-    pip install -r "$REQUIREMENTS_FILE" || handle_error "Failed to install dependencies."
+	# Install Python dependencies
+	log "Installing Python dependencies from $REQUIREMENTS_FILE..."
+	pip install -r "$REQUIREMENTS_FILE" || handle_error "Failed to install dependencies."
 
-    # Make the main script executable
-    log "Making auto_upload.py executable..."
-    chmod u+x auto_upload.py || handle_error "Failed to make auto_upload.py executable."
+	# Make the main script executable
+	log "Making auto_upload.py executable..."
+	chmod u+x auto_upload.py || handle_error "Failed to make auto_upload.py executable."
 
-    # Set up the configuration file if it does not exist
-    if [ -f "$CONFIG_FILE" ]; then
-        log "Configuration file $CONFIG_FILE already exists. Skipping copying."
-    else
-        log "Copying configuration sample to project root..."
-        cp "$CONFIG_SAMPLE" "$CONFIG_FILE" || handle_error "Failed to copy configuration file."
-        log "Please edit $CONFIG_FILE to fill out required values."
-    fi
+	# Set up the configuration file if it does not exist
+	if [ -f "$CONFIG_FILE" ]; then
+		log "Configuration file $CONFIG_FILE already exists. Skipping copying."
+	else
+		log "Copying configuration sample to project root..."
+		cp "$CONFIG_SAMPLE" "$CONFIG_FILE" || handle_error "Failed to copy configuration file."
+		log "Please edit $CONFIG_FILE to fill out required values."
+	fi
 
-    # Completion message
-    log "Setup completed successfully. You can now run the script using:"
-    log "python3 auto_upload.py -t <TRACKERS> -p \"<FILE_OR_FOLDER_TO_BE_UPLOADED>\" [OPTIONAL ARGUMENTS]"
+	# Completion message
+	log "Setup completed successfully. You can now run the script using:"
+	log "python3 auto_upload.py -t <TRACKERS> -p \"<FILE_OR_FOLDER_TO_BE_UPLOADED>\" [OPTIONAL ARGUMENTS]"
 
-    # Deactivate the virtual environment
-    deactivate
-    log "Virtual environment deactivated."
+	# Deactivate the virtual environment
+	deactivate
+	log "Virtual environment deactivated."
 
-    log "Removing"
+	log "Removing"
 	apt-get remove -y python3-dev build-essential
 }
 
 rr_manage() {
-    while true; do
-        echo -e "\033[33m"
-        echo "Choose an option:"
-        echo "1. Install autobrr (autobrr)"
-        echo "2. Upgrade autobrr"
-        echo "3. Manage qBittorrent"
-        echo "4. Install cross-seed"
-        echo "5. Install Prowlarr (prowlarr)"
-        echo "6. Upgrade Prowlarr"
-        echo "0. Quit"
-        echo -e "\033[0m"
-        read -rp "Enter your choice: " choice
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. Install autobrr (autobrr)"
+		echo "2. Upgrade autobrr"
+		echo "3. Manage qBittorrent"
+		echo "4. Install cross-seed"
+		echo "5. Install Prowlarr (prowlarr)"
+		echo "6. Upgrade Prowlarr"
+		echo "0. Quit"
+		echo -e "\033[0m"
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) autobrr_install ;;
-        2) autobrr_upgrade ;;
-        3) qBittorrent_manage ;;
-        4) cross_seed_install ;;
-        5) prowlarr_install ;;
-        6) prowlarr_upgrade ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) autobrr_install ;;
+		2) autobrr_upgrade ;;
+		3) qBittorrent_manage ;;
+		4) cross_seed_install ;;
+		5) prowlarr_install ;;
+		6) prowlarr_upgrade ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 cross_seed_install() {
-    # Check if node is installed
-    if ! command -v node &> /dev/null; then
-        echo "Error: Node.js is not installed. Please install Node.js first."
-        return 1
-    fi
+	# Check if node is installed
+	if ! command -v node &>/dev/null; then
+		echo "Error: Node.js is not installed. Please install Node.js first."
+		return 1
+	fi
 
-    # Check if npm is installed
-    if ! command -v npm &> /dev/null; then
-        echo "Error: npm is not installed. Please install npm (it usually comes with Node.js)."
-        return 1
-    fi
+	# Check if npm is installed
+	if ! command -v npm &>/dev/null; then
+		echo "Error: npm is not installed. Please install npm (it usually comes with Node.js)."
+		return 1
+	fi
 
-    echo "Installing cross-seed..."
-    npm install -g cross-seed
-    
-    # Verify installation was successful
-    if command -v cross-seed &> /dev/null; then
-        cross-seed --version
-    else
-        echo "Error: cross-seed installation failed."
-        return 1
-    fi
+	echo "Installing cross-seed..."
+	npm install -g cross-seed
 
-    echo -e "\nPut config in /root/.cross-seed/ [config.js] [cross-seed.db] [torrent_cache] and press Enter..."
-    read -r
+	# Verify installation was successful
+	if command -v cross-seed &>/dev/null; then
+		cross-seed --version
+	else
+		echo "Error: cross-seed installation failed."
+		return 1
+	fi
 
-    cat <<EOF | tee /etc/systemd/system/cross-seed.service >/dev/null
+	echo -e "\nPut config in /root/.cross-seed/ [config.js] [cross-seed.db] [torrent_cache] and press Enter..."
+	read -r
+
+	cat <<EOF | tee /etc/systemd/system/cross-seed.service >/dev/null
 [Unit]
 Description=cross-seed daemon
 After=syslog.target network-online.target
@@ -4760,38 +4765,38 @@ ExecStart=cross-seed daemon
 WantedBy=multi-user.target
 EOF
 
-    # Reload systemctl daemon
-    systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
+	# Reload systemctl daemon
+	systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
 
-    systemctl enable --now cross-seed.service && systemctl status cross-seed.service || error_exit "Failed to enable and start the service."
+	systemctl enable --now cross-seed.service && systemctl status cross-seed.service || error_exit "Failed to enable and start the service."
 
 }
 
 autobrr_install() {
-    local subdomain
+	local subdomain
 	local SERVICE_USER="autobrr"
 	local SERVICE_GROUP="autobrr"
 
 	# Check if the group exists, if not, create it
-	if ! getent group "$SERVICE_GROUP" > /dev/null; then
+	if ! getent group "$SERVICE_GROUP" >/dev/null; then
 		echo "Creating group $SERVICE_GROUP"
 		groupadd --system "$SERVICE_GROUP"
 	fi
 
 	# Check if the user exists, if not, create it
-	if ! id "$SERVICE_USER" > /dev/null 2>&1; then
+	if ! id "$SERVICE_USER" >/dev/null 2>&1; then
 		echo "Creating system user $SERVICE_USER"
 		useradd --system \
-				--gid "$SERVICE_GROUP" \
-				--no-create-home \
-				--shell /usr/sbin/nologin \
-				--comment "Service account for autobrr" \
-				"$SERVICE_USER"
+			--gid "$SERVICE_GROUP" \
+			--no-create-home \
+			--shell /usr/sbin/nologin \
+			--comment "Service account for autobrr" \
+			"$SERVICE_USER"
 	fi
 
-    mkdir -p /opt/autobrr/config
-    wget "$(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
-    cat <<EOF | tee /etc/systemd/system/autobrr.service >/dev/null
+	mkdir -p /opt/autobrr/config
+	wget "$(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
+	cat <<EOF | tee /etc/systemd/system/autobrr.service >/dev/null
 [Unit]
 Description=autobrr service
 After=syslog.target network-online.target
@@ -4806,12 +4811,12 @@ ExecStart=/opt/autobrr/autobrr --config=/opt/autobrr/config/
 WantedBy=multi-user.target
 EOF
 
-    echo "Creating nginx vHost"
-    mkdir -p "/etc/nginx/sites-available/"
-    
-    read -rp "Enter subdomain for nginx: " subdomain
+	echo "Creating nginx vHost"
+	mkdir -p "/etc/nginx/sites-available/"
 
-    cat >"/etc/nginx/sites-available/autobrr.conf" <<EOF
+	read -rp "Enter subdomain for nginx: " subdomain
+
+	cat >"/etc/nginx/sites-available/autobrr.conf" <<EOF
 server {
     listen 443 ssl;
     http2 on;
@@ -4841,20 +4846,20 @@ server {
 EOF
 	chown -R "$SERVICE_USER":"$SERVICE_GROUP" "/opt/autobrr"
 	chmod -R 750 "/opt/autobrr"
-    nginx_cert_install
-    systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
-    systemctl enable --now autobrr.service && systemctl status autobrr.service || error_exit "Failed to enable and start the service."
-    nginx -t && systemctl reload nginx
+	nginx_cert_install
+	systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
+	systemctl enable --now autobrr.service && systemctl status autobrr.service || error_exit "Failed to enable and start the service."
+	nginx -t && systemctl reload nginx
 }
 
 autobrr_upgrade() {
 	local SERVICE_USER="autobrr"
 	local SERVICE_GROUP="autobrr"
-    systemctl stop autobrr.service
-    wget "$(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
+	systemctl stop autobrr.service
+	wget "$(curl -s https://api.github.com/repos/autobrr/autobrr/releases/latest | grep download | grep "linux_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/autobrr -xzf autobrr*.tar.gz && rm autobrr*.tar.gz
 	chown -R "$SERVICE_USER":"$SERVICE_GROUP" "/opt/autobrr"
 	chmod -R 750 "/opt/autobrr"
-    systemctl start autobrr.service && systemctl status autobrr.service
+	systemctl start autobrr.service && systemctl status autobrr.service
 }
 
 prowlarr_install() {
@@ -4863,14 +4868,13 @@ prowlarr_install() {
 	local GROUP="media"
 	local SHELL="/bin/bash"
 
-    mkdir -p /opt/prowlarr/data
-	
+	mkdir -p /opt/prowlarr/data
 
-	id -u prowlarr &>/dev/null || ( useradd -Nm -g "$GROUP" -s "$SHELL" "$USERNAME" && echo "User '$USERNAME' created successfully." ) || echo "Error: Failed to create user '$USERNAME'"
+	id -u prowlarr &>/dev/null || (useradd -Nm -g "$GROUP" -s "$SHELL" "$USERNAME" && echo "User '$USERNAME' created successfully.") || echo "Error: Failed to create user '$USERNAME'"
 
-    wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/prowlarr/ -xzf Prowlarr*.tar.gz && chown $USERNAME:$GROUP -R /opt/prowlarr && rm Prowlarr*.tar.*
+	wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/prowlarr/ -xzf Prowlarr*.tar.gz && chown $USERNAME:$GROUP -R /opt/prowlarr && rm Prowlarr*.tar.*
 
-    cat << EOF | tee /etc/systemd/system/prowlarr.service > /dev/null
+	cat <<EOF | tee /etc/systemd/system/prowlarr.service >/dev/null
 [Unit]
 Description=Prowlarr Daemon
 After=syslog.target network.target
@@ -4888,140 +4892,139 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-    systemctl daemon-reload && systemctl enable --now prowlarr.service && systemctl status prowlarr.service
+	systemctl daemon-reload && systemctl enable --now prowlarr.service && systemctl status prowlarr.service
 	# journalctl --no-hostname -e -u prowlarr
 }
 
 prowlarr_upgrade() {
-    systemctl stop prowlarr.service
-    wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/prowlarr -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/prowlarr && rm Prowlarr*.tar.*
+	systemctl stop prowlarr.service
+	wget "$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | grep download | grep "linux-core-$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/').tar.gz" | cut -d\" -f4)" && tar -C /opt/prowlarr -xzf Prowlarr*.tar.gz && chown prowlarr:media -R /opt/prowlarr && rm Prowlarr*.tar.*
 
-    systemctl start prowlarr.service && systemctl status prowlarr.service
+	systemctl start prowlarr.service && systemctl status prowlarr.service
 }
 
 qBittorrent_manage() {
-    # https://github.com/userdocs/qbittorrent-nox-static/releases?q=4.6.7&expanded=true
-    # Function to display error message and exit
-    error_exit() {
-        echo "Error: $1" >&2
-        exit 1
-    }
+	# https://github.com/userdocs/qbittorrent-nox-static/releases?q=4.6.7&expanded=true
+	# Function to display error message and exit
+	error_exit() {
+		echo "Error: $1" >&2
+		exit 1
+	}
 
-    # Create Systemd service for current user
-    # local service_dir="$HOME/.config/systemd/user"
-    local service_file="/etc/systemd/system/qbittorrent.service"
-    local install_dir="/opt/qBit"
-    local config_dir="/opt/qBit/qBittorrent/config"
+	# Create Systemd service for current user
+	# local service_dir="$HOME/.config/systemd/user"
+	local service_file="/etc/systemd/system/qbittorrent.service"
+	local install_dir="/opt/qBit"
+	local config_dir="/opt/qBit/qBittorrent/config"
 
-    # Function to hash the password using PBKDF2
-    create_pass() {
-        local pass="$1"
-        local salt_b64=$(openssl rand -base64 16)
-        local salt_hex=$(echo -n "$salt_b64" | openssl base64 -d -A | od -An -t x1 | tr -d ' ')
-        local hash_b64=$(openssl kdf -binary -keylen 64 -kdfopt digest:SHA512 -kdfopt pass:"${pass}" -kdfopt hexsalt:${salt_hex} -kdfopt iter:100000 PBKDF2 | openssl base64 -A)
-        local passLine="\"@ByteArray($salt_b64:$hash_b64)\""
-        echo "$passLine"
-    }
-    upgrade_qbittorrent() {
-        local download_url
-        local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
-        local arch=$(uname -m)
-        case "$arch" in
-        x86_64)
-            download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
-            ;;
-        aarch64)
-            download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
-            ;;
-        *)
-            error_exit "Unsupported architecture: $arch"
-            ;;
-        esac
+	# Function to hash the password using PBKDF2
+	create_pass() {
+		local pass="$1"
+		local salt_b64=$(openssl rand -base64 16)
+		local salt_hex=$(echo -n "$salt_b64" | openssl base64 -d -A | od -An -t x1 | tr -d ' ')
+		local hash_b64=$(openssl kdf -binary -keylen 64 -kdfopt digest:SHA512 -kdfopt pass:"${pass}" -kdfopt hexsalt:${salt_hex} -kdfopt iter:100000 PBKDF2 | openssl base64 -A)
+		local passLine="\"@ByteArray($salt_b64:$hash_b64)\""
+		echo "$passLine"
+	}
+	upgrade_qbittorrent() {
+		local download_url
+		local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
+		local arch=$(uname -m)
+		case "$arch" in
+		x86_64)
+			download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
+			;;
+		aarch64)
+			download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
+			;;
+		*)
+			error_exit "Unsupported architecture: $arch"
+			;;
+		esac
 
-        # Download qBittorrent
-        wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
-        chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
-        chown qbittorrent:media -R "$install_dir"
-        systemctl restart qbittorrent.service && systemctl status qbittorrent.service
-    }
-    # Function to install qBittorrent
-    install_qbittorrent() {
-        local choice
-        local download_url
-        local arch
+		# Download qBittorrent
+		wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
+		chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
+		chown qbittorrent:media -R "$install_dir"
+		systemctl restart qbittorrent.service && systemctl status qbittorrent.service
+	}
+	# Function to install qBittorrent
+	install_qbittorrent() {
+		local choice
+		local download_url
+		local arch
 		local dl_dir="/root/dl"
 		chmod 701 /root
 
-        echo "1. Latest"
-        echo "2. v4.6.7"
-        echo "3. v5.1.2"
-        while true; do
-            read -rp "Which version you want to install? " choice
-            case "$choice" in
-            1)
-                # Get latest version
-                local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
-                break
-                ;;
-            2)
-                local version="release-4.6.7_v1.2.19"
-                break
-                ;;
-            3)
-                local version="release-5.1.2_v1.2.20"
-                break
-                ;;
-            *)
-                echo "Invalid choice."
-                ;;
-            esac
-        done
+		echo "1. Latest"
+		echo "2. v4.6.7"
+		echo "3. v5.1.2"
+		while true; do
+			read -rp "Which version you want to install? " choice
+			case "$choice" in
+			1)
+				# Get latest version
+				local version=$(curl -sL https://github.com/userdocs/qbittorrent-nox-static/releases/latest/download/dependency-version.json | jq -r '. | "release-\(.qbittorrent)_v\(.libtorrent_1_2)"') || error_exit "Failed to get latest version."
+				break
+				;;
+			2)
+				local version="release-4.6.7_v1.2.19"
+				break
+				;;
+			3)
+				local version="release-5.1.2_v1.2.20"
+				break
+				;;
+			*)
+				echo "Invalid choice."
+				;;
+			esac
+		done
 
-        # Download latest version that matches current system arch
-        arch=$(uname -m)
-        case "$arch" in
-        x86_64)
-            download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
-            ;;
-        aarch64)
-            download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
-            ;;
-        *)
-            error_exit "Unsupported architecture: $arch"
-            ;;
-        esac
+		# Download latest version that matches current system arch
+		arch=$(uname -m)
+		case "$arch" in
+		x86_64)
+			download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/x86_64-qbittorrent-nox"
+			;;
+		aarch64)
+			download_url="https://github.com/userdocs/qbittorrent-nox-static/releases/download/$version/aarch64-qbittorrent-nox"
+			;;
+		*)
+			error_exit "Unsupported architecture: $arch"
+			;;
+		esac
 
-        if ! getent group "media" >/dev/null 2>&1; then
-            groupadd "media"
-        fi
-        if ! id "qbittorrent" &>/dev/null; then
-            useradd -Nm -g media -s /bin/bash qbittorrent
-        fi
-        mkdir -p "$config_dir"
-        
+		if ! getent group "media" >/dev/null 2>&1; then
+			groupadd "media"
+		fi
+		if ! id "qbittorrent" &>/dev/null; then
+			useradd -Nm -g media -s /bin/bash qbittorrent
+		fi
+		mkdir -p "$config_dir"
 
-        # Download qBittorrent
-        wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
-        chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
+		# Download qBittorrent
+		wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
+		chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
 
-        # Ask for port and validate
-        read -rp "Enter port for qBittorrent WebUI: " port
-        if ! [[ "$port" =~ ^[0-9]+$ ]]; then
-            error_exit "Port must be a valid number."
-        fi
+		# Ask for port and validate
+		read -rp "Enter port for qBittorrent WebUI: " port
+		if ! [[ "$port" =~ ^[0-9]+$ ]]; then
+			error_exit "Port must be a valid number."
+		fi
 
-        # Ask for username and password
-        read -rp "Enter username for qBittorrent WebUI: " username
-        read -rsp "Enter password for qBittorrent WebUI: " password
-        echo # Newline after password input
+		# Ask for username and password
+		read -rp "Enter username for qBittorrent WebUI: " username
+		read -rsp "Enter password for qBittorrent WebUI: " password
+		echo # Newline after password input
 
-        # Hash the password
-        password_hash=$(create_pass "$password")
+		# Hash the password
+		password_hash=$(create_pass "$password")
 
-mkdir -p "$dl_dir"
-chmod 777 "$dl_dir"
-        # Create Config File
-        cat <<EOF >"$config_dir/qBittorrent.conf"
+		mkdir -p "$dl_dir"
+		chmod 777 "$dl_dir"
+		# Create Config File
+		cat <<EOF >"$config_dir/qBittorrent.conf"
 [Application]
 FileLogger\Enabled=false
 
@@ -5074,9 +5077,9 @@ WebUI\Username=$username
 WebUI\Password_PBKDF2=$password_hash
 EOF
 
-        # Create Systemd service for current user
-        # mkdir -p "$service_dir" || error_exit "Failed to create systemd user service directory."
-        cat <<EOF >"$service_file"
+		# Create Systemd service for current user
+		# mkdir -p "$service_dir" || error_exit "Failed to create systemd user service directory."
+		cat <<EOF >"$service_file"
 [Unit]
 Description=qBittorrent-nox service
 Wants=network-online.target
@@ -5095,24 +5098,24 @@ Group=media
 WantedBy=default.target
 EOF
 
-        chown qbittorrent:media -R "$install_dir"
+		chown qbittorrent:media -R "$install_dir"
 
-        # Reload systemctl daemon
-        systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
+		# Reload systemctl daemon
+		systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
 
-        # Enable and start service
-        systemctl enable --now qbittorrent.service && systemctl status qbittorrent.service || error_exit "Failed to enable and start the service."
+		# Enable and start service
+		systemctl enable --now qbittorrent.service && systemctl status qbittorrent.service || error_exit "Failed to enable and start the service."
 
-        # Check service status
-        # systemctl --user status qbittorrent
+		# Check service status
+		# systemctl --user status qbittorrent
 
-        # Keep services running always
-        # loginctl enable-linger
-        # Check if linger is enabled:  loginctl show-user username | grep Linger
+		# Keep services running always
+		# loginctl enable-linger
+		# Check if linger is enabled:  loginctl show-user username | grep Linger
 
-        echo "qBittorrent installed and configured successfully!"
+		echo "qBittorrent installed and configured successfully!"
 
-        cat <<EOF
+		cat <<EOF
 Nginx proxy configuration:
 location / {
     proxy_pass               http://127.0.0.1:$port/;
@@ -5124,22 +5127,22 @@ location / {
     proxy_cookie_path / "/; Secure";
 }
 EOF
-    }
+	}
 
-    uninstall_qbittorrent() {
-        read -rp "Are you sure you want to uninstall? (y/n)" confirm
-        if [[ $confirm != "y" ]]; then
-            echo "Aborting."
-            return 0
-        fi
-        systemctl stop qbittorrent.service
-        rm "$service_file"
-        systemctl daemon-reload
-        rm -rf "$install_dir"
+	uninstall_qbittorrent() {
+		read -rp "Are you sure you want to uninstall? (y/n)" confirm
+		if [[ $confirm != "y" ]]; then
+			echo "Aborting."
+			return 0
+		fi
+		systemctl stop qbittorrent.service
+		rm "$service_file"
+		systemctl daemon-reload
+		rm -rf "$install_dir"
 
-    }
+	}
 
-    qbit_config_set() {
+	qbit_config_set() {
 		local section="Preferences"
 		local key="$1"
 		local val="$2"
@@ -5161,169 +5164,178 @@ EOF
 		fi
 	}
 
-    # Function to reset username and password for the web UI
-    reset_username_password() {
-		if ! command -v crudini &> /dev/null; then
-			apt-get install crudini -y || { echo "Failed to install crudini"; return 1; }
+	# Function to reset username and password for the web UI
+	reset_username_password() {
+		if ! command -v crudini &>/dev/null; then
+			apt-get install crudini -y || {
+				echo "Failed to install crudini"
+				return 1
+			}
 		fi
-		
-        # Ask for new username and password
-        read -rp "Enter new username for qBittorrent WebUI: " new_username
-        read -rsp "Enter new password for qBittorrent WebUI (hidden): " new_password
-        echo # Newline after password input
 
-        # Hash the password
-        new_password_hash=$(create_pass "$new_password")
-        echo
-        echo "New Hash: $new_password_hash"
-        echo
+		# Ask for new username and password
+		read -rp "Enter new username for qBittorrent WebUI: " new_username
+		read -rsp "Enter new password for qBittorrent WebUI (hidden): " new_password
+		echo # Newline after password input
 
-        # Update Config File with new username and password
-        if [[ -f "$config_dir/qBittorrent.conf" ]]; then
+		# Hash the password
+		new_password_hash=$(create_pass "$new_password")
+		echo
+		echo "New Hash: $new_password_hash"
+		echo
 
-            systemctl stop qbittorrent.service || { echo "Failed to stop qbittorrent.service"; return 1; }
+		# Update Config File with new username and password
+		if [[ -f "$config_dir/qBittorrent.conf" ]]; then
+
+			systemctl stop qbittorrent.service || {
+				echo "Failed to stop qbittorrent.service"
+				return 1
+			}
 
 			qbit_config_set "WebUI\\Username" "$new_username" "$config_dir/qBittorrent.conf" || return 1
 			qbit_config_set "WebUI\\Password_PBKDF2" "$new_password_hash" "$config_dir/qBittorrent.conf" || return 1
 
-            systemctl start qbittorrent.service || { echo "Failed to start qbittorrent.service"; return 1; }
+			systemctl start qbittorrent.service || {
+				echo "Failed to start qbittorrent.service"
+				return 1
+			}
 
-        else
-            error_exit "qBittorrent configuration file not found. Please install qBittorrent first."
-        fi
-    }
+		else
+			error_exit "qBittorrent configuration file not found. Please install qBittorrent first."
+		fi
+	}
 
-    # Menu
-    echo -e "\033[33m"
-    echo "Welcome to qBittorrent Setup"
-    echo "1. Install qBittorrent"
-    echo "2. Upgrade qBittorrent"
-    echo "3. Uninstall qBittorrent"
-    echo "4. Reset username and password for the web UI"
-    echo -e "\033[0m"
-    read -rp "Enter your choice: " choice
+	# Menu
+	echo -e "\033[33m"
+	echo "Welcome to qBittorrent Setup"
+	echo "1. Install qBittorrent"
+	echo "2. Upgrade qBittorrent"
+	echo "3. Uninstall qBittorrent"
+	echo "4. Reset username and password for the web UI"
+	echo -e "\033[0m"
+	read -rp "Enter your choice: " choice
 
-    case "$choice" in
-    1)
-        install_qbittorrent
-        ;;
-    2)
-        upgrade_qbittorrent
-        ;;
-    3)
-        uninstall_qbittorrent
-        ;;
-    4)
-        reset_username_password
-        ;;
-    *)
-        error_exit "Invalid choice. Exiting."
-        ;;
-    esac
+	case "$choice" in
+	1)
+		install_qbittorrent
+		;;
+	2)
+		upgrade_qbittorrent
+		;;
+	3)
+		uninstall_qbittorrent
+		;;
+	4)
+		reset_username_password
+		;;
+	*)
+		error_exit "Invalid choice. Exiting."
+		;;
+	esac
 }
 
 nodejs_manage() {
-    while true; do
-        echo "Choose an option:"
-        echo "1. Install Node.js"
-        echo "2. Remove (purge) Node.js"
-        echo "3. Create Node.js Service"
-        echo "0. Quit"
+	while true; do
+		echo "Choose an option:"
+		echo "1. Install Node.js"
+		echo "2. Remove (purge) Node.js"
+		echo "3. Create Node.js Service"
+		echo "0. Quit"
 
-        read -rp "Enter your choice: " choice
+		read -rp "Enter your choice: " choice
 
-        case $choice in
-        1) nodejs_install ;;
-        2) nodejs_remove ;;
-        3) nodejs_create_service ;;
-        0) return 0 ;;
-        *) echo "Invalid choice." ;;
-        esac
-    done
+		case $choice in
+		1) nodejs_install ;;
+		2) nodejs_remove ;;
+		3) nodejs_create_service ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
 }
 
 nodejs_remove() {
-    local confirm
-    read -rp "This will purge Node.js.. Are you sure? (y/n): " confirm
+	local confirm
+	read -rp "This will purge Node.js.. Are you sure? (y/n): " confirm
 
-    if [[ $confirm != "y" ]]; then
-        echo "Aborting."
-        return 0
-    fi
-    # Purge PHP packages
-    apt purge -y nodejs && apt-get autoremove -y && echo "nodejs has been purged."
+	if [[ $confirm != "y" ]]; then
+		echo "Aborting."
+		return 0
+	fi
+	# Purge PHP packages
+	apt purge -y nodejs && apt-get autoremove -y && echo "nodejs has been purged."
 }
 
 nodejs_install() {
-    local confirm
-    local VERSION
-    if command -v node >/dev/null 2>&1 || [ -f "/etc/apt/sources.list.d/nodesource.list" ]; then
-        read -rp "node/repo is already installed, are you sure you want to continue? (y/n)" confirm
-        if [[ $confirm != "y" ]]; then
-            echo "Aborting."
-            return 0
-        fi
-    fi
+	local confirm
+	local VERSION
+	if command -v node >/dev/null 2>&1 || [ -f "/etc/apt/sources.list.d/nodesource.list" ]; then
+		read -rp "node/repo is already installed, are you sure you want to continue? (y/n)" confirm
+		if [[ $confirm != "y" ]]; then
+			echo "Aborting."
+			return 0
+		fi
+	fi
 
-    echo "Available Node.js versions:"
-    echo "1. Node 18x"
-    echo "2. Node 20x"
-    echo "3. Node 22x"
-    echo "4. Node 24x"
-    # Prompt user for version choice
-    read -rp "Enter the number corresponding to the Node.js version you want to install: " choice
-    case $choice in
-    1) VERSION="18" ;;
-    2) VERSION="20" ;;
-    3) VERSION="22" ;;
-    4) VERSION="24" ;;
-    *)
-        echo "Invalid choice!"
-        nodejs_install
-        ;;
-    esac
-    # Add NodeSource repository
-    curl -fsSL https://deb.nodesource.com/setup_$VERSION.x | bash -s -- || {
-        echo "Failed adding repo"
-        return 1
-    }
-    # Install Node.js and npm
-    apt-get install -y nodejs && echo "Node.js version $VERSION.x has been installed."
+	echo "Available Node.js versions:"
+	echo "1. Node 18x"
+	echo "2. Node 20x"
+	echo "3. Node 22x"
+	echo "4. Node 24x"
+	# Prompt user for version choice
+	read -rp "Enter the number corresponding to the Node.js version you want to install: " choice
+	case $choice in
+	1) VERSION="18" ;;
+	2) VERSION="20" ;;
+	3) VERSION="22" ;;
+	4) VERSION="24" ;;
+	*)
+		echo "Invalid choice!"
+		nodejs_install
+		;;
+	esac
+	# Add NodeSource repository
+	curl -fsSL https://deb.nodesource.com/setup_$VERSION.x | bash -s -- || {
+		echo "Failed adding repo"
+		return 1
+	}
+	# Install Node.js and npm
+	apt-get install -y nodejs && echo "Node.js version $VERSION.x has been installed."
 }
 
 sys_more_pkg_install() {
-    apt-get update && apt-get install -y build-essential software-properties-common python3-full python3 python3-pip python3-venv
+	apt-get update && apt-get install -y build-essential software-properties-common python3-full python3 python3-pip python3-venv
 
-    echo "More Packages installation complete."
+	echo "More Packages installation complete."
 }
 
 mount_usb_install() {
-    # Update package lists and install necessary packages
-    apt-get update && apt-get install -y udiskie udisks2
+	# Update package lists and install necessary packages
+	apt-get update && apt-get install -y udiskie udisks2
 
-    # Create the udiskie configuration directory
-    mkdir -p /root/.config/udiskie
+	# Create the udiskie configuration directory
+	mkdir -p /root/.config/udiskie
 
-    # Create the udiskie configuration file
-    cat <<EOL >/root/.config/udiskie/config.yml
+	# Create the udiskie configuration file
+	cat <<EOL >/root/.config/udiskie/config.yml
 device_config:
   - options:
     - umask=000
 EOL
 
-    cat <<EOL >/etc/polkit-1/localauthority/50-local.d/consolekit.pkla
+	cat <<EOL >/etc/polkit-1/localauthority/50-local.d/consolekit.pkla
 [udiskie]
 Identity=unix-group:root
 Action=org.freedesktop.udisks.*
 ResultAny=yes
 EOL
 
-    cat <<EOL >/etc/udev/rules.d/99-udisks2.rules
+	cat <<EOL >/etc/udev/rules.d/99-udisks2.rules
 ENV{ID_FS_USAGE}=="filesystem|other|crypto", ENV{UDISKS_FILESYSTEM_SHARED}="1"
 EOL
 
-    # Create a systemd service file for udiskie
-    cat <<EOL >/etc/systemd/system/udiskie.service
+	# Create a systemd service file for udiskie
+	cat <<EOL >/etc/systemd/system/udiskie.service
 [Unit]
 Description=Udiskie Automounter
 After=local-fs.target
@@ -5338,141 +5350,141 @@ User=root
 WantedBy=multi-user.target
 EOL
 
-    udevadm control --reload-rules
-    udevadm trigger
+	udevadm control --reload-rules
+	udevadm trigger
 
-    systemctl daemon-reload
-    systemctl enable udiskie
-    systemctl restart udiskie
+	systemctl daemon-reload
+	systemctl enable udiskie
+	systemctl restart udiskie
 }
 
 # Function to check for updates
 update_check() {
-    local github_repo="fa1rid/linux-setup"
-    local script_name="Servo.sh"
-    local script_folder="setup_menu"
-    local SCRIPT_URL="https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name"
-    local TMP_SCRIPT="/tmp/${script_name}"
-    local BACKUP_SCRIPT="$0.bak"
-    local new_version
-    local answer
+	local github_repo="fa1rid/linux-setup"
+	local script_name="Servo.sh"
+	local script_folder="setup_menu"
+	local SCRIPT_URL="https://raw.githubusercontent.com/$github_repo/main/${script_folder}/$script_name"
+	local TMP_SCRIPT="/tmp/${script_name}"
+	local BACKUP_SCRIPT="$0.bak"
+	local new_version
+	local answer
 
-    if ! command -v wget &>/dev/null; then
-        apt-get update && apt-get install -y wget
-    fi
+	if ! command -v wget &>/dev/null; then
+		apt-get update && apt-get install -y wget
+	fi
 
-    echo "Checking for updates..."
-    if ! wget --quiet -O "$TMP_SCRIPT" "$SCRIPT_URL"; then
-        echo "Failed to download the latest version."
-        rm -f "$TMP_SCRIPT"
-        echo "Cleanup done."
-        return 1
-    fi
+	echo "Checking for updates..."
+	if ! wget --quiet -O "$TMP_SCRIPT" "$SCRIPT_URL"; then
+		echo "Failed to download the latest version."
+		rm -f "$TMP_SCRIPT"
+		echo "Cleanup done."
+		return 1
+	fi
 
-    new_version=$(grep -o 'servo_version="[0-9.]*"' "$TMP_SCRIPT" | cut -d '"' -f 2)
+	new_version=$(grep -o 'servo_version="[0-9.]*"' "$TMP_SCRIPT" | cut -d '"' -f 2)
 
-    if [ "$new_version" != "$servo_version" ]; then
-        echo "New version available (v$new_version)."
-        read -rp "Do you want to update? (Y/n): " answer
-        answer=${answer:-Y}
-        if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
-            echo "Updating to version $new_version..."
-            mv "$0" "$BACKUP_SCRIPT"
-            mv "$TMP_SCRIPT" "$0"
-            chmod +x "$0"
-            echo "Update complete. Please run the script again."
-            exit 0
-        else
-            echo "Skipping update."
-        fi
-    else
-        echo "No updates available."
-    fi
+	if [ "$new_version" != "$servo_version" ]; then
+		echo "New version available (v$new_version)."
+		read -rp "Do you want to update? (Y/n): " answer
+		answer=${answer:-Y}
+		if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
+			echo "Updating to version $new_version..."
+			mv "$0" "$BACKUP_SCRIPT"
+			mv "$TMP_SCRIPT" "$0"
+			chmod +x "$0"
+			echo "Update complete. Please run the script again."
+			exit 0
+		else
+			echo "Skipping update."
+		fi
+	else
+		echo "No updates available."
+	fi
 }
 
 version() {
-    echo ${servo_version}
+	echo ${servo_version}
 }
 
 main() {
-    if [[ $EUID -eq 0 ]]; then
-        if [[ ! -d "$cron_dir_user" ]]; then
-            mkdir -p "${cron_dir_user}"
-        fi
-    fi
+	if [[ $EUID -eq 0 ]]; then
+		if [[ ! -d "$cron_dir_user" ]]; then
+			mkdir -p "${cron_dir_user}"
+		fi
+	fi
 
-    if [ $# -ge 1 ]; then
-        local function_name="$1"
-        shift # Remove the function name from the argument list
-        "$function_name" "$@"
-    else
-        # Define an array where each element contains "function|option"
-        local menu=(
-            "exit                       | Exit"
-            "update_check               | Update Script"
-            "sys_manage                 | System"
-            "net_manage                 | Network"
-            "comp_manage                | Compression"
-            "wordpress_manage           | Wordpress"
-            "nginx_manage               | Nginx"
-            "mariadb_manage             | Database"
-            "php_manage                 | PHP"
-            "certbot_manage             | Certbot"
-            "rsync_manage               | Rsync/Rclone"
-            "memcached_manage           | Memcached"
-            "docker_manage              | Docker"
-            "nodejs_manage              | Node.js"
-            "media_manage               | Media"
-            "perm_set                   | Files/Folders Permissions"
-            "rr_manage                    | Manage *rr apps"
-        )
-        # Alternative way of spliting menu
-        # awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//'
-        # awk -F '|' '{print $1}' | sed 's/[[:space:]]*$//'
+	if [ $# -ge 1 ]; then
+		local function_name="$1"
+		shift # Remove the function name from the argument list
+		"$function_name" "$@"
+	else
+		# Define an array where each element contains "function|option"
+		local menu=(
+			"exit                       | Exit"
+			"update_check               | Update Script"
+			"sys_manage                 | System"
+			"net_manage                 | Network"
+			"comp_manage                | Compression"
+			"wordpress_manage           | Wordpress"
+			"nginx_manage               | Nginx"
+			"mariadb_manage             | Database"
+			"php_manage                 | PHP"
+			"certbot_manage             | Certbot"
+			"rsync_manage               | Rsync/Rclone"
+			"memcached_manage           | Memcached"
+			"docker_manage              | Docker"
+			"nodejs_manage              | Node.js"
+			"media_manage               | Media"
+			"perm_set                   | Files/Folders Permissions"
+			"rr_manage                    | Manage *rr apps"
+		)
+		# Alternative way of spliting menu
+		# awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//'
+		# awk -F '|' '{print $1}' | sed 's/[[:space:]]*$//'
 
-        # Display the menu
-        while true; do
-            clear # Clear the screen
-            if [[ $EUID -ne 0 ]]; then
-                echo -e "\033[91m===== Warning: running as non root =====\033[0m"
-            fi
-            echo -e "\033[93m===== Farid's Setup Menu v${servo_version} =====\033[92m"
+		# Display the menu
+		while true; do
+			clear # Clear the screen
+			if [[ $EUID -ne 0 ]]; then
+				echo -e "\033[91m===== Warning: running as non root =====\033[0m"
+			fi
+			echo -e "\033[93m===== Farid's Setup Menu v${servo_version} =====\033[92m"
 
-            # Iterate through the menu array and display menu options with numbers
-            local index
-            for index in "${!menu[@]}"; do
-                option_description=$(echo "${menu[index]}" | sed -E 's/ +\| */\t/g' | cut -f 2)
-                echo "$((index)). $option_description"
-            done
+			# Iterate through the menu array and display menu options with numbers
+			local index
+			for index in "${!menu[@]}"; do
+				option_description=$(echo "${menu[index]}" | sed -E 's/ +\| */\t/g' | cut -f 2)
+				echo "$((index)). $option_description"
+			done
 
-            echo -e "\033[93mAvailable functions:\033[94m"
-            echo "  db_backup [database_name] [save_location]"
-            echo "  db_restore [database_name] [db_filename]"
-            echo "  decompress [filename]"
-            echo "  compress [7z   bz2  gz   tar  xz   zip] [filename]"
-            echo "  gen_pass [length] [min_numbers] [min_special_chars]"
-            echo "  perm_set <target> <user> <group>"
-            echo "  rsync_push_letsencrypt <path> <host> <port> <user>"
-            echo "  rsync_push_ssl <path> <host> <port> <user>"
-            echo "  sys_init"
-            echo -e "\033[93m===============================\033[0m"
+			echo -e "\033[93mAvailable functions:\033[94m"
+			echo "  db_backup [database_name] [save_location]"
+			echo "  db_restore [database_name] [db_filename]"
+			echo "  decompress [filename]"
+			echo "  compress [7z   bz2  gz   tar  xz   zip] [filename]"
+			echo "  gen_pass [length] [min_numbers] [min_special_chars]"
+			echo "  perm_set <target> <user> <group>"
+			echo "  rsync_push_letsencrypt <path> <host> <port> <user>"
+			echo "  rsync_push_ssl <path> <host> <port> <user>"
+			echo "  sys_init"
+			echo -e "\033[93m===============================\033[0m"
 
-            # Prompt the user for a choice
-            local choice
-            read -rp "Enter your choice (0-$((${#menu[@]} - 1))): " choice
-            if [[ ! $choice =~ ^[0-9]+$ ]]; then
-                continue
-            fi
-            ((choice = 10#$choice))
-            # Check if the choice is within a valid range
-            if [ "$choice" -lt ${#menu[@]} ]; then
-                selected_option="${menu[choice]}"
-                function_name=$(echo "$selected_option" | sed -E 's/ +\| */\t/g' | cut -f 1)
-                $function_name
-                read -n 1 -srp "Press any key to continue..."
-            fi
-        done
-    fi
+			# Prompt the user for a choice
+			local choice
+			read -rp "Enter your choice (0-$((${#menu[@]} - 1))): " choice
+			if [[ ! $choice =~ ^[0-9]+$ ]]; then
+				continue
+			fi
+			((choice = 10#$choice))
+			# Check if the choice is within a valid range
+			if [ "$choice" -lt ${#menu[@]} ]; then
+				selected_option="${menu[choice]}"
+				function_name=$(echo "$selected_option" | sed -E 's/ +\| */\t/g' | cut -f 1)
+				$function_name
+				read -n 1 -srp "Press any key to continue..."
+			fi
+		done
+	fi
 }
 
 main "$@"
@@ -5654,7 +5666,7 @@ main "$@"
 # -L         transform symlink into referent file/dir
 #-----------------------------------
 # Rsync daemon "/etc/rsyncd.conf"
-# Example Usage: 
+# Example Usage:
 # rsync rsync://server.net/
 # rsync -ahPL "rsync://server.net/downloads/video.mkv" ./folder/
 # (uses port 873)
@@ -5728,7 +5740,7 @@ main "$@"
 
 # Mount after adding fstab without reboot
 # systemctl daemon-reload
-# mount -a 
+# mount -a
 
 # tune2fs -m 0 /dev/sdb # change reserved space (not needed if -m is used in mkfs.ext4)
 # findmnt /mnt/media
@@ -5846,7 +5858,7 @@ main "$@"
 # export https_proxy=http://<username>:<password>@<proxy-ip>:<proxy-port>
 # To make the proxy settings permanent, add these export lines to your ~/.bashrc or ~/.bash_profile file.
 ##########################
-# Cron / crontab 
+# Cron / crontab
 ##########################
 # For a specific user, the cron entries from crontab -l are stored in a file called
 # /var/spool/cron/crontabs/<username>
@@ -5891,4 +5903,3 @@ main "$@"
 ##########################
 #
 ##########################
-
