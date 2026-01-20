@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="1.0.2"
+servo_version="1.0.3"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1869,6 +1869,26 @@ db_create() {
         GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'$DB_HOST';
         FLUSH PRIVILEGES;
     "
+	# Manual usage
+	# mariadb -e "CREATE USER 'dbuser'@'localhost' IDENTIFIED BY 'dbpass';"
+
+	# # change host
+	# mariadb -e "RENAME USER 'dbuser'@'10.0.0.%' TO 'dbuser'@'%'; FLUSH PRIVILEGES;"
+
+	# # list users
+	# SELECT User, Host FROM mysql.user;
+
+	# # Change user password
+	# ALTER USER 'dbuser'@'%' IDENTIFIED BY 'dbpass6'; FLUSH PRIVILEGES;
+
+	# # Show user's permissions
+	# SHOW GRANTS FOR 'dbuser'@'%';
+
+	# # login as user
+	# mariadb -u dbuser -p
+
+	# # Create db,user,password and set host
+	# Servo.sh db_create db dbuser 'dbpass' %
 }
 
 db_config_read() {
@@ -3329,7 +3349,7 @@ net_tune_kernel() {
 	echo "net.core.netdev_max_backlog = 16384" | tee -a /etc/sysctl.d/tune_kernel.conf
 	echo "net.core.netdev_budget = 1000" | tee -a /etc/sysctl.d/tune_kernel.conf
 	echo "net.ipv4.tcp_slow_start_after_idle = 0" | tee -a /etc/sysctl.d/tune_kernel.conf
-	echo "net.ipv4.tcp_max_syn_backlog = 4096" | tee -a /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.tcp_max_syn_backlog = 8192" | tee -a /etc/sysctl.d/tune_kernel.conf
 	echo "net.ipv4.tcp_max_tw_buckets = 1440000" | tee -a /etc/sysctl.d/tune_kernel.conf
 	echo "net.netfilter.nf_conntrack_max = 1048576" | tee -a /etc/sysctl.d/tune_kernel.conf
 	echo "net.netfilter.nf_conntrack_buckets = 262144" | tee -a /etc/sysctl.d/tune_kernel.conf
@@ -4354,6 +4374,15 @@ EOFX
 	cat >"$sinfo_script" <<'EOF'
 #!/bin/bash
 
+# Check if the reboot file exists
+if [ -f /var/run/reboot-required ]; then
+    # Extract package names, replace newlines with commas for a single-line output
+    reasons=$(cat /var/run/reboot-required.pkgs 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+    reboot_msg=" \e[93mReboot needed! ($reasons)\e[0m"
+else
+    reboot_msg=""
+fi
+
 # Get Script version
 script_version=$(Servo.sh version)
 
@@ -4367,7 +4396,7 @@ os_info=$(lsb_release -d -s 2>/dev/null || cat /etc/os-release | grep PRETTY_NAM
 kernel_info=$(uname -smr)
 
 # Get uptime
-uptime_info=$(uptime -p | sed 's/up //')
+uptime_info=$(uptime -p | sed 's/up //')$reboot_msg
 
 # Get package count
 package_count=$(dpkg -l | grep -c '^ii' 2>/dev/null || rpm -qa --last | wc -l 2>/dev/null)
@@ -5643,27 +5672,23 @@ main "$@"
 ##########################
 # Rsync
 ##########################
-## Commands to Migrate Solaris Server
-# rsync --stats -zahL --info=progress2 --info=name0 --no-inc-recursive "/root/.ssh/id_ed25519.pub" "/root/.ssh/id_ed25519" -e "ssh -p 4444" "root@${ip}:/root/.ssh/"
-# rsync --stats -zahL --info=progress2 --info=name0 --no-inc-recursive "/root/.config/rsnapshot/" -e "ssh -p 4444" "root@${ip}:/root/.config/rsnapshot/"
-# rsync --stats -zahL --info=progress2 --info=name0 --no-inc-recursive "/var/www/solaris/solarissolutions.co/" -e "ssh -p 4444" "root@${ip):/var/www/solaris/solarissolutions.co/"
+# rsync --log-file="/var/log/rsync/...log" -zahL --info=progress2 -e "ssh -p 22" "root@ip:/root/Downloads/" "."
 
-# rsync --log-file="/var/log/rsync/...log" -zahL --info=progress2 --info=name0 --no-inc-recursive -e "ssh -p 4444" "root@10.0.0.3:/root/Downloads/" "."
-
-# -u         skip files that are newer on the receiver
-# -a         archive mode is -rlptgoD (no -A,-X,-U,-N,-H)
-# -r           recurse into directories
-# -l           copy symlinks as symlinks
-# -t           preserve modification times
-# -g           preserve group
-# -o           preserve owner (super-user only)
-# -D           same as --devices --specials
-# -v         increase verbosity
-# -h         output numbers in a human-readable format
-# -z         compress file data during the transfer
-# -p         preserve permissions
-# -P         same as --partial --progress (show progress during transfer)
-# -L         transform symlink into referent file/dir
+# -R   use relative path names
+# -u   skip files that are newer on the receiver
+# -a   archive mode is -rlptgoD (no -A,-X,-U,-N,-H)
+# -r     recurse into directories
+# -l     copy symlinks as symlinks
+# -t     preserve modification times
+# -g     preserve group
+# -o     preserve owner (super-user only)
+# -D     same as --devices --specials
+# -v   increase verbosity
+# -h   output numbers in a human-readable format
+# -z   compress file data during the transfer
+# -p   preserve permissions
+# -P   same as --partial --progress (show progress during transfer)
+# -L   transform symlink into referent file/dir
 #-----------------------------------
 # Rsync daemon "/etc/rsyncd.conf"
 # Example Usage:
@@ -5900,6 +5925,13 @@ main "$@"
 # systemctl reset-failed 'wg-quick@wg0'
 # or for all
 # systemctl reset-failed
+##########################
+# Kernel
+##########################
+# Remove cloud kernel and install normal
+# apt install linux-image-amd64 && apt autoremove purge linux-image-cloud-amd64
+# or
+# apt install linux-image-amd64 && apt purge linux-image-cloud-amd64 linux-image-6.12.xx+deb13-cloud-amd64*
 ##########################
 #
 ##########################
