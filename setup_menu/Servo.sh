@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="1.0.3"
+servo_version="1.0.4"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1276,7 +1276,7 @@ EOFX
 
 nginx_cert_install() {
 	local nginx_conf_dir="/etc/nginx/sites-available"
-	local ssl_dir="/etc/ssl"
+	local ssl_dir="/etc/ssl/sites"
 	local ssl_cert
 
 	nginx_config=$(select_from_dir "$nginx_conf_dir")
@@ -2034,8 +2034,9 @@ docker_install() {
 	# echo "deb [arch=$architecture signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $codename stable" |
 	#     tee /etc/apt/sources.list.d/docker.list >/dev/null
 	# apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-	apt-mark hold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	dpkg -l | grep -E 'docker|containerd' | grep '^ii' | awk '{print $2}' | xargs apt-mark hold
 	# apt-mark unhold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	# apt-mark unhold $(apt-mark showhold)
 }
 
 docker_remove() {
@@ -2313,8 +2314,8 @@ certbot_certificate_get() {
 
 	# Request the certificate (For debugging add: --dry-run -vvv)
 	if certbot certonly -n --dns-cloudflare -d "${domain_name},*.${domain_name}" --dns-cloudflare-propagation-seconds 20 --dns-cloudflare-credentials "${selected_config}" ${account}; then
-		mkdir -p /etc/ssl
-		ln -s "/etc/letsencrypt/live/${domain_name}" /etc/ssl/
+		mkdir -p /etc/ssl/sites
+		ln -s "/etc/letsencrypt/live/${domain_name}" /etc/ssl/sites/
 	fi
 
 	# --account <account-id or URI>
@@ -2495,7 +2496,7 @@ rsync_push_letsencrypt() {
 			user=root
 		fi
 	fi
-	rsync --log-file="/var/log/rsync/letsencrypt.log" -uahzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
+	rsync --log-file="/var/log/rsync/letsencrypt.log" -uahzPL "/etc/letsencrypt/live/${domain}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/sites/
 	echo "Log written to '/var/log/rsync/letsencrypt.log'"
 }
 
@@ -2504,7 +2505,7 @@ rsync_push_ssl() {
 
 	# 1. Check if path selection fails
 	if [[ -z "$path" ]]; then
-		path=$(select_from_dir "/etc/ssl/")
+		path=$(select_from_dir "/etc/ssl/sites/")
 		[[ -z "$path" ]] && return 1
 	fi
 
@@ -2529,7 +2530,7 @@ rsync_push_ssl() {
 	fi
 
 	# 3. Execute rsync and capture result
-	rsync --log-file="/var/log/rsync/push_ssl.log" -uahzPL "${path}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/
+	rsync --log-file="/var/log/rsync/push_ssl.log" -uahzPL "${path}" -e "ssh -p $port" "${user}@${host}":/etc/ssl/sites/
 	local exit_code=$?
 
 	if [[ $exit_code -eq 0 ]]; then
@@ -4933,6 +4934,9 @@ prowlarr_upgrade() {
 }
 
 qBittorrent_manage() {
+	local instance
+	read -rp "Enter instance number (leave blank for default) " instance
+
 	# https://github.com/userdocs/qbittorrent-nox-static/releases?q=4.6.7&expanded=true
 	# Function to display error message and exit
 	error_exit() {
@@ -4942,9 +4946,9 @@ qBittorrent_manage() {
 
 	# Create Systemd service for current user
 	# local service_dir="$HOME/.config/systemd/user"
-	local service_file="/etc/systemd/system/qbittorrent.service"
-	local install_dir="/opt/qBit"
-	local config_dir="/opt/qBit/qBittorrent/config"
+	local service_file="/etc/systemd/system/qbittorrent${instance}.service"
+	local install_dir="/opt/qBit${instance}"
+	local config_dir="${install_dir}/qBittorrent/config"
 
 	# Function to hash the password using PBKDF2
 	create_pass() {
@@ -4975,7 +4979,7 @@ qBittorrent_manage() {
 		wget -qO "$install_dir/qbittorrent-nox" "$download_url" || error_exit "Failed to download qBittorrent."
 		chmod +x "$install_dir/qbittorrent-nox" || error_exit "Failed to set permissions for qBittorrent."
 		chown qbittorrent:media -R "$install_dir"
-		systemctl restart qbittorrent.service && systemctl status qbittorrent.service
+		systemctl restart qbittorrent${instance}.service && systemctl status qbittorrent${instance}.service
 	}
 	# Function to install qBittorrent
 	install_qbittorrent() {
@@ -5110,7 +5114,7 @@ EOF
 		# mkdir -p "$service_dir" || error_exit "Failed to create systemd user service directory."
 		cat <<EOF >"$service_file"
 [Unit]
-Description=qBittorrent-nox service
+Description=qBittorrent-nox service ${instance}
 Wants=network-online.target
 After=network-online.target nss-lookup.target
 
@@ -5119,7 +5123,7 @@ Type=exec
 PrivateTmp=false
 ExecStart="$install_dir/qbittorrent-nox" --profile="$install_dir"
 Restart=on-failure
-SyslogIdentifier=qbittorrent-nox
+SyslogIdentifier=qbittorrent-nox${instance}
 User=qbittorrent
 Group=media
 
@@ -5133,7 +5137,7 @@ EOF
 		systemctl daemon-reload || error_exit "Failed to reload systemd daemon."
 
 		# Enable and start service
-		systemctl enable --now qbittorrent.service && systemctl status qbittorrent.service || error_exit "Failed to enable and start the service."
+		systemctl enable --now qbittorrent${instance}.service && systemctl status qbittorrent${instance}.service || error_exit "Failed to enable and start the service."
 
 		# Check service status
 		# systemctl --user status qbittorrent
@@ -5164,7 +5168,7 @@ EOF
 			echo "Aborting."
 			return 0
 		fi
-		systemctl stop qbittorrent.service
+		systemctl stop qbittorrent${instance}.service
 		rm "$service_file"
 		systemctl daemon-reload
 		rm -rf "$install_dir"
@@ -5216,16 +5220,16 @@ EOF
 		# Update Config File with new username and password
 		if [[ -f "$config_dir/qBittorrent.conf" ]]; then
 
-			systemctl stop qbittorrent.service || {
-				echo "Failed to stop qbittorrent.service"
+			systemctl stop qbittorrent${instance}.service || {
+				echo "Failed to stop qbittorrent${instance}.service"
 				return 1
 			}
 
 			qbit_config_set "WebUI\\Username" "$new_username" "$config_dir/qBittorrent.conf" || return 1
 			qbit_config_set "WebUI\\Password_PBKDF2" "$new_password_hash" "$config_dir/qBittorrent.conf" || return 1
 
-			systemctl start qbittorrent.service || {
-				echo "Failed to start qbittorrent.service"
+			systemctl start qbittorrent${instance}.service || {
+				echo "Failed to start qbittorrent${instance}.service"
 				return 1
 			}
 
@@ -5496,6 +5500,7 @@ main() {
 			echo "  rsync_push_letsencrypt <path> <host> <port> <user>"
 			echo "  rsync_push_ssl <path> <host> <port> <user>"
 			echo "  sys_init"
+			echo "  sys_init_php_nginx"
 			echo -e "\033[93m===============================\033[0m"
 
 			# Prompt the user for a choice
@@ -5657,6 +5662,14 @@ main "$@"
 # dig +tcp @1.1.1.1 google.com +tries=1 +time=2
 # dig -b binds the source IP so kernel chooses wg0 for the outgoing packet.
 # dig -b 192.168.. @1.1.1.1 google.com +tries=1 +time=2
+# Google's "o-o" (Out-of-Band) Tool
+# dig +short o-o.myaddr.l.google.com TXT
+
+# Check system's DNS
+# dig google.com | grep "SERVER"
+# resolvectl status
+# cat /etc/resolv.conf
+# systemd-resolve --status | grep "DNS Servers" -A2
 ##########################
 # Change System local/keyboard
 ##########################
@@ -5833,7 +5846,13 @@ main "$@"
 ##########################
 # journald
 ##########################
+# journalctl -f _COMM=dhcpcd
+# journalctl -f SYSLOG_IDENTIFIER=dhcpcd
+# journalctl -o short-precise SYSLOG_IDENTIFIER=dhcpcd
+
 # journalctl --disk-usage
+# Check the Allowed Limit
+# systemd-analyze cat-config systemd/journald.conf | grep Runtime
 
 # one-time operation, delete older logs
 # journalctl --vacuum-time=2weeks
@@ -5866,8 +5885,7 @@ main "$@"
 # Bind to an Interface
 # curl --interface enp7s0 ipinfo.io/ip
 # Bind to a Source IP
-# curl --interface 192.168.1.100 http://example.com
-
+# curl --interface 10.2.0.2 -H "Host: ifconfig.me" http://34.160.111.145
 # test and view your HTTP headers
 # curl  https://httpbin.org/headers
 ##########################
