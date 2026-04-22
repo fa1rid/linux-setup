@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="1.0.4"
+servo_version="1.0.5"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1597,7 +1597,7 @@ mariadb_server_install() {
 		if [[ $install_repo == "1" ]]; then
 			# Add MariaDB Repository
 			echo "Adding mariadb repo.."
-			curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- || {
+			curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- --skip-maxscale || {
 				echo "Failed adding Mariadb repo"
 				return 1
 			}
@@ -5670,6 +5670,18 @@ main "$@"
 # resolvectl status
 # cat /etc/resolv.conf
 # systemd-resolve --status | grep "DNS Servers" -A2
+
+# Test DNS overriding
+# nslookup wildcard.badssl.com: 104.154.89.105
+
+# http:
+# curl --socks5-hostname 127.0.0.1:10808 --resolve "ifconfig.me:80:104.154.89.105" "http://ifconfig.me/"
+# curl --resolve "ifconfig.me:80:104.154.89.105" "http://ifconfig.me/"
+
+# https
+# curl --socks5-hostname 127.0.0.1:10808 --resolve "ipinfo.io:443:104.154.89.105" "https://ipinfo.io/json"
+# curl -v --socks5-hostname 127.0.0.1:10808 "https://ipinfo.io/json"
+# curl -k --resolve "ipinfo.io:443:104.154.89.105" "https://ipinfo.io/json"
 ##########################
 # Change System local/keyboard
 ##########################
