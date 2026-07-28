@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="1.0.5"
+servo_version="1.0.7"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1027,12 +1027,12 @@ EOFX
 	cat >/etc/nginx/nginx.conf <<'EOTX'
 user www-data;
 worker_processes auto;
-worker_rlimit_nofile 20960;
+worker_rlimit_nofile 12000;
 pid /run/nginx.pid;
 include /etc/nginx/modules-enabled/*.conf;
 
 events {
-    worker_connections 2048;
+    worker_connections 5120;
     multi_accept        on; 
 }
 
@@ -1183,95 +1183,181 @@ nginx_restore_config() {
 }
 
 nginx_cloudflare_add() {
+	# Optional arg: Custom Docker container name (defaults to 'nginx')
+	local container_name="${1:-nginx}"
 	local cloudflare_script="/usr/local/bin/cloudflare_sync"
+	
+	# Safe fallback if your global cron_dir accidentally gets unset
+	local current_cron_dir="${cron_dir:-/etc/cron.d}"
+
+	local has_native=false
+	local has_docker=false
+
+	# 1. Auto-detect configurations
+	if [[ -d "/etc/nginx/conf.d" ]]; then
+		has_native=true
+		echo "Detected Native NGINX path (/etc/nginx/conf.d)."
+	fi
+
+	if [[ -d "/opt/nginx/settings.d" ]]; then
+		has_docker=true
+		echo "Detected Docker NGINX path (/opt/nginx/settings.d)."
+	fi
+
+	# 2. Warning and Fallback Prompt if nothing is detected
+	if [[ "$has_native" == false && "$has_docker" == false ]]; then
+		echo "WARNING: No NGINX configuration directories found."
+		echo " - Expected Native: /etc/nginx/conf.d"
+		echo " - Expected Docker: /opt/nginx/settings.d"
+		
+		read -r -p "Which environment do you want to force install? (native/docker/both/abort) [abort]: " force_choice
+		case "${force_choice,,}" in
+			native) has_native=true ;;
+			docker) has_docker=true ;;
+			both)   has_native=true; has_docker=true ;;
+			*) 
+				echo "Aborting Cloudflare setup."
+				return 1 
+				;;
+		esac
+	fi
+
+	# Create directories if forced by the prompt
+	[[ "$has_native" == true ]] && mkdir -p /etc/nginx/conf.d
+	[[ "$has_docker" == true ]] && mkdir -p /opt/nginx/settings.d
+
+	echo "Generating sync script at $cloudflare_script..."
+
+	# 3. Write the static header of the script
 	cat >"$cloudflare_script" <<'EOFX'
 #!/bin/bash
+# Strict mode: fail on error, undefined vars, or pipe failures
+set -euo pipefail
 
-CLOUDFLARE_FILE_PATH=/etc/nginx/conf.d/cloudflare.conf
+HASH_FILE="/var/tmp/cloudflare_hash"
+
+# Securely create and manage temp file. TRAP ensures it deletes on exit/error.
 TEMP_FILE=$(mktemp)
-HASH_FILE=/var/tmp/cloudflare_hash
+trap 'rm -f "$TEMP_FILE"' EXIT
 
-# Fetch new Cloudflare IPs and verify them
-new_ipv4=$(curl -sS https://www.cloudflare.com/ips-v4)
-new_ipv6=$(curl -sS https://www.cloudflare.com/ips-v6)
+# Targets array to hold "CONFIG_PATH|TEST_CMD|RELOAD_CMD"
+TARGETS=()
+EOFX
 
-if [[ -z $new_ipv4 || -z $new_ipv6 ]]; then
-    echo "Failed to fetch Cloudflare IPs. Aborting."
-    exit 1
+	# 4. Inject dynamically detected targets into the generated script
+	if [[ "$has_native" == true ]]; then
+		echo 'TARGETS+=("/etc/nginx/conf.d/cloudflare.conf|nginx -t|systemctl reload nginx")' >> "$cloudflare_script"
+	fi
+	if [[ "$has_docker" == true ]]; then
+		# Use double quotes here to evaluate the container_name variable
+		echo "TARGETS+=(\"/opt/nginx/settings.d/cloudflare.conf|docker exec ${container_name} nginx -t|docker exec ${container_name} nginx -s reload\")" >> "$cloudflare_script"
+	fi
+
+	# 5. Write the rest of the synchronization logic
+	cat >>"$cloudflare_script" <<'EOFX'
+fetch_ips() {
+	curl -fsSL --max-time 10 --retry 3 "$1"
+}
+
+echo "Fetching Cloudflare IPs..."
+new_ipv4=$(fetch_ips https://www.cloudflare.com/ips-v4 || true)
+new_ipv6=$(fetch_ips https://www.cloudflare.com/ips-v6 || true)
+
+# Validate that we actually got data, and it looks like IPs/CIDRs
+if ! echo "$new_ipv4" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+'; then
+	echo "Error: Invalid or missing IPv4 data received." >&2
+	exit 1
 fi
 
-# Calculate hashes of the new IPs
-new_hash=$(echo -n "$new_ipv4$new_ipv6" | sha256sum | cut -d ' ' -f 1)
-
-# Check if the IPs have changed
-if [ -f $HASH_FILE ] && [ "$(cat $HASH_FILE)" = "$new_hash" ]; then
-    echo "Cloudflare IPs have not changed. No update needed."
-    exit 0
+if ! echo "$new_ipv6" | grep -qE '^[0-9a-fA-F:]+/[0-9]+'; then
+	echo "Error: Invalid or missing IPv6 data received." >&2
+	exit 1
 fi
 
-# Write the new configuration to a temporary file
-echo "#Cloudflare" > $TEMP_FILE;
-echo "" >> $TEMP_FILE;
+# Calculate hash
+new_hash=$(echo -n "$new_ipv4$new_ipv6" | sha256sum | awk '{print $1}')
 
-echo "# - IPv4" >> $TEMP_FILE;
-echo "$new_ipv4" | while read -r i; do
-    echo "set_real_ip_from $i;" >> $TEMP_FILE;
+# Check if hash changed
+if [[ -f "$HASH_FILE" ]] && [[ "$(cat "$HASH_FILE")" == "$new_hash" ]]; then
+	echo "Cloudflare IPs have not changed. No update needed."
+	exit 0
+fi
+
+echo "IPs changed. Generating new configuration..."
+
+{
+	echo "# Cloudflare IPs (Auto-Updated)"
+	echo ""
+	echo "# - IPv4"
+	echo "$new_ipv4" | sed '/^[[:space:]]*$/d' | sed 's/^/set_real_ip_from /; s/$/;/'
+	echo ""
+	echo "# - IPv6"
+	echo "$new_ipv6" | sed '/^[[:space:]]*$/d' | sed 's/^/set_real_ip_from /; s/$/;/'
+	echo ""
+	echo "real_ip_header CF-Connecting-IP;"
+} > "$TEMP_FILE"
+
+SUCCESS_COUNT=0
+
+# Loop through Native, Docker, or Both
+for target in "${TARGETS[@]}"; do
+	IFS='|' read -r conf_path test_cmd reload_cmd <<< "$target"
+	
+	echo "Processing target: $conf_path"
+	
+	# Backup existing config
+	if [[ -f "$conf_path" ]]; then
+		cp "$conf_path" "${conf_path}.bak"
+	fi
+	
+	# Apply new config
+	cat "$TEMP_FILE" > "$conf_path"
+	
+	# Test configuration
+	if eval "$test_cmd"; then
+		echo "Test passed. Reloading NGINX..."
+		eval "$reload_cmd"
+		SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+	else
+		echo "NGINX configuration test failed for $conf_path! Rolling back..." >&2
+		if [[ -f "${conf_path}.bak" ]]; then
+			mv "${conf_path}.bak" "$conf_path"
+		else
+			rm -f "$conf_path"
+		fi
+	fi
 done
 
-echo "" >> $TEMP_FILE;
-echo "# - IPv6" >> $TEMP_FILE;
-echo "$new_ipv6" | while read -r i; do
-    echo "set_real_ip_from $i;" >> $TEMP_FILE;
-done
-
-echo "" >> $TEMP_FILE;
-echo "real_ip_header CF-Connecting-IP;" >> $TEMP_FILE;
-
-if [[ -f "$CLOUDFLARE_FILE_PATH" ]]; then
-    mv "$CLOUDFLARE_FILE_PATH" "${CLOUDFLARE_FILE_PATH}.bak"
-fi
-mv $TEMP_FILE $CLOUDFLARE_FILE_PATH
-
-# Test the new configuration
-nginx -t
-
-if [ $? -eq 0 ]; then
-    # Update the hash file with the new hash
-    echo "$new_hash" > $HASH_FILE
-
-    echo "Cloudflare IPs updated successfully."
-    systemctl reload nginx
+# If at least one environment updated successfully, save the new hash
+if [[ $SUCCESS_COUNT -gt 0 ]]; then
+	echo "$new_hash" > "$HASH_FILE"
+	echo "Cloudflare IPs updated successfully on $SUCCESS_COUNT environment(s)."
 else
-    echo "New configuration test failed. Rolling back."
-    if [[ -f "${CLOUDFLARE_FILE_PATH}.bak" ]]; then
-        mv "${CLOUDFLARE_FILE_PATH}.bak" "$CLOUDFLARE_FILE_PATH"
-    fi
-    exit 1
+	echo "All configured NGINX updates failed." >&2
+	exit 1
 fi
 EOFX
 
 	chmod 700 "$cloudflare_script"
+	
+	# 6. Run it once immediately
+	echo "Running initial Cloudflare sync..."
+	"$cloudflare_script"
 
-	echo "Fetching IPs from cloudflare.."
-	cloudflare_sync
-	# Add daily cron job
-	echo "Adding cron job.."
+	# 7. Setup Cron
+	echo "Configuring daily cron job..."
+	mkdir -p /var/log/nginx/
+	mkdir -p "$current_cron_dir"
 
-	if [[ ! -d "/var/log/nginx/" ]]; then
-		mkdir -p /var/log/nginx/
-	fi
+	local cron_file="${current_cron_dir}/cloudflare"
+	cat > "$cron_file" <<EOF
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 1 * * * root $cloudflare_script >> /var/log/nginx/cloudflare.log 2>&1
+EOF
+	chmod 644 "$cron_file"
 
-	echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >"${cron_dir}/cloudflare"
-	echo "30 1 * * * root ${cloudflare_script} >> /var/log/nginx/cloudflare.log 2>&1" >>"${cron_dir}/cloudflare"
-	chmod 644 "${cron_dir}/cloudflare"
-	# cat "${cron_dir}"/* | crontab -
-	echo -e "cat ${cron_dir}/cloudflare\n"
-	cat "${cron_dir}/cloudflare"
-	# crontab -l
-	# Jobs inside "/etc/cron.d/" directory are monitored for changes
-	# /etc/init.d/cron reload
-	# systemctl restart cron
-	# /var/spool/cron/crontabs
+	echo "Installation complete. Cron file contents:"
+	cat "$cron_file"
 }
 
 nginx_cert_install() {
@@ -2113,10 +2199,10 @@ wordpress_install() {
 	local DB_NAME="wp_${hex}"
 	local DB_USER="wp_${hex}"
 	local DB_PASS
-	DB_PASS=$(openssl rand -base64 12)
+	DB_PASS=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 16)
 	local WP_ADMIN_USER="admin"
 	local WP_ADMIN_PASS
-	WP_ADMIN_PASS=$(openssl rand -base64 12)
+	WP_ADMIN_PASS=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 16)
 
 	local WP_ADMIN_EMAIL="user@example.com"
 	local WP_URL="${wpURL}"
@@ -3326,8 +3412,8 @@ net_tune_kernel() {
 
 	# Tune Kernel
 	echo "------------- Adding -------------"
-	# echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
-	echo "net.ipv4.ip_local_port_range = 16384 60999" | tee /etc/sysctl.d/tune_kernel.conf
+	echo "net.ipv4.ip_local_port_range = 1024 65535" | tee /etc/sysctl.d/tune_kernel.conf
+	# echo "net.ipv4.ip_local_port_range = 16384 60999" | tee /etc/sysctl.d/tune_kernel.conf
 	echo "net.ipv4.tcp_congestion_control = bbr" | tee -a /etc/sysctl.d/tune_kernel.conf
 	echo "net.core.default_qdisc = fq_codel" | tee -a /etc/sysctl.d/tune_kernel.conf
 	echo "net.ipv4.tcp_fastopen = 3" | tee -a /etc/sysctl.d/tune_kernel.conf
@@ -5005,7 +5091,11 @@ qBittorrent_manage() {
 				break
 				;;
 			3)
-				local version="release-5.1.2_v1.2.20"
+				local version="release-5.1.4_v1.2.20"
+				break
+				;;
+			4)
+				local version="release-5.2.3_v1.2.20"
 				break
 				;;
 			*)
@@ -5328,10 +5418,10 @@ nodejs_install() {
 		;;
 	esac
 	# Add NodeSource repository
-	curl -fsSL https://deb.nodesource.com/setup_$VERSION.x | bash -s -- || {
-		echo "Failed adding repo"
+	if ! bash <(curl -fsSL https://deb.nodesource.com/setup_24.x) -s -- || [ ! -f /etc/apt/sources.list.d/nodesource.sources ]; then
+		echo "Failed adding repo (Script failed or exited with 0 incorrectly)"
 		return 1
-	}
+	fi
 	# Install Node.js and npm
 	apt-get install -y nodejs && echo "Node.js version $VERSION.x has been installed."
 }
@@ -5665,6 +5755,10 @@ main "$@"
 # Google's "o-o" (Out-of-Band) Tool
 # dig +short o-o.myaddr.l.google.com TXT
 
+# Check HTTPS DNS
+# dig HTTPS amp-api-edge.apps.apple.com @8.8.8.8
+# dig HTTPS amp-api-edge.apps.apple.com @127.0.0.1
+
 # Check system's DNS
 # dig google.com | grep "SERVER"
 # resolvectl status
@@ -5674,14 +5768,26 @@ main "$@"
 # Test DNS overriding
 # nslookup wildcard.badssl.com: 104.154.89.105
 
+# Direct Origin Request via cURL Host Resolution (Bypassing CDN via --resolve) Omit the Response Body:
+# Either use -I (HEAD request), OR Windows: -o NUL | Linux: -o /dev/null OR | head -n 10 (first 10 lines) | head -c 300 (first 300 bytes)
+# -H "Accept-Encoding: zstd, br, gzip"
+# curl -v --resolve example.com:8443:IP https://example.com:8443/
+
 # http:
 # curl --socks5-hostname 127.0.0.1:10808 --resolve "ifconfig.me:80:104.154.89.105" "http://ifconfig.me/"
 # curl --resolve "ifconfig.me:80:104.154.89.105" "http://ifconfig.me/"
 
 # https
-# curl --socks5-hostname 127.0.0.1:10808 --resolve "ipinfo.io:443:104.154.89.105" "https://ipinfo.io/json"
+# Use SOCKS5 Address Type 3 (Domain Name).
+# curl --socks5-hostname 127.0.0.1:10808 "https://ipinfo.io/json"
+
+# Use SOCKS5 Address Type 1 (IPv4)
+# curl --socks5 127.0.0.1:1014 --resolve "ipinfo.io:443:34.117.59.81" "https://ipinfo.io/json"
+
 # curl -v --socks5-hostname 127.0.0.1:10808 "https://ipinfo.io/json"
 # curl -k --resolve "ipinfo.io:443:104.154.89.105" "https://ipinfo.io/json"
+
+# curl --interface wgcf1 https://1.1.1.1/cdn-cgi/trace
 ##########################
 # Change System local/keyboard
 ##########################
@@ -5876,6 +5982,8 @@ main "$@"
 # echo "RuntimeMaxUse=200M" | tee -a /etc/systemd/journald.conf
 # Make journald store logs only in RAM
 # echo "Storage=volatile" | tee -a /etc/systemd/journald.conf
+
+# APPLY changes
 # systemctl restart systemd-journald
 ##########################
 # makemkv
@@ -5962,6 +6070,23 @@ main "$@"
 # apt install linux-image-amd64 && apt autoremove purge linux-image-cloud-amd64
 # or
 # apt install linux-image-amd64 && apt purge linux-image-cloud-amd64 linux-image-6.12.xx+deb13-cloud-amd64*
+##########################
+# Docker
+##########################
+# To track down  which Docker container is running a process
+# for container in $(docker ps -q); do 
+#     if docker top "$container" | grep -q "SET_PID_HERE"; then 
+#         echo "Found it! Container ID/Name:"
+#         docker ps --filter "id=$container" --format "table {{.ID}}\t{{.Names}}\t{{.Status}}"
+#     fi
+# done
+
+# query Docker to list all running containers alongside their host PIDs:
+# docker inspect --format '{{.State.Pid}} {{.Name}}' $(docker ps -q)
+##########################
+# Quick HTTP server
+##########################
+# runuser -u nobody -- python3 -m http.server PORT
 ##########################
 #
 ##########################
