@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="1.0.8"
+servo_version="1.0.9"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -1240,17 +1240,16 @@ HASH_FILE="/var/tmp/cloudflare_hash"
 TEMP_FILE=$(mktemp)
 trap 'rm -f "$TEMP_FILE"' EXIT
 
-# Targets array to hold "CONFIG_PATH|TEST_CMD|RELOAD_CMD"
+# Targets array to hold "ENV_TYPE|CONFIG_PATH|CONTAINER_NAME"
 TARGETS=()
 EOFX
 
 	# 4. Inject dynamically detected targets into the generated script
 	if [[ "$has_native" == true ]]; then
-		echo 'TARGETS+=("/etc/nginx/conf.d/cloudflare.conf|nginx -t|systemctl reload nginx")' >> "$cloudflare_script"
+		echo 'TARGETS+=("native|/etc/nginx/conf.d/cloudflare.conf|")' >> "$cloudflare_script"
 	fi
 	if [[ "$has_docker" == true ]]; then
-		# Use double quotes here to evaluate the container_name variable
-		echo "TARGETS+=(\"/opt/nginx/settings.d/cloudflare.conf|docker exec ${container_name} nginx -t|docker exec ${container_name} nginx -s reload\")" >> "$cloudflare_script"
+		echo "TARGETS+=(\"docker|/opt/nginx/settings.d/cloudflare.conf|${container_name}\")" >> "$cloudflare_script"
 	fi
 
 	# 5. Write the rest of the synchronization logic
@@ -1301,9 +1300,13 @@ SUCCESS_COUNT=0
 
 # Loop through Native, Docker, or Both
 for target in "${TARGETS[@]}"; do
-	IFS='|' read -r conf_path test_cmd reload_cmd <<< "$target"
+	IFS='|' read -r env_type conf_path c_name <<< "$target"
 	
-	echo "Processing target: $conf_path"
+	echo "----------------------------------------"
+	echo "Processing [$env_type] target: $conf_path"
+	
+	# Edge Case: Directory was manually deleted between cron runs
+	mkdir -p "$(dirname "$conf_path")"
 	
 	# Backup existing config
 	if [[ -f "$conf_path" ]]; then
@@ -1313,20 +1316,57 @@ for target in "${TARGETS[@]}"; do
 	# Apply new config
 	cat "$TEMP_FILE" > "$conf_path"
 	
-	# Test configuration
-	if eval "$test_cmd"; then
-		echo "Test passed. Reloading NGINX..."
-		eval "$reload_cmd"
-		SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-	else
-		echo "NGINX configuration test failed for $conf_path! Rolling back..." >&2
-		if [[ -f "${conf_path}.bak" ]]; then
-			mv "${conf_path}.bak" "$conf_path"
+	test_cmd=""
+	reload_cmd=""
+	can_test=true
+
+	# State Checks to handle stopped services/containers gracefully
+	if [[ "$env_type" == "docker" ]]; then
+		if ! docker info >/dev/null 2>&1; then
+			echo "Warning: Docker daemon is down. Config saved for next boot."
+			can_test=false
+		elif ! docker inspect -f '{{.State.Running}}' "$c_name" >/dev/null 2>&1; then
+			echo "Warning: Container '$c_name' is missing or stopped. Config saved for next boot."
+			can_test=false
 		else
-			rm -f "$conf_path"
+			test_cmd="docker exec $c_name nginx -t"
+			reload_cmd="docker exec $c_name nginx -s reload"
+		fi
+	else
+		# Native NGINX check
+		if ! command -v nginx >/dev/null 2>&1; then
+			echo "Warning: Native NGINX binary not found. Config saved."
+			can_test=false
+		else
+			test_cmd="nginx -t"
+			reload_cmd="systemctl reload nginx"
 		fi
 	fi
+
+	# Perform Test & Reload if capable
+	if [[ "$can_test" == true ]]; then
+		if eval "$test_cmd"; then
+			echo "Test passed. Reloading NGINX..."
+			if eval "$reload_cmd"; then
+				echo "Reload successful."
+			else
+				echo "Warning: Reload failed (NGINX might be stopped). Config is saved." >&2
+			fi
+			SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+		else
+			echo "NGINX configuration test failed for $conf_path! Rolling back..." >&2
+			if [[ -f "${conf_path}.bak" ]]; then
+				mv "${conf_path}.bak" "$conf_path"
+			else
+				rm -f "$conf_path"
+			fi
+		fi
+	else
+		# If we couldn't test because it's stopped, we assume the auto-generated IP file is safe.
+		SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+	fi
 done
+echo "----------------------------------------"
 
 # If at least one environment updated successfully, save the new hash
 if [[ $SUCCESS_COUNT -gt 0 ]]; then
