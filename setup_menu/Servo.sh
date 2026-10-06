@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="1.0.9"
+servo_version="1.1.0"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -28,7 +28,7 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
 		if ((cword == 2)); then
 			case "${prev}" in
 			compress)
-				local formats="zip tar gz bz2 xz 7z"
+				local formats="zip tar gz bz2 xz zstd 7z"
 				COMPREPLY=($(compgen -W "${formats}" -- ${cur}))
 				return
 				;;
@@ -2669,15 +2669,9 @@ rsync_push_ssl() {
 }
 
 compress() {
-	# Validate the availability of compression methods
-	local commands=("zip" "tar" "gzip" "bzip2" "xz" "7z")
-	for cmd in "${commands[@]}"; do
-		validate_command "$cmd" || return 1
-	done
-
 	if [ "$#" -ne 2 ]; then
 		echo "Insufficient number of arguments. Usage: $0 compress [format] [path]"
-		exit 1
+		return 1
 	fi
 	local format=$1
 	local path=$2
@@ -2703,6 +2697,8 @@ compress() {
 
 	case $format in
 	"zip")
+		validate_command "7z" || return 1
+
 		# if [ -d "$path" ]; then
 		#     zip -r "$path.zip" "$path"
 		# else
@@ -2710,38 +2706,53 @@ compress() {
 		# fi
 		7z a -tzip -mx=5 "$path.zip" "$path" # mx5 still better and faster than zip -9
 		;;
-	"tar") tar -cvf "$path.tar" "$path" ;;
+	"tar")
+		validate_command "tar" || return 1
+		tar -cf "$path.tar" "$path"
+		;;
 	"gz")
+		validate_command "gzip" || return 1
 		if [ -d "$path" ]; then
-			tar -czvf "$path.tar.gz" "$path"
+			validate_command "tar" || return 1
+			tar -czf "$path.tar.gz" "$path"
 		else
 			gzip -c "$path" >"$path.gz"
 		fi
 		;;
 	"bz2")
+		validate_command "bzip2" || return 1
 		if [ -d "$path" ]; then
-			tar -cjvf "$path.tar.bz2" "$path"
+			validate_command "tar" || return 1
+			tar -cjf "$path.tar.bz2" "$path"
 		else
 			bzip2 -c "$path" >"$path.bz2"
 		fi
 		;;
 	"xz")
+		validate_command "xz" || return 1
 		if [ -d "$path" ]; then
-			tar -cJvf "$path.tar.xz" "$path"
+			validate_command "tar" || return 1
+			tar -cJf "$path.tar.xz" "$path"
 		else
 			xz -c "$path" >"$path.xz"
 		fi
 		;;
+	"zstd")
+		validate_command "zstd" || return 1
+		if [ -d "$path" ]; then
+			validate_command "tar" || return 1
+			(set -o pipefail; tar -cf - "$path" | zstd -o "$path.tar.zst") || return 1
+		else
+			zstd -c "$path" >"$path.zst"
+		fi
+		;;
 	"7z")
+		validate_command "7z" || return 1
+
 		while true; do
 			read -rp "Enter compression level for 7z: [0|1|3|5|7|9]: " level
 			case $level in
-			0) break ;;
-			1) break ;;
-			3) break ;;
-			5) break ;;
-			7) break ;;
-			9) break ;;
+			0 | 1 | 3 | 5 | 7 | 9) break ;;
 			*) echo "Invalid choice." ;;
 			esac
 		done
@@ -2753,17 +2764,11 @@ compress() {
 }
 
 decompress() {
-	# Validate the availability of compression methods
-	# Validate the availability of compression methods
-	local commands=("unzip" "tar" "gzip" "bzip2" "xz" "7z")
-	for cmd in "${commands[@]}"; do
-		validate_command "$cmd" || return 1
-	done
-
 	if [ "$#" -ne 1 ]; then
 		echo "Insufficient number of arguments. Usage: $0 decompress [path]"
-		exit 1
+		return 1
 	fi
+
 	detect_format() {
 		local file_path=$1
 		local extension="${file_path##*.}"
@@ -2774,6 +2779,7 @@ decompress() {
 		"gz") echo "gz" ;;
 		"bz2") echo "bz2" ;;
 		"xz") echo "xz" ;;
+		"zst" | "zstd") echo "zstd" ;;
 		"7z") echo "7z" ;;
 		*)
 			local file_type=$(file -b "$file_path" | awk '{print $1}')
@@ -2784,12 +2790,14 @@ decompress() {
 			"gzip") echo "gz" ;;
 			"bzip2") echo "bz2" ;;
 			"XZ") echo "xz" ;;
+			"Zstandard") echo "zstd" ;;
 			"7-zip") echo "7z" ;;
 			*) echo "Unknown" ;;
 			esac
 			;;
 		esac
 	}
+
 	local format path=$1
 
 	if ! file_exists "$path"; then
@@ -2804,13 +2812,55 @@ decompress() {
 	fi
 
 	case $format in
-	"zip") unzip "$path" ;;
-	"tar") tar -xvf "$path" ;;
-	"gz") tar -xzvf "$path" ;;
-	"bz2") tar -xjvf "$path" ;;
-	"xz") tar -xJvf "$path" ;;
-	"7z") 7z x "$path" ;;
-	*) echo "Invalid compression format." ;;
+	"zip")
+		validate_command "unzip" || return 1
+		unzip -q "$path"
+		;;
+	"tar")
+		validate_command "tar" || return 1
+		tar -xf "$path"
+		;;
+	"gz")
+		validate_command "gzip" || return 1
+		if [[ "$path" == *.tar.gz || "$path" == *.tgz ]]; then
+			validate_command "tar" || return 1
+			tar -xzf "$path"
+		else
+			gzip -dk "$path"
+		fi
+		;;
+	"bz2")
+		validate_command "bzip2" || return 1
+		if [[ "$path" == *.tar.bz2 || "$path" == *.tbz2 ]]; then
+			validate_command "tar" || return 1
+			tar -xjf "$path"
+		else
+			bzip2 -dk "$path"
+		fi
+		;;
+	"xz")
+		validate_command "xz" || return 1
+		if [[ "$path" == *.tar.xz || "$path" == *.txz ]]; then
+			validate_command "tar" || return 1
+			tar -xJf "$path"
+		else
+			xz -dk "$path"
+		fi
+		;;
+	"zstd")
+		validate_command "zstd" || return 1
+		if [[ "$path" == *.tar.zst || "$path" == *.tar.zstd ]]; then
+			validate_command "tar" || return 1
+			(set -o pipefail; zstd -q -dc "$path" | tar -xf -) || return 1
+		else
+			zstd -q -d "$path"
+		fi
+		;;
+	"7z")
+		validate_command "7z" || return 1
+		7z x -bb0 "$path"
+		;;
+	*) echo "Invalid compression format."; return 1 ;;
 	esac
 }
 
@@ -2829,9 +2879,9 @@ comp_manage() {
 		0) return 0 ;;
 		1)
 			while true; do
-				read -rp "Enter compression format (zip, tar, gz, bz2, xz, 7z): " format
+				read -rp "Enter compression format (zip, tar, gz, bz2, xz, zstd, 7z): " format
 				case $format in
-				"zip" | "tar" | "gz" | "bz2" | "xz" | "7z") break ;;
+				"zip" | "tar" | "gz" | "bz2" | "xz" | "zstd" | "7z") break ;;
 				*)
 					echo "Invalid compression format."
 					;;
@@ -5463,7 +5513,7 @@ nodejs_install() {
 		return 1
 	fi
 	# Install Node.js and npm
-	apt-get install -y nodejs && echo "Node.js version $VERSION.x has been installed."
+	apt-get install -y nodejs && echo "Node.js version $VERSION.x has been installed." && npm config set dangerously-allow-all-scripts true --location=user
 }
 
 sys_more_pkg_install() {
@@ -5519,6 +5569,69 @@ EOL
 	systemctl daemon-reload
 	systemctl enable udiskie
 	systemctl restart udiskie
+}
+
+git_manage() {
+	while true; do
+		echo -e "\033[33m"
+		echo "Choose an option:"
+		echo "1. git_remove_folder_history"
+		echo "0. Quit"
+		echo -e "\033[0m"
+		read -rp "Enter your choice: " choice
+
+		case $choice in
+		1) git_remove_folder_history ;;
+		0) return 0 ;;
+		*) echo "Invalid choice." ;;
+		esac
+	done
+}
+
+git_remove_folder_history() {
+	local folder
+
+	# Ensure git-filter-repo is installed
+	if ! command -v git-filter-repo >/dev/null 2>&1; then
+		echo "git-filter-repo is not installed. Installing..."
+
+		if [[ "$(id -u)" -eq 0 ]]; then
+			apt-get update
+			apt-get install -y git-filter-repo
+		else
+			su -c 'apt-get update && apt-get install -y git-filter-repo'
+		fi
+
+		if ! command -v git-filter-repo >/dev/null 2>&1; then
+			echo "Failed to install git-filter-repo."
+			return 1
+		fi
+	fi
+
+	# Ensure we're inside a Git repository
+	if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+		echo "Not inside a Git repository."
+		return 1
+	fi
+
+	read -rp "Folder to remove from Git history: " folder
+
+	# Normalize path
+	folder="${folder#./}"
+	folder="${folder#/}"
+	folder="${folder%/}"
+
+	if [[ -z "$folder" || "$folder" == "." ]]; then
+		echo "Invalid folder."
+		return 1
+	fi
+
+	git filter-repo \
+		--path "$folder/" \
+		--invert-paths \
+		--force
+
+	echo "Removed '$folder/' from Git history."
 }
 
 # Function to check for updates
@@ -5599,7 +5712,8 @@ main() {
 			"nodejs_manage              | Node.js"
 			"media_manage               | Media"
 			"perm_set                   | Files/Folders Permissions"
-			"rr_manage                    | Manage *rr apps"
+			"rr_manage                  | Manage *rr apps"
+			"git_manage                  | Git"
 		)
 		# Alternative way of spliting menu
 		# awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//'
@@ -5624,7 +5738,7 @@ main() {
 			echo "  db_backup [database_name] [save_location]"
 			echo "  db_restore [database_name] [db_filename]"
 			echo "  decompress [filename]"
-			echo "  compress [7z   bz2  gz   tar  xz   zip] [filename]"
+			echo "  compress [7z   bz2  gz   tar  xz   zstd   zip] [filename]"
 			echo "  gen_pass [length] [min_numbers] [min_special_chars]"
 			echo "  perm_set <target> <user> <group>"
 			echo "  rsync_push_letsencrypt <path> <host> <port> <user>"
@@ -5863,8 +5977,9 @@ main "$@"
 #-----------------------------------
 # Rsync daemon "/etc/rsyncd.conf"
 # Example Usage:
+# --inplace OR --append
 # rsync rsync://server.net/
-# rsync -ahPL "rsync://server.net/downloads/video.mkv" ./folder/
+# rsync -avhL --progress --partial-dir=.rsync-partial "rsync://server.net/downloads/video.mkv" ./folder/
 # (uses port 873)
 ##########################
 # NGINX
@@ -6048,6 +6163,12 @@ main "$@"
 # curl --interface 10.2.0.2 -H "Host: ifconfig.me" http://34.160.111.145
 # test and view your HTTP headers
 # curl  https://httpbin.org/headers
+
+# Use proxy such as Charles
+# curl --proxy http://127.0.0.1:8888 --cacert ./charles.pem https://jsonip.com
+# Resolve IP locally, then pass it to curl
+# TARGET_IP=$(dig +short jsonip.com | tail -n 1)
+# curl --proxy http://127.0.0.1:8888 --cacert ./charles.pem --resolve jsonip.com:443:$TARGET_IP \https://jsonip.com
 ##########################
 # wget
 ##########################
