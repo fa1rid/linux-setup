@@ -8,7 +8,7 @@
 #  - SC2207: Prefer mapfile or read -a to split command output (or quote to avoid splitting).
 #  - SC2254: Quote expansions in case patterns to match literally rather than as a glob.
 #
-servo_version="1.1.0"
+servo_version="1.1.1"
 # curl -H "Cache-Control: no-cache" -sS "https://raw.githubusercontent.com/fa1rid/linux-setup/main/setup_menu/Servo.sh" -o /usr/local/bin/Servo.sh && chmod +x /usr/local/bin/Servo.sh
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -29,7 +29,7 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
 			case "${prev}" in
 			compress)
 				local formats="zip tar gz bz2 xz zstd 7z"
-				COMPREPLY=($(compgen -W "${formats}" -- ${cur}))
+				COMPREPLY=($(compgen -W "${formats}" -- "${cur}"))
 				return
 				;;
 				# decompress)
@@ -2163,6 +2163,22 @@ docker_install() {
 	dpkg -l | grep -E 'docker|containerd' | grep '^ii' | awk '{print $2}' | xargs apt-mark hold
 	# apt-mark unhold docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 	# apt-mark unhold $(apt-mark showhold)
+
+	mkdir -p /etc/docker
+	cat >/etc/docker/daemon.json <<'EOF'
+{
+  "log-driver": "local",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3",
+    "mode": "non-blocking",
+    "max-buffer-size": "4m"
+  }
+}
+EOF
+	systemctl restart docker
+	echo "Docker logging driver:"
+	docker info --format '{{.LoggingDriver}}'
 }
 
 docker_remove() {
@@ -2741,9 +2757,9 @@ compress() {
 		validate_command "zstd" || return 1
 		if [ -d "$path" ]; then
 			validate_command "tar" || return 1
-			(set -o pipefail; tar -cf - "$path" | zstd -o "$path.tar.zst") || return 1
+			tar -I 'zstd -8' -cf "$path.tar.zst" "$path"
 		else
-			zstd -c "$path" >"$path.zst"
+			zstd -8 -c "$path" >"$path.zst"
 		fi
 		;;
 	"7z")
@@ -2851,9 +2867,9 @@ decompress() {
 		validate_command "zstd" || return 1
 		if [[ "$path" == *.tar.zst || "$path" == *.tar.zstd ]]; then
 			validate_command "tar" || return 1
-			(set -o pipefail; zstd -q -dc "$path" | tar -xf -) || return 1
+			tar --zstd -xf "$path"
 		else
-			zstd -q -d "$path"
+			zstd -q -dk "$path"
 		fi
 		;;
 	"7z")
@@ -4252,6 +4268,7 @@ sys_std_pkg_install() {
 		whiptail \
 		iputils-ping \
 		apt-utils \
+		zstd \
 		less
 	# net-tools \
 
